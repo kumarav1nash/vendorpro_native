@@ -79,7 +79,18 @@ export default function LoginScreen() {
         mobile,
       };
       await AsyncStorage.setItem('user', JSON.stringify(userData));
-      router.replace('/(tabs)/dashboard');
+      
+      // Check if shop details exist
+      const shopDetails = await AsyncStorage.getItem('shopDetails');
+      const onboardingComplete = await AsyncStorage.getItem('onboardingComplete');
+      
+      if (shopDetails && onboardingComplete) {
+        // If onboarding is complete, go to dashboard
+        router.replace('/(tabs)/dashboard');
+      } else {
+        // If onboarding is not complete, redirect to onboarding
+        router.replace('/(onboarding)/shop-details');
+      }
     } catch (err) {
       setError('Invalid OTP. Please try again.');
     } finally {
