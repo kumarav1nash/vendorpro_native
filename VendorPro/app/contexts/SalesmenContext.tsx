@@ -1,54 +1,56 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Salesman type definition
 export type Salesman = {
   id: string;
+  shopId: string;
   name: string;
   mobile: string;
-  username: string;
-  password: string; // In a real app, this should be hashed
-  commissionRate: number; // Percentage of sales
-  isActive: boolean;
-  createdAt: number;
-  updatedAt: number;
-  totalSales?: number; // Calculated value
-  totalCommission?: number; // Calculated value
+  username?: string;
+  commissionRate: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type SalesmenContextType = {
   salesmen: Salesman[];
-  isLoading: boolean;
+  addSalesman: (salesman: Salesman) => Promise<void>;
+  updateSalesman: (salesman: Salesman) => Promise<void>;
+  deleteSalesman: (salesmanId: string) => Promise<void>;
+  getShopSalesmen: (shopId: string) => Salesman[];
+  getSalesmanById: (salesmanId: string) => Salesman | undefined;
   loadSalesmen: () => Promise<void>;
-  saveSalesmen: (updatedSalesmen: Salesman[]) => Promise<void>;
-  addSalesman: (salesman: Omit<Salesman, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
-  updateSalesman: (id: string, updates: Partial<Omit<Salesman, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<void>;
-  deleteSalesman: (id: string) => Promise<void>;
 };
 
 const SalesmenContext = createContext<SalesmenContextType | undefined>(undefined);
 
+export const useSalesmen = () => {
+  const context = useContext(SalesmenContext);
+  if (!context) {
+    throw new Error('useSalesmen must be used within a SalesmenProvider');
+  }
+  return context;
+};
+
 export const SalesmenProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [salesmen, setSalesmen] = useState<Salesman[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadSalesmen();
   }, []);
 
   const loadSalesmen = async () => {
-    setIsLoading(true);
     try {
-      const savedSalesmen = await AsyncStorage.getItem('salesmen');
-      
-      if (savedSalesmen) {
-        const parsedSalesmen = JSON.parse(savedSalesmen) as Salesman[];
-        setSalesmen(parsedSalesmen);
+      const salesmenData = await AsyncStorage.getItem('salesmen');
+      if (salesmenData) {
+        setSalesmen(JSON.parse(salesmenData));
+      } else {
+        // Initialize with empty array if no data
+        await AsyncStorage.setItem('salesmen', JSON.stringify([]));
+        setSalesmen([]);
       }
     } catch (error) {
       console.error('Error loading salesmen:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -58,64 +60,55 @@ export const SalesmenProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setSalesmen(updatedSalesmen);
     } catch (error) {
       console.error('Error saving salesmen:', error);
-      throw error;
     }
   };
 
-  const addSalesman = async (salesman: Omit<Salesman, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const timestamp = Date.now();
-    const newSalesman: Salesman = {
-      ...salesman,
-      id: `salesman-${timestamp}`,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    
-    const updatedSalesmen = [...salesmen, newSalesman];
-    await saveSalesmen(updatedSalesmen);
+  const addSalesman = async (salesman: Salesman) => {
+    try {
+      const updatedSalesmen = [...salesmen, salesman];
+      await saveSalesmen(updatedSalesmen);
+    } catch (error) {
+      console.error('Error adding salesman:', error);
+    }
   };
 
-  const updateSalesman = async (id: string, updates: Partial<Omit<Salesman, 'id' | 'createdAt' | 'updatedAt'>>) => {
-    const timestamp = Date.now();
-    const updatedSalesmen = salesmen.map(salesman => 
-      salesman.id === id 
-        ? { 
-            ...salesman, 
-            ...updates, 
-            updatedAt: timestamp 
-          } 
-        : salesman
-    );
-    
-    await saveSalesmen(updatedSalesmen);
+  const updateSalesman = async (updatedSalesman: Salesman) => {
+    try {
+      const updatedSalesmen = salesmen.map(salesman => 
+        salesman.id === updatedSalesman.id ? updatedSalesman : salesman
+      );
+      await saveSalesmen(updatedSalesmen);
+    } catch (error) {
+      console.error('Error updating salesman:', error);
+    }
   };
 
-  const deleteSalesman = async (id: string) => {
-    const updatedSalesmen = salesmen.filter(salesman => salesman.id !== id);
-    await saveSalesmen(updatedSalesmen);
+  const deleteSalesman = async (salesmanId: string) => {
+    try {
+      const updatedSalesmen = salesmen.filter(salesman => salesman.id !== salesmanId);
+      await saveSalesmen(updatedSalesmen);
+    } catch (error) {
+      console.error('Error deleting salesman:', error);
+    }
   };
 
-  return (
-    <SalesmenContext.Provider 
-      value={{ 
-        salesmen, 
-        isLoading, 
-        loadSalesmen, 
-        saveSalesmen,
-        addSalesman,
-        updateSalesman,
-        deleteSalesman
-      }}
-    >
-      {children}
-    </SalesmenContext.Provider>
-  );
-};
+  const getShopSalesmen = (shopId: string) => {
+    return salesmen.filter(salesman => salesman.shopId === shopId);
+  };
 
-export const useSalesmen = () => {
-  const context = useContext(SalesmenContext);
-  if (context === undefined) {
-    throw new Error('useSalesmen must be used within a SalesmenProvider');
-  }
-  return context;
+  const getSalesmanById = (salesmanId: string) => {
+    return salesmen.find(salesman => salesman.id === salesmanId);
+  };
+
+  const value = {
+    salesmen,
+    addSalesman,
+    updateSalesman,
+    deleteSalesman,
+    getShopSalesmen,
+    getSalesmanById,
+    loadSalesmen,
+  };
+
+  return <SalesmenContext.Provider value={value}>{children}</SalesmenContext.Provider>;
 }; 
