@@ -31,7 +31,7 @@ type Sale = {
   quantity: number;
   salePrice: number;
   totalAmount: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'completed' | 'rejected';
   salesmanId: string;
   salesmanName: string;
   timestamp: number;
@@ -61,7 +61,7 @@ export default function SalesScreen() {
     salePrice: 0,
   });
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
@@ -224,7 +224,7 @@ export default function SalesScreen() {
   };
 
   // Update sale status (for owner)
-  const handleUpdateSaleStatus = async (saleId: string, newStatus: 'approved' | 'rejected', rejectionReason?: string) => {
+  const handleUpdateSaleStatus = async (saleId: string, newStatus: 'completed' | 'rejected', rejectionReason?: string) => {
     try {
       // Find the sale to be updated
       const saleToUpdate = sales.find(sale => sale.id === saleId);
@@ -312,7 +312,7 @@ export default function SalesScreen() {
   const renderSaleItem = ({ item }: { item: Sale }) => {
     const statusColors = {
       pending: '#FFC107',
-      approved: '#4CAF50',
+      completed: '#4CAF50',
       rejected: '#F44336',
     };
     
@@ -378,7 +378,7 @@ export default function SalesScreen() {
             
             <TouchableOpacity
               style={[styles.actionButton, styles.approveButton]}
-              onPress={() => handleUpdateSaleStatus(item.id, 'approved')}
+              onPress={() => handleUpdateSaleStatus(item.id, 'completed')}
             >
               <MaterialCommunityIcons name="check" size={16} color="#fff" />
               <Text style={styles.actionButtonText}>Approve</Text>
@@ -414,12 +414,12 @@ export default function SalesScreen() {
   const getSummaryData = () => {
     const totalSales = filteredSales.length;
     const pendingSales = filteredSales.filter(sale => sale.status === 'pending').length;
-    const approvedSales = filteredSales.filter(sale => sale.status === 'approved').length;
+    const completedSales = filteredSales.filter(sale => sale.status === 'completed').length;
     const totalRevenue = filteredSales
-      .filter(sale => sale.status === 'approved')
+      .filter(sale => sale.status === 'completed')
       .reduce((sum, sale) => sum + sale.totalAmount, 0);
     
-    return { totalSales, pendingSales, approvedSales, totalRevenue };
+    return { totalSales, pendingSales, completedSales, totalRevenue };
   };
 
   // Main render
@@ -496,17 +496,17 @@ export default function SalesScreen() {
           <TouchableOpacity
             style={[
               styles.filterButton,
-              filterStatus === 'approved' && styles.filterButtonActive
+              filterStatus === 'completed' && styles.filterButtonActive
             ]}
-            onPress={() => setFilterStatus('approved')}
+            onPress={() => setFilterStatus('completed')}
           >
             <Text 
               style={[
                 styles.filterButtonText,
-                filterStatus === 'approved' && styles.filterButtonTextActive
+                filterStatus === 'completed' && styles.filterButtonTextActive
               ]}
             >
-              Approved
+              Completed
             </Text>
           </TouchableOpacity>
           
@@ -533,7 +533,7 @@ export default function SalesScreen() {
       {!isLoading && (
         <View style={styles.summaryContainer}>
           {(() => {
-            const { totalSales, pendingSales, approvedSales, totalRevenue } = getSummaryData();
+            const { totalSales, pendingSales, completedSales, totalRevenue } = getSummaryData();
             return (
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={[styles.summaryCard, { backgroundColor: '#E3F2FD' }]}>
@@ -547,8 +547,8 @@ export default function SalesScreen() {
                 </View>
                 
                 <View style={[styles.summaryCard, { backgroundColor: '#E8F5E9' }]}>
-                  <Text style={styles.summaryValue}>{approvedSales}</Text>
-                  <Text style={styles.summaryLabel}>Approved</Text>
+                  <Text style={styles.summaryValue}>{completedSales}</Text>
+                  <Text style={styles.summaryLabel}>Completed</Text>
                 </View>
                 
                 <View style={[styles.summaryCard, { backgroundColor: '#F3E5F5' }]}>
