@@ -11,7 +11,7 @@ type User = {
 };
 
 export const unstable_settings = {
-  initialRouteName: '(auth)/register',
+  initialRouteName: '(auth)/login',
 };
 
 function useProtectedRoute() {
@@ -24,8 +24,8 @@ function useProtectedRoute() {
       const isAuth = segments[0];
       
       if (!userSession && isAuth !== '(auth)') {
-        // Redirect to the sign-in page if not authenticated
-        router.replace('/register');
+        // Redirect to the login page if not authenticated
+        router.replace('/login');
       } else if (userSession && isAuth === '(auth)') {
         // Redirect to the dashboard if authenticated
         router.replace('/dashboard');

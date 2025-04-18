@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
-import { router } from 'expo-router';
+import { router, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function RegisterScreen() {
@@ -10,6 +10,22 @@ export default function RegisterScreen() {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [timer, setTimer] = useState(0);
+
+  useEffect(() => {
+    if (timer > 0) {
+      const interval = setInterval(() => {
+        setTimer((prevTimer) => prevTimer - 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [timer]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleSendOTP = async () => {
     if (!name.trim() || !mobile.trim() || mobile.length !== 10) {
@@ -19,11 +35,25 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       // TODO: Implement your OTP sending logic here
-      // For demo purposes, we'll just move to the next step
       setError('');
       setStep(2);
+      setTimer(30); // Start 30-second timer for resend
     } catch (err) {
       setError('Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (timer > 0) return;
+    setLoading(true);
+    try {
+      // TODO: Implement your OTP resend logic here
+      setTimer(30); // Restart timer
+      setError('');
+    } catch (err) {
+      setError('Failed to resend OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -37,7 +67,6 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       // TODO: Implement your OTP verification logic here
-      // For demo purposes, we'll just store the user data and redirect
       const userData = {
         name,
         mobile,
@@ -53,15 +82,19 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Shop Owner Registration</Text>
+      <View style={styles.logoContainer}>
+        <Text style={styles.logoText}>VendorPro</Text>
+        <Text style={styles.tagline}>Manage your business efficiently</Text>
+      </View>
       
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {step === 1 ? (
         <View style={styles.form}>
+          <Text style={styles.label}>Create your account</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter your name"
+            placeholder="Enter your full name"
             value={name}
             onChangeText={setName}
             autoCapitalize="words"
@@ -105,11 +138,30 @@ export default function RegisterScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Verify OTP</Text>
+              <Text style={styles.buttonText}>Create Account</Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.resendButton, timer > 0 && styles.resendButtonDisabled]}
+            onPress={handleResendOTP}
+            disabled={timer > 0 || loading}
+          >
+            <Text style={[styles.resendText, timer > 0 && styles.resendTextDisabled]}>
+              {timer > 0 ? `Resend OTP in ${formatTime(timer)}` : 'Resend OTP'}
+            </Text>
           </TouchableOpacity>
         </View>
       )}
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Already have an account? </Text>
+        <Link href="/login" asChild>
+          <TouchableOpacity>
+            <Text style={styles.loginLink}>Login here</Text>
+          </TouchableOpacity>
+        </Link>
+      </View>
     </View>
   );
 }
@@ -120,6 +172,20 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#fff',
     justifyContent: 'center',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 50,
+  },
+  logoText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 8,
+  },
+  tagline: {
+    fontSize: 16,
+    color: '#666',
   },
   title: {
     fontSize: 24,
@@ -135,6 +201,13 @@ const styles = StyleSheet.create({
   form: {
     width: '100%',
   },
+  label: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 20,
+    color: '#333',
+    textAlign: 'center',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -142,6 +215,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 15,
     fontSize: 16,
+    backgroundColor: '#f8f8f8',
   },
   button: {
     backgroundColor: '#007AFF',
@@ -154,9 +228,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  resendButton: {
+    marginTop: 15,
+    padding: 10,
+    alignItems: 'center',
+  },
+  resendButtonDisabled: {
+    opacity: 0.6,
+  },
+  resendText: {
+    color: '#007AFF',
+    fontSize: 14,
+  },
+  resendTextDisabled: {
+    color: '#666',
+  },
   error: {
     color: 'red',
     marginBottom: 15,
     textAlign: 'center',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 30,
+  },
+  footerText: {
+    color: '#666',
+  },
+  loginLink: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
 }); 
