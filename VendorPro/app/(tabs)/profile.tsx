@@ -192,6 +192,38 @@ export default function ProfileScreen() {
         )}
 
         <TouchableOpacity
+          style={[styles.actionButton, styles.setupButton]}
+          onPress={() => {
+            Alert.alert(
+              'Shop Setup',
+              'Do you want to go through the shop setup process again?',
+              [
+                {
+                  text: 'Cancel',
+                  style: 'cancel',
+                },
+                {
+                  text: 'Continue',
+                  onPress: async () => {
+                    try {
+                      // Remove onboarding complete flag to trigger setup flow
+                      await AsyncStorage.removeItem('onboardingComplete');
+                      router.replace('/(onboarding)/shop-details');
+                    } catch (error) {
+                      console.error('Error initiating setup:', error);
+                      Alert.alert('Error', 'Failed to start setup process');
+                    }
+                  },
+                },
+              ]
+            );
+          }}
+        >
+          <MaterialCommunityIcons name="store-settings" size={20} color="#007AFF" />
+          <Text style={styles.setupButtonText}>Shop Setup</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={styles.logoutButton}
           onPress={handleLogout}
         >
@@ -329,6 +361,25 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 16,
     fontWeight: '600',
+    marginLeft: 10,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginTop: 20,
+  },
+  setupButton: {
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  setupButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '500',
     marginLeft: 10,
   },
 }); 

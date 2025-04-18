@@ -1,26 +1,29 @@
+import React, { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
-import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function Index() {
   const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasShopDetails, setHasShopDetails] = useState(false);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const user = await AsyncStorage.getItem('user');
-      setIsAuthenticated(!!user);
-    } catch (error) {
-      console.error('Error checking auth:', error);
-    } finally {
-      setIsLoading(false);
+    async function checkOnboardingStatus() {
+      try {
+        // Check if shop details exist
+        const shopDetails = await AsyncStorage.getItem('shopDetails');
+        const onboardingComplete = await AsyncStorage.getItem('onboardingComplete');
+        
+        setHasShopDetails(!!shopDetails && !!onboardingComplete);
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
-  };
+
+    checkOnboardingStatus();
+  }, []);
 
   if (isLoading) {
     return (
@@ -30,5 +33,11 @@ export default function Index() {
     );
   }
 
-  return isAuthenticated ? <Redirect href="/(tabs)/dashboard" /> : <Redirect href="/(auth)/login" />;
+  // If shop details don't exist, redirect to onboarding
+  if (!hasShopDetails) {
+    return <Redirect href="/(onboarding)/shop-details" />;
+  }
+
+  // If shop details exist, redirect to dashboard
+  return <Redirect href="/(tabs)/dashboard" />;
 }
