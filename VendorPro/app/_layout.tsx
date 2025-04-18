@@ -3,6 +3,7 @@ import "./globals.css";
 import { useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Define session context type
 type User = {
@@ -40,9 +41,12 @@ export default function RootLayout() {
   useProtectedRoute();
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <SafeAreaProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(onboarding)" />
+      </Stack>
+    </SafeAreaProvider>
   );
 }
