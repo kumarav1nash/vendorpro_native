@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ProductProvider } from './contexts/ProductContext';
 import { SalesProvider } from './contexts/SalesContext';
+import { SalesmenProvider } from './contexts/SalesmenContext';
 
 // Define session context type
 type User = {
@@ -27,11 +28,16 @@ function useProtectedRoute() {
       const userSession = await AsyncStorage.getItem('user');
       const isAuth = segments[0];
       
+      // Don't interfere with salesman routes
+      if (isAuth === '(salesman)') {
+        return;
+      }
+      
       if (!userSession && isAuth !== '(auth)') {
         // Redirect to the login page if not authenticated
         router.replace('/login');
-      } else if (userSession && isAuth === '(auth)') {
-        // Redirect to the tabs if authenticated
+      } else if (userSession && isAuth === '(auth)' && segments[1] !== 'salesman-login') {
+        // Redirect to the tabs if authenticated - but only if not on salesman login
         router.replace('/(tabs)/dashboard');
       }
     };
@@ -46,12 +52,15 @@ export default function RootLayout() {
   return (
     <ProductProvider>
       <SalesProvider>
-        <StatusBar style="auto" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="(onboarding)" />
-        </Stack>
+        <SalesmenProvider>
+          <StatusBar style="auto" />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="(onboarding)" />
+            <Stack.Screen name="(salesman)" />
+          </Stack>
+        </SalesmenProvider>
       </SalesProvider>
     </ProductProvider>
   );
