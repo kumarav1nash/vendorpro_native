@@ -10,10 +10,11 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  Switch,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSalesmen, Salesman } from '../../contexts/SalesmenContext';
-import { useSales, Sale } from '../../contexts/SalesContext';
+import { useSales } from '../../contexts/SalesContext';
 
 type SalesmenTabProps = {
   shopId: string;
@@ -44,7 +45,9 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     name: '',
     mobile: '',
     username: '',
+    password: '',
     commissionRate: '',
+    isActive: true,
   });
   
   // Performance metrics state
@@ -86,7 +89,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     setIsLoading(false);
   };
   
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     setSalesmanForm({ ...salesmanForm, [field]: value });
   };
   
@@ -127,7 +130,9 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       name: salesmanForm.name,
       mobile: salesmanForm.mobile,
       username: salesmanForm.username || undefined,
+      password: salesmanForm.password || undefined,
       commissionRate: salesmanForm.commissionRate ? parseFloat(salesmanForm.commissionRate) : 0,
+      isActive: salesmanForm.isActive,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -149,7 +154,9 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       name: salesmanForm.name,
       mobile: salesmanForm.mobile,
       username: salesmanForm.username || undefined,
+      password: salesmanForm.password ? salesmanForm.password : currentSalesman.password,
       commissionRate: salesmanForm.commissionRate ? parseFloat(salesmanForm.commissionRate) : 0,
+      isActive: salesmanForm.isActive,
       updatedAt: new Date().toISOString(),
     };
     
@@ -207,7 +214,9 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       name: salesman.name,
       mobile: salesman.mobile,
       username: salesman.username || '',
+      password: '',
       commissionRate: salesman.commissionRate ? salesman.commissionRate.toString() : '',
+      isActive: salesman.isActive !== undefined ? salesman.isActive : true,
     });
     setIsModalVisible(true);
   };
@@ -217,7 +226,9 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       name: '',
       mobile: '',
       username: '',
+      password: '',
       commissionRate: '',
+      isActive: true,
     });
     setCurrentSalesman(null);
   };
@@ -246,8 +257,39 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     setShowPerformanceModal(true);
   };
   
+  // Generate a random password
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    handleInputChange('password', password);
+  };
+
+  // Generate a username based on name
+  const generateUsername = () => {
+    if (!salesmanForm.name.trim()) {
+      Alert.alert('Error', 'Please enter salesman name first');
+      return;
+    }
+    
+    // Create username from name (first name + first letter of last name if exists)
+    const nameParts = salesmanForm.name.trim().toLowerCase().split(' ');
+    let username = nameParts[0];
+    
+    if (nameParts.length > 1) {
+      username += nameParts[nameParts.length - 1].charAt(0);
+    }
+    
+    // Add random number to make it unique
+    username += Math.floor(Math.random() * 100);
+    
+    handleInputChange('username', username);
+  };
+  
   const renderSalesmanItem = ({ item }: { item: Salesman }) => (
-    <View style={styles.salesmanItem}>
+    <View style={[styles.salesmanItem, !item.isActive && styles.inactiveSalesman]}>
       <View style={styles.salesmanHeader}>
         <View>
           <Text style={styles.salesmanName}>{item.name}</Text>
@@ -291,6 +333,13 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
         </View>
         
         <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Status:</Text>
+          <View style={[styles.statusBadge, item.isActive ? styles.activeBadge : styles.inactiveBadge]}>
+            <Text style={styles.statusText}>{item.isActive ? 'Active' : 'Inactive'}</Text>
+          </View>
+        </View>
+        
+        <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Joined:</Text>
           <Text style={styles.detailValue}>
             {new Date(item.createdAt).toLocaleDateString('en-IN')}
@@ -320,6 +369,11 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearch}>
+              <MaterialCommunityIcons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
         </View>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <MaterialCommunityIcons name="plus" size={20} color="#fff" />
@@ -389,13 +443,36 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
               </View>
               
               <View style={styles.formField}>
-                <Text style={styles.label}>Username</Text>
+                <View style={styles.usernameContainer}>
+                  <Text style={styles.label}>Username</Text>
+                  <TouchableOpacity onPress={generateUsername}>
+                    <Text style={styles.generateText}>Generate</Text>
+                  </TouchableOpacity>
+                </View>
                 <TextInput
                   style={styles.input}
                   placeholder="Username (optional)"
                   value={salesmanForm.username}
                   onChangeText={(value) => handleInputChange('username', value)}
                   autoCapitalize="none"
+                />
+              </View>
+              
+              <View style={styles.formField}>
+                <View style={styles.usernameContainer}>
+                  <Text style={styles.label}>
+                    {isEditMode ? 'New Password' : 'Password'}
+                  </Text>
+                  <TouchableOpacity onPress={generatePassword}>
+                    <Text style={styles.generateText}>Generate</Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={styles.input}
+                  placeholder={isEditMode ? "Leave blank to keep current" : "Enter password (optional)"}
+                  value={salesmanForm.password}
+                  onChangeText={(value) => handleInputChange('password', value)}
+                  secureTextEntry={true}
                 />
               </View>
               
@@ -408,6 +485,19 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
                   onChangeText={(value) => handleInputChange('commissionRate', value)}
                   keyboardType="numeric"
                 />
+              </View>
+              
+              <View style={styles.formField}>
+                <View style={styles.switchContainer}>
+                  <Text style={styles.label}>Active Status</Text>
+                  <Switch
+                    trackColor={{ false: "#ccc", true: "#007AFF" }}
+                    thumbColor="#fff"
+                    ios_backgroundColor="#ccc"
+                    onValueChange={(value) => handleInputChange('isActive', value)}
+                    value={salesmanForm.isActive}
+                  />
+                </View>
               </View>
               
               <TouchableOpacity
@@ -551,6 +641,9 @@ const styles = StyleSheet.create({
     height: 36,
     fontSize: 14,
   },
+  clearSearch: {
+    padding: 4,
+  },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -579,6 +672,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  inactiveSalesman: {
+    borderLeftColor: '#ccc',
+    opacity: 0.7,
   },
   salesmanHeader: {
     flexDirection: 'row',
@@ -621,6 +720,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  activeBadge: {
+    backgroundColor: '#4CAF50',
+  },
+  inactiveBadge: {
+    backgroundColor: '#999',
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '500',
   },
   emptyState: {
     flex: 1,
@@ -675,6 +790,12 @@ const styles = StyleSheet.create({
   formField: {
     marginBottom: 16,
   },
+  usernameContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   label: {
     fontSize: 14,
     fontWeight: '500',
@@ -688,12 +809,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
   },
+  generateText: {
+    color: '#007AFF',
+    fontSize: 14,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   submitButton: {
     backgroundColor: '#007AFF',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 20,
   },
   submitButtonText: {
     color: '#fff',
