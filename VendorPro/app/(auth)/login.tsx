@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { router, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
   const [step, setStep] = useState(1);
@@ -98,6 +99,10 @@ export default function LoginScreen() {
     }
   };
 
+  const goToSalesmanLogin = () => {
+    router.push('/(auth)/salesman-login');
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
@@ -173,6 +178,11 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </Link>
       </View>
+
+      <TouchableOpacity style={styles.salesmanLoginButton} onPress={goToSalesmanLogin}>
+        <MaterialCommunityIcons name="account-tie" size={20} color="#fff" style={styles.salesmanIcon} />
+        <Text style={styles.salesmanLoginText}>Salesman Login</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -250,12 +260,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   resendTextDisabled: {
-    color: '#666',
+    color: '#999',
   },
   error: {
     color: 'red',
-    marginBottom: 15,
     textAlign: 'center',
+    marginBottom: 20,
   },
   footer: {
     flexDirection: 'row',
@@ -267,6 +277,23 @@ const styles = StyleSheet.create({
   },
   registerLink: {
     color: '#007AFF',
+    fontWeight: '600',
+  },
+  salesmanLoginButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 30,
+  },
+  salesmanIcon: {
+    marginRight: 8,
+  },
+  salesmanLoginText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
   },
 }); 
