@@ -9,7 +9,7 @@ export default function Index() {
         alignItems: "center",
       }}
     >
-      <Text>Welcome to VendorPro.</Text>
+      <Text>VendorPro.</Text>
     </View>
   );
 }
