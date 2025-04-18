@@ -1,6 +1,6 @@
 import { Stack } from "expo-router";
 import "./globals.css";
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -27,8 +27,8 @@ function useProtectedRoute() {
         // Redirect to the login page if not authenticated
         router.replace('/login');
       } else if (userSession && isAuth === '(auth)') {
-        // Redirect to the dashboard if authenticated
-        router.replace('/dashboard');
+        // Redirect to the tabs if authenticated
+        router.replace('/(tabs)/dashboard');
       }
     };
 
@@ -38,5 +38,11 @@ function useProtectedRoute() {
 
 export default function RootLayout() {
   useProtectedRoute();
-  return <Slot />;
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
+  );
 }

@@ -30,5 +30,5 @@ export default function Index() {
     );
   }
 
-  return isAuthenticated ? <Redirect href="/dashboard" /> : <Redirect href="/login" />;
+  return isAuthenticated ? <Redirect href="/(tabs)/dashboard" /> : <Redirect href="/(auth)/login" />;
 }

@@ -72,7 +72,7 @@ export default function RegisterScreen() {
         mobile,
       };
       await AsyncStorage.setItem('user', JSON.stringify(userData));
-      router.replace('/dashboard');
+      router.replace('/(tabs)/dashboard');
     } catch (err) {
       setError('Invalid OTP. Please try again.');
     } finally {
