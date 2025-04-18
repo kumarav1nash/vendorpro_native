@@ -4,6 +4,9 @@ import { useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { ProductProvider } from './contexts/ProductContext';
+import { SalesProvider } from './contexts/SalesContext';
 
 // Define session context type
 type User = {
@@ -41,12 +44,15 @@ export default function RootLayout() {
   useProtectedRoute();
 
   return (
-    <SafeAreaProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="(onboarding)" />
-      </Stack>
-    </SafeAreaProvider>
+    <ProductProvider>
+      <SalesProvider>
+        <StatusBar style="auto" />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="(onboarding)" />
+        </Stack>
+      </SalesProvider>
+    </ProductProvider>
   );
 }
