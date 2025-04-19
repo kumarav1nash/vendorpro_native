@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -51,29 +52,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="inventory"
+        name="shops"
         options={{
-          title: 'Inventory',
+          title: 'Shops',
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="package-variant" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="sales"
-        options={{
-          title: 'Sales',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cash-register" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="salesmen"
-        options={{
-          title: 'Salesmen',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-group" size={size} color={color} />
+            <MaterialCommunityIcons name="store" size={size} color={color} />
           ),
         }}
       />

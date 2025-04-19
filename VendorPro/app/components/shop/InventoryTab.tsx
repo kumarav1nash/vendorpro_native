@@ -13,62 +13,55 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { useProducts, Product } from '../../contexts/ProductContext';
 
-// Product type definition
-type Product = {
-  id: string;
-  name: string;
-  basePrice: number;
-  sellingPrice: number;
-  quantity: number;
-  imageUri?: string;
-  createdAt: number;
-  updatedAt: number;
+type InventoryTabProps = {
+  shopId: string;
 };
 
-// Form state type for adding/editing products
-type ProductForm = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
-
-export default function InventoryScreen() {
+export default function InventoryTab({ shopId }: InventoryTabProps) {
+  const { products, addProduct, updateProduct, deleteProduct, getShopProducts } = useProducts();
+  
   // State management
-  const [products, setProducts] = useState<Product[]>([]);
+  const [shopProducts, setShopProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState<ProductForm>({
-    name: '',
-    basePrice: 0,
-    sellingPrice: 0,
-    quantity: 0,
-    imageUri: '',
-  });
+  const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'quantity'>('name');
   const [filterLowStock, setFilterLowStock] = useState(false);
+  const [productForm, setProductForm] = useState({
+    name: '',
+    basePrice: '',
+    sellingPrice: '',
+    quantity: '',
+    imageUri: '',
+    category: '',
+    description: '',
+    unit: '',
+  });
 
   // Constants
   const LOW_STOCK_THRESHOLD = 5;
 
   // Load products on component mount
   useEffect(() => {
-    loadProducts();
-  }, []);
+    loadInventory();
+  }, [shopId, products]);
 
   // Filter products when search query changes
   useEffect(() => {
-    if (searchQuery.trim() === '' && !filterLowStock) {
-      setFilteredProducts(products);
-    } else {
-      let filtered = products;
+    if (shopProducts.length > 0) {
+      let filtered = [...shopProducts];
       
       // Apply search filter
       if (searchQuery.trim() !== '') {
         filtered = filtered.filter(product => 
-          product.name.toLowerCase().includes(searchQuery.toLowerCase())
+          product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (product.category?.toLowerCase() || '').includes(searchQuery.toLowerCase())
         );
       }
       
@@ -79,7 +72,7 @@ export default function InventoryScreen() {
       
       setFilteredProducts(filtered);
     }
-  }, [searchQuery, products, filterLowStock]);
+  }, [searchQuery, shopProducts, filterLowStock]);
 
   // Sort products when sort criteria changes
   useEffect(() => {
@@ -96,17 +89,13 @@ export default function InventoryScreen() {
     setFilteredProducts(sortedProducts);
   }, [sortBy]);
 
-  // Load products from storage
-  const loadProducts = async () => {
+  // Load inventory from context
+  const loadInventory = () => {
     setIsLoading(true);
     try {
-      const savedProducts = await AsyncStorage.getItem('products');
-      
-      if (savedProducts) {
-        const parsedProducts = JSON.parse(savedProducts) as Product[];
-        setProducts(parsedProducts);
-        setFilteredProducts(parsedProducts);
-      }
+      const productsForShop = getShopProducts(shopId);
+      setShopProducts(productsForShop);
+      setFilteredProducts(productsForShop);
     } catch (error) {
       console.error('Error loading products:', error);
       Alert.alert('Error', 'Failed to load products');
@@ -115,74 +104,84 @@ export default function InventoryScreen() {
     }
   };
 
-  // Save products to storage
-  const saveProducts = async (updatedProducts: Product[]) => {
-    try {
-      await AsyncStorage.setItem('products', JSON.stringify(updatedProducts));
-      setProducts(updatedProducts);
-      setFilteredProducts(updatedProducts);
-    } catch (error) {
-      console.error('Error saving products:', error);
-      Alert.alert('Error', 'Failed to save products');
-    }
+  // Handle input change
+  const handleInputChange = (field: string, value: string) => {
+    setProductForm({ ...productForm, [field]: value });
   };
 
-  // Add or update a product
-  const handleSubmit = () => {
+  // Form validation
+  const validateForm = () => {
     // Validate the form
-    if (!currentProduct.name.trim()) {
+    if (!productForm.name.trim()) {
       Alert.alert('Error', 'Product name is required');
-      return;
+      return false;
     }
     
-    if (currentProduct.basePrice <= 0) {
+    if (!productForm.basePrice || isNaN(parseFloat(productForm.basePrice)) || parseFloat(productForm.basePrice) <= 0) {
       Alert.alert('Error', 'Base price must be greater than 0');
-      return;
+      return false;
     }
     
-    if (currentProduct.sellingPrice <= 0) {
+    if (!productForm.sellingPrice || isNaN(parseFloat(productForm.sellingPrice)) || parseFloat(productForm.sellingPrice) <= 0) {
       Alert.alert('Error', 'Selling price must be greater than 0');
-      return;
+      return false;
     }
     
-    if (currentProduct.quantity < 0) {
+    if (!productForm.quantity || isNaN(parseInt(productForm.quantity)) || parseInt(productForm.quantity) < 0) {
       Alert.alert('Error', 'Quantity cannot be negative');
-      return;
+      return false;
     }
 
-    const timestamp = Date.now();
+    return true;
+  };
+
+  // Submit form
+  const handleSubmit = () => {
+    if (!validateForm()) return;
+
+    const timestamp = new Date().toISOString();
     
-    if (isEditing) {
+    if (isEditing && currentProduct) {
       // Update existing product
-      const productId = (currentProduct as any).id;
-      const updatedProducts = products.map(p => 
-        p.id === productId 
-          ? { 
-              ...p, 
-              ...currentProduct, 
-              updatedAt: timestamp 
-            } 
-          : p
-      );
+      const updatedProduct: Product = {
+        ...currentProduct,
+        name: productForm.name,
+        basePrice: parseFloat(productForm.basePrice),
+        sellingPrice: parseFloat(productForm.sellingPrice),
+        quantity: parseInt(productForm.quantity),
+        imageUri: productForm.imageUri || undefined,
+        category: productForm.category || undefined,
+        description: productForm.description || undefined,
+        unit: productForm.unit || undefined,
+        updatedAt: timestamp
+      };
       
-      saveProducts(updatedProducts);
+      updateProduct(updatedProduct);
       Alert.alert('Success', 'Product updated successfully');
     } else {
       // Add new product
       const newProduct: Product = {
-        ...currentProduct,
-        id: `product-${timestamp}`,
+        id: Date.now().toString(),
+        shopId: shopId,
+        name: productForm.name,
+        basePrice: parseFloat(productForm.basePrice),
+        sellingPrice: parseFloat(productForm.sellingPrice),
+        quantity: parseInt(productForm.quantity),
+        imageUri: productForm.imageUri || undefined,
+        category: productForm.category || undefined,
+        description: productForm.description || undefined,
+        unit: productForm.unit || undefined,
         createdAt: timestamp,
         updatedAt: timestamp,
       };
       
-      const updatedProducts = [...products, newProduct];
-      saveProducts(updatedProducts);
+      addProduct(newProduct);
       Alert.alert('Success', 'Product added successfully');
     }
     
     setShowModal(false);
     resetForm();
+    loadInventory();
   };
 
   // Delete a product
@@ -198,9 +197,10 @@ export default function InventoryScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            const updatedProducts = products.filter(p => p.id !== id);
-            await saveProducts(updatedProducts);
+          onPress: () => {
+            deleteProduct(id);
+            Alert.alert('Success', 'Product deleted successfully');
+            loadInventory();
           },
         },
       ]
@@ -209,36 +209,47 @@ export default function InventoryScreen() {
 
   // Edit a product
   const handleEdit = (product: Product) => {
-    setCurrentProduct({ ...product });
+    setCurrentProduct(product);
+    setProductForm({
+      name: product.name,
+      basePrice: product.basePrice.toString(),
+      sellingPrice: product.sellingPrice.toString(),
+      quantity: product.quantity.toString(),
+      imageUri: product.imageUri || '',
+      category: product.category || '',
+      description: product.description || '',
+      unit: product.unit || '',
+    });
     setIsEditing(true);
     setShowModal(true);
   };
 
   // Reset the form
   const resetForm = () => {
-    setCurrentProduct({
+    setProductForm({
       name: '',
-      basePrice: 0,
-      sellingPrice: 0,
-      quantity: 0,
+      basePrice: '',
+      sellingPrice: '',
+      quantity: '',
       imageUri: '',
+      category: '',
+      description: '',
+      unit: '',
     });
     setIsEditing(false);
+    setCurrentProduct(null);
   };
-
-  // Request permission to access the gallery
-  useEffect(() => {
-    (async () => {
-      const galleryStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (galleryStatus.status !== 'granted') {
-        Alert.alert('Permission required', 'Please allow access to your photo library to add product images.');
-      }
-    })();
-  }, []);
 
   // Pick an image from the gallery
   const pickImage = async () => {
     try {
+      // Request permission if not already granted
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission required', 'Please allow access to your photo library to add product images.');
+        return;
+      }
+      
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -247,10 +258,7 @@ export default function InventoryScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setCurrentProduct({
-          ...currentProduct,
-          imageUri: result.assets[0].uri,
-        });
+        handleInputChange('imageUri', result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -277,7 +285,7 @@ export default function InventoryScreen() {
         
         <View style={styles.productDetails}>
           <Text style={styles.productName}>{item.name}</Text>
-          <Text style={styles.productPrice}>₹{item.sellingPrice} <Text style={styles.basePrice}>(Base: ₹{item.basePrice})</Text></Text>
+          <Text style={styles.productPrice}>₹{item.sellingPrice.toFixed(2)} <Text style={styles.basePrice}>(Base: ₹{item.basePrice.toFixed(2)})</Text></Text>
           <View style={styles.quantityContainer}>
             <Text 
               style={[
@@ -285,7 +293,7 @@ export default function InventoryScreen() {
                 isLowStock && styles.lowStockText
               ]}
             >
-              Qty: {item.quantity}
+              Qty: {item.quantity} {item.unit || ''}
             </Text>
             {isLowStock && (
               <View style={styles.lowStockBadge}>
@@ -308,10 +316,6 @@ export default function InventoryScreen() {
   // Main component render
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Inventory Management</Text>
-      </View>
-      
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#666" />
@@ -476,8 +480,8 @@ export default function InventoryScreen() {
                 <Text style={styles.label}>Product Name*</Text>
                 <TextInput
                   style={styles.input}
-                  value={currentProduct.name}
-                  onChangeText={(text) => setCurrentProduct({ ...currentProduct, name: text })}
+                  value={productForm.name}
+                  onChangeText={(text) => handleInputChange('name', text)}
                   placeholder="Enter product name"
                 />
               </View>
@@ -487,11 +491,8 @@ export default function InventoryScreen() {
                   <Text style={styles.label}>Base Price (₹)*</Text>
                   <TextInput
                     style={styles.input}
-                    value={currentProduct.basePrice.toString()}
-                    onChangeText={(text) => {
-                      const basePrice = text.trim() === '' ? 0 : parseFloat(text);
-                      setCurrentProduct({ ...currentProduct, basePrice });
-                    }}
+                    value={productForm.basePrice}
+                    onChangeText={(text) => handleInputChange('basePrice', text)}
                     keyboardType="numeric"
                     placeholder="0.00"
                   />
@@ -501,43 +502,70 @@ export default function InventoryScreen() {
                   <Text style={styles.label}>Selling Price (₹)*</Text>
                   <TextInput
                     style={styles.input}
-                    value={currentProduct.sellingPrice.toString()}
-                    onChangeText={(text) => {
-                      const sellingPrice = text.trim() === '' ? 0 : parseFloat(text);
-                      setCurrentProduct({ ...currentProduct, sellingPrice });
-                    }}
+                    value={productForm.sellingPrice}
+                    onChangeText={(text) => handleInputChange('sellingPrice', text)}
                     keyboardType="numeric"
                     placeholder="0.00"
                   />
                 </View>
               </View>
               
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.label}>Quantity*</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={productForm.quantity}
+                    onChangeText={(text) => handleInputChange('quantity', text)}
+                    keyboardType="numeric"
+                    placeholder="0"
+                  />
+                </View>
+                
+                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.label}>Unit</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={productForm.unit}
+                    onChangeText={(text) => handleInputChange('unit', text)}
+                    placeholder="e.g. pcs, kg, etc."
+                  />
+                </View>
+              </View>
+              
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Quantity*</Text>
+                <Text style={styles.label}>Category</Text>
                 <TextInput
                   style={styles.input}
-                  value={currentProduct.quantity.toString()}
-                  onChangeText={(text) => {
-                    const quantity = text.trim() === '' ? 0 : parseInt(text, 10);
-                    setCurrentProduct({ ...currentProduct, quantity });
-                  }}
-                  keyboardType="numeric"
-                  placeholder="0"
+                  value={productForm.category}
+                  onChangeText={(text) => handleInputChange('category', text)}
+                  placeholder="Product category"
+                />
+              </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Description</Text>
+                <TextInput
+                  style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                  value={productForm.description}
+                  onChangeText={(text) => handleInputChange('description', text)}
+                  placeholder="Product description"
+                  multiline
                 />
               </View>
               
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Product Image (Optional)</Text>
                 <View style={styles.imagePickerContainer}>
-                  {currentProduct.imageUri ? (
+                  {productForm.imageUri ? (
                     <View style={styles.imagePreviewContainer}>
                       <Image 
-                        source={{ uri: currentProduct.imageUri }} 
+                        source={{ uri: productForm.imageUri }} 
                         style={styles.imagePreview} 
                       />
                       <TouchableOpacity 
                         style={styles.removeImageButton}
-                        onPress={() => setCurrentProduct({ ...currentProduct, imageUri: '' })}
+                        onPress={() => handleInputChange('imageUri', '')}
                       >
                         <MaterialCommunityIcons name="close-circle" size={24} color="#FF3B30" />
                       </TouchableOpacity>
@@ -557,7 +585,7 @@ export default function InventoryScreen() {
                   onPress={pickImage}
                 >
                   <Text style={styles.imagePickerLinkText}>
-                    {currentProduct.imageUri ? 'Change Image' : 'Add Image from Gallery'}
+                    {productForm.imageUri ? 'Change Image' : 'Add Image from Gallery'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -582,21 +610,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000',
   },
   searchContainer: {
     padding: 15,

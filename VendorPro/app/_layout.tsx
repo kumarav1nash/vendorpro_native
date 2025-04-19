@@ -8,6 +8,8 @@ import { StatusBar } from 'expo-status-bar';
 import { ProductProvider } from './contexts/ProductContext';
 import { SalesProvider } from './contexts/SalesContext';
 import { SalesmenProvider } from './contexts/SalesmenContext';
+import { ShopProvider } from './contexts/ShopContext';
+import { Slot } from 'expo-router';
 
 // Define session context type
 type User = {
@@ -46,22 +48,21 @@ function useProtectedRoute() {
   }, [segments]);
 }
 
-export default function RootLayout() {
+export default function Layout() {
   useProtectedRoute();
 
   return (
-    <ProductProvider>
-      <SalesProvider>
-        <SalesmenProvider>
-          <StatusBar style="auto" />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="(onboarding)" />
-            <Stack.Screen name="(salesman)" />
-          </Stack>
-        </SalesmenProvider>
-      </SalesProvider>
-    </ProductProvider>
+    <SafeAreaProvider>
+      <ShopProvider>
+        <ProductProvider>
+          <SalesProvider>
+            <SalesmenProvider>
+              <StatusBar style="auto" />
+              <Slot />
+            </SalesmenProvider>
+          </SalesProvider>
+        </ProductProvider>
+      </ShopProvider>
+    </SafeAreaProvider>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,15 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
+import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useShop } from '../contexts/ShopContext';
+import { useProducts } from '../contexts/ProductContext';
+import { useSales } from '../contexts/SalesContext';
+import { useSalesmen } from '../contexts/SalesmenContext';
 
 type User = {
   name?: string;
@@ -17,93 +23,118 @@ type User = {
 
 type KPICard = {
   title: string;
-  value: string;
+  value: string | number;
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   color: string;
 };
 
 export default function DashboardScreen() {
+  const { shops, currentShop, loadShops } = useShop();
+  const { products, loadProducts } = useProducts();
+  const { sales, loadSales, getTotalRevenue, getPendingSales, getCompletedSales } = useSales();
+  const { salesmen, loadSalesmen } = useSalesmen();
+  
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [shopName, setShopName] = useState('My Shop'); // TODO: Get from actual shop data
-
+  const [kpiData, setKpiData] = useState<KPICard[]>([]);
+  
   useEffect(() => {
-    loadUserData();
+    loadInitialData();
   }, []);
-
-  const loadUserData = async () => {
+  
+  useEffect(() => {
+    if (!isLoading) {
+      updateKPIData();
+    }
+  }, [isLoading, sales, products, salesmen, currentShop]);
+  
+  const loadInitialData = async () => {
+    setIsLoading(true);
     try {
+      // Load user data
       const userData = await AsyncStorage.getItem('user');
       if (userData) {
         setUser(JSON.parse(userData));
       }
+      
+      // Load all required data
+      await Promise.all([
+        loadShops(),
+        loadProducts(),
+        loadSales(),
+        loadSalesmen()
+      ]);
+      
+      setIsLoading(false);
     } catch (error) {
-      console.error('Error loading user data:', error);
+      console.error('Error loading dashboard data:', error);
+      setIsLoading(false);
     }
   };
-
-  const onRefresh = React.useCallback(() => {
+  
+  const onRefresh = async () => {
     setRefreshing(true);
-    // TODO: Implement refresh logic here
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  }, []);
+    await loadInitialData();
+    setRefreshing(false);
+  };
+  
+  const updateKPIData = () => {
+    const shopId = currentShop?.id;
+    
+    const kpis: KPICard[] = [
+      {
+        title: 'Total Revenue',
+        value: `₹${getTotalRevenue(shopId).toFixed(2)}`,
+        icon: 'cash-multiple',
+        color: '#4CAF50',
+      },
+      {
+        title: 'Total Products',
+        value: shopId 
+          ? products.filter(p => p.shopId === shopId).length
+          : products.length,
+        icon: 'package-variant',
+        color: '#2196F3',
+      },
+      {
+        title: 'Total Sales',
+        value: shopId
+          ? sales.filter(s => s.shopId === shopId).length
+          : sales.length,
+        icon: 'cart',
+        color: '#FF9800',
+      },
+      {
+        title: 'Salesmen',
+        value: shopId
+          ? salesmen.filter(s => s.shopId === shopId).length
+          : salesmen.length,
+        icon: 'account-group',
+        color: '#9C27B0',
+      },
+    ];
+    
+    setKpiData(kpis);
+  };
 
-  const kpiData: KPICard[] = [
-    {
-      title: 'Today\'s Sales',
-      value: '₹12,500',
-      icon: 'currency-inr',
-      color: '#4CAF50',
-    },
-    {
-      title: 'Weekly Sales',
-      value: '₹85,000',
-      icon: 'chart-line',
-      color: '#2196F3',
-    },
-    {
-      title: 'Active Salesmen',
-      value: '5',
-      icon: 'account-group',
-      color: '#9C27B0',
-    },
-    {
-      title: 'Low Stock Items',
-      value: '3',
-      icon: 'alert-circle',
-      color: '#F44336',
-    },
-  ];
-
-  const quickActions = [
-    {
-      title: 'Add Product',
-      icon: 'package-variant-plus',
-      color: '#4CAF50',
-      onPress: () => {/* TODO: Implement navigation */},
-    },
-    {
-      title: 'Add Salesman',
-      icon: 'account-plus',
-      color: '#2196F3',
-      onPress: () => {/* TODO: Implement navigation */},
-    },
-    {
-      title: 'Approve Sales',
-      icon: 'check-circle',
-      color: '#FF9800',
-      onPress: () => {/* TODO: Implement navigation */},
-    },
-    {
-      title: 'View Reports',
-      icon: 'chart-box',
-      color: '#9C27B0',
-      onPress: () => {/* TODO: Implement navigation */},
-    },
-  ];
-
+  const navigateToShop = (shopId?: string) => {
+    if (shopId) {
+      router.push(`/shop/${shopId}`);
+    } else {
+      router.push('/(tabs)/shops');
+    }
+  };
+  
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading dashboard...</Text>
+      </View>
+    );
+  }
+  
   return (
     <ScrollView
       style={styles.container}
@@ -113,49 +144,72 @@ export default function DashboardScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={styles.welcomeText}>Welcome back,</Text>
-          <Text style={styles.shopName}>{shopName}</Text>
+          <Text style={styles.greeting}>Hello,</Text>
+          <Text style={styles.userName}>{user?.name || 'Shop Owner'}</Text>
         </View>
-        <TouchableOpacity style={styles.notificationButton}>
-          <MaterialCommunityIcons name="bell" size={24} color="#666" />
-        </TouchableOpacity>
+        {currentShop && (
+          <TouchableOpacity 
+            style={styles.currentShopButton}
+            onPress={() => navigateToShop(currentShop.id)}
+          >
+            <Text style={styles.currentShopText} numberOfLines={1}>
+              {currentShop.name}
+            </Text>
+            <MaterialCommunityIcons name="chevron-right" size={20} color="#007AFF" />
+          </TouchableOpacity>
+        )}
       </View>
-
+      
       <View style={styles.kpiContainer}>
         {kpiData.map((kpi, index) => (
           <View key={index} style={styles.kpiCard}>
-            <MaterialCommunityIcons name={kpi.icon} size={24} color={kpi.color} />
+            <View style={[styles.iconContainer, { backgroundColor: kpi.color }]}>
+              <MaterialCommunityIcons name={kpi.icon} size={24} color="#fff" />
+            </View>
             <Text style={styles.kpiValue}>{kpi.value}</Text>
             <Text style={styles.kpiTitle}>{kpi.title}</Text>
           </View>
         ))}
       </View>
-
-      <View style={styles.section}>
+      
+      <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.quickActions}>
-          {quickActions.map((action, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.actionButton}
-              onPress={action.onPress}
-            >
-              <MaterialCommunityIcons
-                name={action.icon}
-                size={24}
-                color={action.color}
-              />
-              <Text style={styles.actionText}>{action.title}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
       </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent Activities</Text>
-        <View style={styles.activityCard}>
-          <Text style={styles.activityText}>No recent activities</Text>
-        </View>
+      
+      <View style={styles.quickActions}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => navigateToShop()}
+        >
+          <View style={[styles.actionIcon, { backgroundColor: '#2196F3' }]}>
+            <MaterialCommunityIcons name="store" size={24} color="#fff" />
+          </View>
+          <Text style={styles.actionText}>Manage Shops</Text>
+        </TouchableOpacity>
+        
+        {currentShop && (
+          <>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => navigateToShop(currentShop.id)}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#4CAF50' }]}>
+                <MaterialCommunityIcons name="view-dashboard" size={24} color="#fff" />
+              </View>
+              <Text style={styles.actionText}>Shop Dashboard</Text>
+            </TouchableOpacity>
+          </>
+        )}
+        
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => router.push('/(tabs)/profile')}
+        >
+          <View style={[styles.actionIcon, { backgroundColor: '#9C27B0' }]}>
+            <MaterialCommunityIcons name="account-circle" size={24} color="#fff" />
+          </View>
+          <Text style={styles.actionText}>My Profile</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -166,102 +220,121 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
-  welcomeText: {
-    fontSize: 14,
+  greeting: {
+    fontSize: 16,
     color: '#666',
   },
-  shopName: {
-    fontSize: 20,
+  userName: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#000',
+    color: '#333',
   },
-  notificationButton: {
-    padding: 8,
+  currentShopButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: 150,
+  },
+  currentShopText: {
+    fontSize: 14,
+    color: '#007AFF',
+    marginRight: 4,
   },
   kpiContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 10,
+    justifyContent: 'space-between',
+    padding: 16,
   },
   kpiCard: {
-    width: '48%',
     backgroundColor: '#fff',
-    padding: 15,
-    margin: '1%',
-    borderRadius: 10,
+    borderRadius: 12,
+    padding: 16,
+    width: '48%',
+    marginBottom: 16,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  kpiTitle: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 5,
-    textAlign: 'center',
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   kpiValue: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 5,
-    color: '#000',
+    color: '#333',
+    marginBottom: 4,
   },
-  section: {
-    padding: 20,
+  kpiTitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  sectionHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 15,
-    color: '#000',
+    color: '#333',
   },
   quickActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: -5,
+    padding: 16,
   },
   actionButton: {
-    width: '48%',
-    backgroundColor: '#fff',
-    padding: 15,
-    margin: '1%',
-    borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
   actionText: {
-    marginTop: 8,
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '500',
     color: '#333',
-    textAlign: 'center',
-  },
-  activityCard: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  activityText: {
-    color: '#666',
-    textAlign: 'center',
   },
 }); 
