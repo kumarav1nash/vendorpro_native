@@ -90,19 +90,28 @@ export default function SalesmanDashboardScreen() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load salesman data
+      // Load salesman data first
+      let currentSalesman: Salesman | null = null;
       const salesmanData = await AsyncStorage.getItem('currentSalesman');
       if (salesmanData) {
-        const parsedSalesman = JSON.parse(salesmanData) as Salesman;
-        setSalesman(parsedSalesman);
+        currentSalesman = JSON.parse(salesmanData) as Salesman;
+        setSalesman(currentSalesman);
       }
 
-      // Load products
+      // Then load and filter products based on salesman's shop
       const productsData = await AsyncStorage.getItem('products');
       if (productsData) {
         const parsedProducts = JSON.parse(productsData) as Product[];
-        setProducts(parsedProducts);
-        setFilteredProducts(parsedProducts);
+        
+        // Filter products to only show those from the salesman's assigned shop
+        if (currentSalesman && currentSalesman.shopId) {
+          const shopProducts = parsedProducts.filter(product => product.shopId === currentSalesman.shopId);
+          setProducts(shopProducts);
+          setFilteredProducts(shopProducts);
+        } else {
+          setProducts([]);
+          setFilteredProducts([]);
+        }
       }
 
       // Load sales
@@ -112,9 +121,9 @@ export default function SalesmanDashboardScreen() {
         setSales(parsedSales);
 
         // Calculate metrics
-        if (salesman) {
+        if (currentSalesman) {
           // Filter sales for this salesman
-          const salesmanSales = parsedSales.filter(sale => sale.salesmanId === salesman.id);
+          const salesmanSales = parsedSales.filter(sale => sale.salesmanId === currentSalesman.id);
           
           // Pending sales
           setPendingSales(salesmanSales.filter(sale => sale.status === 'pending').length);
@@ -131,10 +140,19 @@ export default function SalesmanDashboardScreen() {
           // Today's sales
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          const todayTimestamp = today.getTime();
+          const todayTimestamp = today.toISOString().split('T')[0]; // Get YYYY-MM-DD part
           
           const todaySalesAmount = salesmanSales
-            .filter(sale => sale.date >= todayTimestamp && sale.status !== 'rejected')
+            .filter(sale => {
+              if (!sale.createdAt) return false;
+              try {
+                const saleDate = new Date(sale.createdAt).toISOString().split('T')[0]; // Get YYYY-MM-DD part
+                return saleDate === todayTimestamp && sale.status !== 'rejected';
+              } catch (error) {
+                console.error('Invalid date format for sale:', sale.id);
+                return false;
+              }
+            })
             .reduce((sum, sale) => sum + sale.totalAmount, 0);
           setTodaySales(todaySalesAmount);
         }
@@ -224,20 +242,21 @@ export default function SalesmanDashboardScreen() {
     try {
       // Create new sale
       const timestamp = Date.now();
+      const currentDate = new Date().toISOString();
       const commission = saleForm.totalAmount * (salesman.commissionRate / 100);
       
       const newSale: Sale = {
         id: `sale-${timestamp}`,
+        shopId: salesman.shopId,
         customerName: saleForm.customerName,
         productId: selectedProduct.id,
-        productName: selectedProduct.name,
         salesmanId: salesman.id,
-        salesmanName: salesman.name,
         quantity: saleForm.quantity,
         totalAmount: saleForm.totalAmount,
-        status: 'pending', // All sales start as pending
-        date: timestamp,
-        commission
+        commission,
+        status: 'pending',
+        createdAt: currentDate,
+        updatedAt: currentDate
       };
       
       // Update sales in AsyncStorage
@@ -375,32 +394,35 @@ export default function SalesmanDashboardScreen() {
           ) : (
             sales
               .filter(sale => sale.salesmanId === salesman?.id)
-              .sort((a, b) => b.date - a.date)
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
               .slice(0, 5)
-              .map((sale) => (
-                <View key={sale.id} style={styles.saleItem}>
-                  <View style={styles.saleInfo}>
-                    <Text style={styles.saleProductName}>{sale.productName}</Text>
-                    <Text style={styles.saleDetail}>
-                      Customer: {sale.customerName}
-                    </Text>
-                    <Text style={styles.saleDetail}>
-                      {new Date(sale.date).toLocaleDateString()}
-                    </Text>
-                  </View>
-                  <View style={styles.saleDetails}>
-                    <Text style={styles.saleAmount}>₹{sale.totalAmount.toFixed(2)}</Text>
-                    <View style={[
-                      styles.statusBadge, 
-                      sale.status === 'completed' ? styles.statusCompleted : 
-                      sale.status === 'rejected' ? styles.statusRejected : 
-                      styles.statusPending
-                    ]}>
-                      <Text style={styles.statusText}>{sale.status}</Text>
+              .map((sale) => {
+                const product = products.find(p => p.id === sale.productId);
+                return (
+                  <View key={sale.id} style={styles.saleItem}>
+                    <View style={styles.saleInfo}>
+                      <Text style={styles.saleProductName}>{product ? product.name : 'Unknown Product'}</Text>
+                      <Text style={styles.saleDetail}>
+                        Customer: {sale.customerName}
+                      </Text>
+                      <Text style={styles.saleDetail}>
+                        {new Date(sale.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <View style={styles.saleDetails}>
+                      <Text style={styles.saleAmount}>₹{sale.totalAmount.toFixed(2)}</Text>
+                      <View style={[
+                        styles.statusBadge, 
+                        sale.status === 'completed' ? styles.statusCompleted : 
+                        sale.status === 'rejected' ? styles.statusRejected : 
+                        styles.statusPending
+                      ]}>
+                        <Text style={styles.statusText}>{sale.status}</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))
+                );
+              })
           )}
         </View>
       </ScrollView>

@@ -1,73 +1,59 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import ServiceFactory from '../services/ServiceFactory';
 
 // Shop type definition
 export type Shop = {
   id: string;
   name: string;
-  address: string;
-  contactNumber: string;
+  gstin: string;
+  address?: string;
+  ownerName: string;
+  ownerId: string;
   email?: string;
-  gstin?: string;
-  createdAt: number;
-  updatedAt: number;
+  phone?: string;
   isActive: boolean;
-  ownerId: string; // For future multi-user support
+  createdAt: string;
+  updatedAt: string;
 };
 
 type ShopContextType = {
   shops: Shop[];
-  isLoading: boolean;
   currentShop: Shop | null;
+  addShop: (shop: Shop) => Promise<void>;
+  updateShop: (shopId: string, shopData: Partial<Shop>) => Promise<void>;
+  deleteShop: (shopId: string) => Promise<void>;
+  getShopById: (shopId: string) => Shop | undefined;
   setCurrentShop: (shop: Shop | null) => void;
   loadShops: () => Promise<void>;
-  saveShops: (updatedShops: Shop[]) => Promise<void>;
-  addShop: (shop: Omit<Shop, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Shop>;
-  updateShop: (id: string, updates: Partial<Omit<Shop, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<void>;
-  deleteShop: (id: string) => Promise<void>;
+  isLoading: boolean;
 };
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
 
+export const useShop = () => {
+  const context = useContext(ShopContext);
+  if (!context) {
+    throw new Error('useShop must be used within a ShopProvider');
+  }
+  return context;
+};
+
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [shops, setShops] = useState<Shop[]>([]);
   const [currentShop, setCurrentShop] = useState<Shop | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  // Get repository instance
+  const shopsRepository = ServiceFactory.getShopsRepository();
 
   useEffect(() => {
     loadShops();
   }, []);
 
-  useEffect(() => {
-    // Save current shop to AsyncStorage when it changes
-    if (currentShop) {
-      AsyncStorage.setItem('currentShop', JSON.stringify(currentShop));
-    }
-  }, [currentShop]);
-
   const loadShops = async () => {
-    setIsLoading(true);
     try {
-      // Load shops
-      const savedShops = await AsyncStorage.getItem('shops');
-      let parsedShops: Shop[] = [];
-      
-      if (savedShops) {
-        parsedShops = JSON.parse(savedShops) as Shop[];
-        setShops(parsedShops);
-      }
-
-      // Load current shop
-      const savedCurrentShop = await AsyncStorage.getItem('currentShop');
-      
-      if (savedCurrentShop) {
-        const parsedCurrentShop = JSON.parse(savedCurrentShop) as Shop;
-        setCurrentShop(parsedCurrentShop);
-      } else if (parsedShops.length > 0) {
-        // Set first shop as current if none is set but shops exist
-        setCurrentShop(parsedShops[0]);
-        await AsyncStorage.setItem('currentShop', JSON.stringify(parsedShops[0]));
-      }
+      setIsLoading(true);
+      const loadedShops = await shopsRepository.getAll();
+      setShops(loadedShops);
     } catch (error) {
       console.error('Error loading shops:', error);
     } finally {
@@ -75,108 +61,75 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const saveShops = async (updatedShops: Shop[]) => {
+  const addShop = async (shop: Shop) => {
     try {
-      await AsyncStorage.setItem('shops', JSON.stringify(updatedShops));
-      setShops(updatedShops);
+      await shopsRepository.create(shop);
+      await loadShops(); // Reload shops after adding
+    } catch (error) {
+      console.error('Error adding shop:', error);
+    }
+  };
+
+  const updateShop = async (shopId: string, shopData: Partial<Shop>) => {
+    try {
+      const existingShop = getShopById(shopId);
+      if (!existingShop) {
+        throw new Error(`Shop with ID ${shopId} not found`);
+      }
       
-      // If current shop was deleted or modified, update it
-      if (currentShop) {
-        const updatedCurrentShop = updatedShops.find(shop => shop.id === currentShop.id);
-        if (updatedCurrentShop) {
-          setCurrentShop(updatedCurrentShop);
-        } else if (updatedShops.length > 0) {
-          setCurrentShop(updatedShops[0]);
-        } else {
-          setCurrentShop(null);
-        }
+      const updatedShop: Shop = {
+        ...existingShop,
+        ...shopData,
+        updatedAt: new Date().toISOString()
+      };
+      
+      await shopsRepository.update(updatedShop);
+      await loadShops(); // Reload shops after updating
+      
+      // Update currentShop if it's the one being updated
+      if (currentShop && currentShop.id === shopId) {
+        setCurrentShop(updatedShop);
       }
     } catch (error) {
-      console.error('Error saving shops:', error);
+      console.error('Error updating shop:', error);
       throw error;
     }
   };
 
-  const addShop = async (shop: Omit<Shop, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const timestamp = Date.now();
-    const newShop: Shop = {
-      ...shop,
-      id: `shop-${timestamp}`,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    
-    const updatedShops = [...shops, newShop];
-    await saveShops(updatedShops);
-    
-    // If this is the first shop, set it as current
-    if (shops.length === 0) {
-      setCurrentShop(newShop);
-    }
-    
-    return newShop;
-  };
-
-  const updateShop = async (id: string, updates: Partial<Omit<Shop, 'id' | 'createdAt' | 'updatedAt'>>) => {
-    const timestamp = Date.now();
-    const updatedShops = shops.map(shop => 
-      shop.id === id 
-        ? { 
-            ...shop, 
-            ...updates, 
-            updatedAt: timestamp 
-          } 
-        : shop
-    );
-    
-    await saveShops(updatedShops);
-    
-    // Update current shop if it was the one that was modified
-    if (currentShop && currentShop.id === id) {
-      const updatedShop = updatedShops.find(shop => shop.id === id);
-      if (updatedShop) {
-        setCurrentShop(updatedShop);
-      }
-    }
-  };
-
-  const deleteShop = async (id: string) => {
-    const updatedShops = shops.filter(shop => shop.id !== id);
-    await saveShops(updatedShops);
-    
-    // If the deleted shop was the current shop, set a new current shop
-    if (currentShop && currentShop.id === id) {
-      if (updatedShops.length > 0) {
-        setCurrentShop(updatedShops[0]);
-      } else {
+  const deleteShop = async (shopId: string) => {
+    try {
+      await shopsRepository.delete(shopId);
+      await loadShops(); // Reload shops after deleting
+      
+      // Clear currentShop if it's the one being deleted
+      if (currentShop && currentShop.id === shopId) {
         setCurrentShop(null);
       }
+    } catch (error) {
+      console.error('Error deleting shop:', error);
     }
   };
 
-  return (
-    <ShopContext.Provider 
-      value={{ 
-        shops,
-        isLoading,
-        currentShop,
-        setCurrentShop,
-        loadShops, 
-        saveShops,
-        addShop,
-        updateShop,
-        deleteShop
-      }}
-    >
-      {children}
-    </ShopContext.Provider>
-  );
+  const getShopById = (shopId: string) => {
+    return shops.find(shop => shop.id === shopId);
+  };
+
+  const value = {
+    shops,
+    currentShop,
+    addShop,
+    updateShop,
+    deleteShop,
+    getShopById,
+    setCurrentShop,
+    loadShops,
+    isLoading,
+  };
+
+  return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 };
 
-export const useShop = () => {
-  const context = useContext(ShopContext);
-  if (context === undefined) {
-    throw new Error('useShop must be used within a ShopProvider');
-  }
-  return context;
-}; 
+// Add default export for the component to fix the routing error
+export default function ShopContextScreen() {
+  return null;
+} 

@@ -7,10 +7,12 @@ import {
   ActivityIndicator,
   StyleSheet,
   Image,
+  Alert,
 } from 'react-native';
 import { router, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import ServiceFactory from '../services/ServiceFactory';
 
 export default function LoginScreen() {
   const [step, setStep] = useState(1);
@@ -42,6 +44,39 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
+      // Get user repository
+      const userRepository = ServiceFactory.getUserRepository();
+      
+      // Check if user exists with this mobile number
+      const users = await userRepository.getAll();
+      const existingUser = users.find(user => user.mobile === mobile);
+      
+      if (!existingUser) {
+        // User doesn't exist, prompt to register
+        Alert.alert(
+          'Account Not Found',
+          'No account found with this mobile number. Would you like to register?',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => {
+                setLoading(false);
+                setError('');
+              },
+            },
+            {
+              text: 'Register',
+              onPress: () => {
+                setLoading(false);
+                router.push('/register');
+              },
+            },
+          ]
+        );
+        return;
+      }
+
       // TODO: Implement your OTP sending logic here
       setError('');
       setStep(2);
@@ -74,12 +109,19 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
+      // Get user repository
+      const userRepository = ServiceFactory.getUserRepository();
+      
+      // Get existing user data
+      const users = await userRepository.getAll();
+      const userData = users.find(user => user.mobile === mobile);
+      
+      if (!userData) {
+        setError('User not found. Please try again.');
+        return;
+      }
+      
       // TODO: Implement your OTP verification logic here
-      // For demo purposes, we'll just store basic user data
-      const userData = {
-        mobile,
-      };
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
       
       // Check if shop details exist
       const shopDetails = await AsyncStorage.getItem('shopDetails');

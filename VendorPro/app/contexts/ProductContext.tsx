@@ -1,42 +1,43 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import ServiceFactory from '../services/ServiceFactory';
 
 export type Product = {
   id: string;
   shopId: string;
   name: string;
-  category?: string;
   description?: string;
+  quantity: number;
   basePrice: number;
   sellingPrice: number;
-  quantity: number;
   unit?: string;
   createdAt: string;
   updatedAt: string;
 };
 
-type ProductContextType = {
+type ProductsContextType = {
   products: Product[];
   addProduct: (product: Product) => Promise<void>;
   updateProduct: (product: Product) => Promise<void>;
   deleteProduct: (productId: string) => Promise<void>;
-  getProductById: (productId: string) => Product | undefined;
   getShopProducts: (shopId: string) => Product[];
+  getProductById: (productId: string) => Product | undefined;
   loadProducts: () => Promise<void>;
 };
 
-const ProductContext = createContext<ProductContextType | undefined>(undefined);
+const ProductsContext = createContext<ProductsContextType | undefined>(undefined);
 
 export const useProducts = () => {
-  const context = useContext(ProductContext);
+  const context = useContext(ProductsContext);
   if (!context) {
-    throw new Error('useProducts must be used within a ProductProvider');
+    throw new Error('useProducts must be used within a ProductsProvider');
   }
   return context;
 };
 
-export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
+  // Get repository instance
+  const productsRepository = ServiceFactory.getProductsRepository();
 
   useEffect(() => {
     loadProducts();
@@ -44,32 +45,17 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const loadProducts = async () => {
     try {
-      const productsData = await AsyncStorage.getItem('products');
-      if (productsData) {
-        setProducts(JSON.parse(productsData));
-      } else {
-        // Initialize with empty array if no data
-        await AsyncStorage.setItem('products', JSON.stringify([]));
-        setProducts([]);
-      }
+      const loadedProducts = await productsRepository.getAll();
+      setProducts(loadedProducts);
     } catch (error) {
       console.error('Error loading products:', error);
     }
   };
 
-  const saveProducts = async (updatedProducts: Product[]) => {
-    try {
-      await AsyncStorage.setItem('products', JSON.stringify(updatedProducts));
-      setProducts(updatedProducts);
-    } catch (error) {
-      console.error('Error saving products:', error);
-    }
-  };
-
   const addProduct = async (product: Product) => {
     try {
-      const updatedProducts = [...products, product];
-      await saveProducts(updatedProducts);
+      await productsRepository.create(product);
+      await loadProducts(); // Reload products after adding
     } catch (error) {
       console.error('Error adding product:', error);
     }
@@ -77,10 +63,8 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateProduct = async (updatedProduct: Product) => {
     try {
-      const updatedProducts = products.map(product => 
-        product.id === updatedProduct.id ? updatedProduct : product
-      );
-      await saveProducts(updatedProducts);
+      await productsRepository.update(updatedProduct);
+      await loadProducts(); // Reload products after updating
     } catch (error) {
       console.error('Error updating product:', error);
     }
@@ -88,19 +72,19 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deleteProduct = async (productId: string) => {
     try {
-      const updatedProducts = products.filter(product => product.id !== productId);
-      await saveProducts(updatedProducts);
+      await productsRepository.delete(productId);
+      await loadProducts(); // Reload products after deleting
     } catch (error) {
       console.error('Error deleting product:', error);
     }
   };
 
-  const getProductById = (productId: string) => {
-    return products.find(product => product.id === productId);
-  };
-
   const getShopProducts = (shopId: string) => {
     return products.filter(product => product.shopId === shopId);
+  };
+
+  const getProductById = (productId: string) => {
+    return products.find(product => product.id === productId);
   };
 
   const value = {
@@ -108,10 +92,15 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addProduct,
     updateProduct,
     deleteProduct,
-    getProductById,
     getShopProducts,
+    getProductById,
     loadProducts,
   };
 
-  return <ProductContext.Provider value={value}>{children}</ProductContext.Provider>;
-}; 
+  return <ProductsContext.Provider value={value}>{children}</ProductsContext.Provider>;
+};
+
+// Add default export for the component to fix the routing error
+export default function ProductsContextScreen() {
+  return null;
+} 

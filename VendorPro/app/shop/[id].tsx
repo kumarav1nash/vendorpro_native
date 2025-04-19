@@ -89,7 +89,7 @@ export default function ShopDetailScreen() {
           </View>
           <View style={styles.shopInfoRow}>
             <MaterialCommunityIcons name="phone" size={18} color="#666" />
-            <Text style={styles.shopInfoText}>{shop.contactNumber}</Text>
+            <Text style={styles.shopInfoText}>{shop.phone}</Text>
           </View>
           {shop.email && (
             <View style={styles.shopInfoRow}>

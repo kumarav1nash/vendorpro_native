@@ -12,18 +12,20 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { useUser } from '../contexts/UserContext';
 
 type UserProfile = {
   name: string;
   mobile: string;
-  email: string;
-  shopName: string;
+  email?: string;
+  shopName?: string;
   gstin?: string;
-  language: 'en' | 'hi';
+  language?: 'en' | 'hi';
   notificationsEnabled: boolean;
 };
 
 export default function ProfileScreen() {
+  const { currentUser, updateUser, loadUser } = useUser();
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
     name: '',
@@ -36,27 +38,22 @@ export default function ProfileScreen() {
   });
 
   useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
-    try {
-      const userData = await AsyncStorage.getItem('user');
-      if (userData) {
-        const user = JSON.parse(userData);
-        setProfile(prev => ({
-          ...prev,
-          ...user,
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading profile:', error);
+    if (currentUser) {
+      setProfile({
+        name: currentUser.name,
+        mobile: currentUser.mobile,
+        email: currentUser.email || '',
+        shopName: currentUser.shopName || '',
+        gstin: currentUser.gstin || '',
+        language: (currentUser.language as 'en' | 'hi') || 'en',
+        notificationsEnabled: currentUser.notificationsEnabled || true,
+      });
     }
-  };
+  }, [currentUser]);
 
   const handleSave = async () => {
     try {
-      await AsyncStorage.setItem('user', JSON.stringify(profile));
+      await updateUser(profile);
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully');
     } catch (error) {
@@ -126,10 +123,10 @@ export default function ProfileScreen() {
         <Text style={styles.sectionTitle}>Personal Information</Text>
         {renderField('Name', profile.name, 'name')}
         {renderField('Mobile', profile.mobile, 'mobile')}
-        {renderField('Email', profile.email, 'email')}
+        {renderField('Email', profile.email || '', 'email')}
         
         <Text style={styles.sectionTitle}>Shop Information</Text>
-        {renderField('Shop Name', profile.shopName, 'shopName')}
+        {renderField('Shop Name', profile.shopName || '', 'shopName')}
         {renderField('GSTIN (Optional)', profile.gstin || '', 'gstin')}
 
         <Text style={styles.sectionTitle}>Preferences</Text>

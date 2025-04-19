@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import ServiceFactory from '../services/ServiceFactory';
 
 export type Sale = {
   id: string;
@@ -10,7 +10,8 @@ export type Sale = {
   quantity: number;
   totalAmount: number;
   commission: number;
-  status: 'pending' | 'completed';
+  status: 'pending' | 'completed' | 'rejected';
+  rejectionReason?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -41,6 +42,8 @@ export const useSales = () => {
 
 export const SalesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sales, setSales] = useState<Sale[]>([]);
+  // Get repository instance
+  const salesRepository = ServiceFactory.getSalesRepository();
 
   useEffect(() => {
     loadSales();
@@ -48,32 +51,17 @@ export const SalesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const loadSales = async () => {
     try {
-      const salesData = await AsyncStorage.getItem('sales');
-      if (salesData) {
-        setSales(JSON.parse(salesData));
-      } else {
-        // Initialize with empty array if no data
-        await AsyncStorage.setItem('sales', JSON.stringify([]));
-        setSales([]);
-      }
+      const loadedSales = await salesRepository.getAll();
+      setSales(loadedSales);
     } catch (error) {
       console.error('Error loading sales:', error);
     }
   };
 
-  const saveSales = async (updatedSales: Sale[]) => {
-    try {
-      await AsyncStorage.setItem('sales', JSON.stringify(updatedSales));
-      setSales(updatedSales);
-    } catch (error) {
-      console.error('Error saving sales:', error);
-    }
-  };
-
   const addSale = async (sale: Sale) => {
     try {
-      const updatedSales = [...sales, sale];
-      await saveSales(updatedSales);
+      await salesRepository.create(sale);
+      await loadSales(); // Reload sales after adding
     } catch (error) {
       console.error('Error adding sale:', error);
     }
@@ -81,10 +69,8 @@ export const SalesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateSale = async (updatedSale: Sale) => {
     try {
-      const updatedSales = sales.map(sale => 
-        sale.id === updatedSale.id ? updatedSale : sale
-      );
-      await saveSales(updatedSales);
+      await salesRepository.update(updatedSale);
+      await loadSales(); // Reload sales after updating
     } catch (error) {
       console.error('Error updating sale:', error);
     }
@@ -92,8 +78,8 @@ export const SalesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deleteSale = async (saleId: string) => {
     try {
-      const updatedSales = sales.filter(sale => sale.id !== saleId);
-      await saveSales(updatedSales);
+      await salesRepository.delete(saleId);
+      await loadSales(); // Reload sales after deleting
     } catch (error) {
       console.error('Error deleting sale:', error);
     }
@@ -147,4 +133,9 @@ export const SalesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   return <SalesContext.Provider value={value}>{children}</SalesContext.Provider>;
-}; 
+};
+
+// Add default export for the component to fix the routing error
+export default function SalesContextScreen() {
+  return null;
+} 
