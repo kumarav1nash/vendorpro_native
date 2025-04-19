@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ServiceFactory } from '../services/ServiceFactory';
 
 export type Salesman = {
   id: string;
@@ -34,6 +34,8 @@ export const useSalesmen = () => {
 
 export const SalesmenProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [salesmen, setSalesmen] = useState<Salesman[]>([]);
+  // Get repository instance
+  const salesmenRepository = ServiceFactory.getSalesmenRepository();
 
   useEffect(() => {
     loadSalesmen();
@@ -41,32 +43,17 @@ export const SalesmenProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const loadSalesmen = async () => {
     try {
-      const salesmenData = await AsyncStorage.getItem('salesmen');
-      if (salesmenData) {
-        setSalesmen(JSON.parse(salesmenData));
-      } else {
-        // Initialize with empty array if no data
-        await AsyncStorage.setItem('salesmen', JSON.stringify([]));
-        setSalesmen([]);
-      }
+      const loadedSalesmen = await salesmenRepository.getAll();
+      setSalesmen(loadedSalesmen);
     } catch (error) {
       console.error('Error loading salesmen:', error);
     }
   };
 
-  const saveSalesmen = async (updatedSalesmen: Salesman[]) => {
-    try {
-      await AsyncStorage.setItem('salesmen', JSON.stringify(updatedSalesmen));
-      setSalesmen(updatedSalesmen);
-    } catch (error) {
-      console.error('Error saving salesmen:', error);
-    }
-  };
-
   const addSalesman = async (salesman: Salesman) => {
     try {
-      const updatedSalesmen = [...salesmen, salesman];
-      await saveSalesmen(updatedSalesmen);
+      await salesmenRepository.create(salesman);
+      await loadSalesmen(); // Reload salesmen after adding
     } catch (error) {
       console.error('Error adding salesman:', error);
     }
@@ -74,10 +61,8 @@ export const SalesmenProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const updateSalesman = async (updatedSalesman: Salesman) => {
     try {
-      const updatedSalesmen = salesmen.map(salesman => 
-        salesman.id === updatedSalesman.id ? updatedSalesman : salesman
-      );
-      await saveSalesmen(updatedSalesmen);
+      await salesmenRepository.update(updatedSalesman);
+      await loadSalesmen(); // Reload salesmen after updating
     } catch (error) {
       console.error('Error updating salesman:', error);
     }
@@ -85,8 +70,8 @@ export const SalesmenProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const deleteSalesman = async (salesmanId: string) => {
     try {
-      const updatedSalesmen = salesmen.filter(salesman => salesman.id !== salesmanId);
-      await saveSalesmen(updatedSalesmen);
+      await salesmenRepository.delete(salesmanId);
+      await loadSalesmen(); // Reload salesmen after deleting
     } catch (error) {
       console.error('Error deleting salesman:', error);
     }

@@ -1,67 +1,51 @@
-import { Stack } from "expo-router";
-import "./globals.css";
-import { useRouter, useSegments } from 'expo-router';
-import { useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ProductProvider } from './contexts/ProductContext';
+import { useColorScheme } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SalesProvider } from './contexts/SalesContext';
-import { SalesmenProvider } from './contexts/SalesmenContext';
+import { ProductsProvider } from './contexts/ProductContext';
 import { ShopProvider } from './contexts/ShopContext';
-import { Slot } from 'expo-router';
+import { SalesmenProvider } from './contexts/SalesmenContext';
 
-// Define session context type
-type User = {
-  name: string;
-  mobile: string;
-};
-
-export const unstable_settings = {
-  initialRouteName: '(auth)/login',
-};
-
-function useProtectedRoute() {
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const userSession = await AsyncStorage.getItem('user');
-      const isAuth = segments[0];
-      
-      // Don't interfere with salesman routes
-      if (isAuth === '(salesman)') {
-        return;
-      }
-      
-      if (!userSession && isAuth !== '(auth)') {
-        // Redirect to the login page if not authenticated
-        router.replace('/login');
-      } else if (userSession && isAuth === '(auth)' && segments[1] !== 'salesman-login') {
-        // Redirect to the tabs if authenticated - but only if not on salesman login
-        router.replace('/(tabs)/dashboard');
-      }
-    };
-
-    checkAuth();
-  }, [segments]);
-}
-
-export default function Layout() {
-  useProtectedRoute();
+// Global layout component that wraps the entire app
+export default function RootLayout() {
+  const colorScheme = useColorScheme();
 
   return (
     <SafeAreaProvider>
+      <StatusBar style="auto" />
+      
+      {/* Context providers for data sharing across the app */}
       <ShopProvider>
-        <ProductProvider>
-          <SalesProvider>
-            <SalesmenProvider>
-              <StatusBar style="auto" />
-              <Slot />
-            </SalesmenProvider>
-          </SalesProvider>
-        </ProductProvider>
+        <ProductsProvider>
+          <SalesmenProvider>
+            <SalesProvider>
+              {/* Root stack navigator */}
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+                <Stack.Screen name="(redirects)" options={{ headerShown: false }} />
+                <Stack.Screen name="(salesman)" options={{ headerShown: false }} />
+                <Stack.Screen 
+                  name="shop/[id]" 
+                  options={{ 
+                    headerShown: true,
+                    headerTitle: 'Shop Details',
+                    headerBackTitle: 'Back'
+                  }} 
+                />
+                <Stack.Screen 
+                  name="index" 
+                  options={{ 
+                    // Auth check & redirect screen, no header needed
+                    headerShown: false 
+                  }} 
+                />
+              </Stack>
+            </SalesProvider>
+          </SalesmenProvider>
+        </ProductsProvider>
       </ShopProvider>
     </SafeAreaProvider>
   );

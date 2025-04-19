@@ -31,7 +31,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [sortField, setSortField] = useState<'date' | 'amount' | 'createdAt'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
@@ -108,7 +108,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
     }
   };
   
-  const handleStatusFilter = (status: 'all' | 'pending' | 'completed') => {
+  const handleStatusFilter = (status: 'all' | 'pending' | 'completed' | 'rejected') => {
     setFilterStatus(status);
   };
   
@@ -322,7 +322,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
               styles.filterChip, 
               filterStatus === 'rejected' ? styles.activeChip : null
             ]}
-            onPress={() => setFilterStatus('rejected')}
+            onPress={() => handleStatusFilter('rejected')}
           >
             <Text style={[
               styles.filterChipText,

@@ -140,10 +140,13 @@ export default function SalesmanDashboardScreen() {
           // Today's sales
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          const todayTimestamp = today.getTime();
+          const todayTimestamp = today.toISOString().split('T')[0]; // Get YYYY-MM-DD part
           
           const todaySalesAmount = salesmanSales
-            .filter(sale => sale.date >= todayTimestamp && sale.status !== 'rejected')
+            .filter(sale => {
+              const saleDate = sale.createdAt.split('T')[0]; // Get YYYY-MM-DD part
+              return saleDate === todayTimestamp && sale.status !== 'rejected';
+            })
             .reduce((sum, sale) => sum + sale.totalAmount, 0);
           setTodaySales(todaySalesAmount);
         }
@@ -233,20 +236,21 @@ export default function SalesmanDashboardScreen() {
     try {
       // Create new sale
       const timestamp = Date.now();
+      const currentDate = new Date().toISOString();
       const commission = saleForm.totalAmount * (salesman.commissionRate / 100);
       
       const newSale: Sale = {
         id: `sale-${timestamp}`,
+        shopId: salesman.shopId,
         customerName: saleForm.customerName,
         productId: selectedProduct.id,
-        productName: selectedProduct.name,
         salesmanId: salesman.id,
-        salesmanName: salesman.name,
         quantity: saleForm.quantity,
         totalAmount: saleForm.totalAmount,
-        status: 'pending', // All sales start as pending
-        date: timestamp,
-        commission
+        commission,
+        status: 'pending',
+        createdAt: currentDate,
+        updatedAt: currentDate
       };
       
       // Update sales in AsyncStorage
@@ -384,32 +388,35 @@ export default function SalesmanDashboardScreen() {
           ) : (
             sales
               .filter(sale => sale.salesmanId === salesman?.id)
-              .sort((a, b) => b.date - a.date)
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
               .slice(0, 5)
-              .map((sale) => (
-                <View key={sale.id} style={styles.saleItem}>
-                  <View style={styles.saleInfo}>
-                    <Text style={styles.saleProductName}>{sale.productName}</Text>
-                    <Text style={styles.saleDetail}>
-                      Customer: {sale.customerName}
-                    </Text>
-                    <Text style={styles.saleDetail}>
-                      {new Date(sale.date).toLocaleDateString()}
-                    </Text>
-                  </View>
-                  <View style={styles.saleDetails}>
-                    <Text style={styles.saleAmount}>₹{sale.totalAmount.toFixed(2)}</Text>
-                    <View style={[
-                      styles.statusBadge, 
-                      sale.status === 'completed' ? styles.statusCompleted : 
-                      sale.status === 'rejected' ? styles.statusRejected : 
-                      styles.statusPending
-                    ]}>
-                      <Text style={styles.statusText}>{sale.status}</Text>
+              .map((sale) => {
+                const product = products.find(p => p.id === sale.productId);
+                return (
+                  <View key={sale.id} style={styles.saleItem}>
+                    <View style={styles.saleInfo}>
+                      <Text style={styles.saleProductName}>{product ? product.name : 'Unknown Product'}</Text>
+                      <Text style={styles.saleDetail}>
+                        Customer: {sale.customerName}
+                      </Text>
+                      <Text style={styles.saleDetail}>
+                        {new Date(sale.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <View style={styles.saleDetails}>
+                      <Text style={styles.saleAmount}>₹{sale.totalAmount.toFixed(2)}</Text>
+                      <View style={[
+                        styles.statusBadge, 
+                        sale.status === 'completed' ? styles.statusCompleted : 
+                        sale.status === 'rejected' ? styles.statusRejected : 
+                        styles.statusPending
+                      ]}>
+                        <Text style={styles.statusText}>{sale.status}</Text>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))
+                );
+              })
           )}
         </View>
       </ScrollView>
