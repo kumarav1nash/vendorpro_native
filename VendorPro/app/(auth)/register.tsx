@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { router, Link } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ServiceFactory from '../services/ServiceFactory';
 
 export default function RegisterScreen() {
   const [step, setStep] = useState(1);
@@ -67,11 +68,22 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       // TODO: Implement your OTP verification logic here
+      // Get user repository
+      const userRepository = ServiceFactory.getUserRepository();
+      
+      // Create a new user object
       const userData = {
+        id: Date.now().toString(),
         name,
         mobile,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        notificationsEnabled: true
       };
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      
+      // Save the user using repository
+      await userRepository.create(userData);
+      
       router.replace('/(tabs)/dashboard');
     } catch (err) {
       setError('Invalid OTP. Please try again.');

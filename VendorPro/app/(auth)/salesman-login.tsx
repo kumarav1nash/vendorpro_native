@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Salesman } from '../contexts/SalesmenContext';
+import ServiceFactory from '../services/ServiceFactory';
 
 export default function SalesmanLoginScreen() {
   const [username, setUsername] = useState('');
@@ -50,16 +51,17 @@ export default function SalesmanLoginScreen() {
     setError('');
     
     try {
-      // Retrieve salesmen list
-      const salesmenData = await AsyncStorage.getItem('salesmen');
+      // Get repository instance
+      const salesmenRepository = ServiceFactory.getSalesmenRepository();
       
-      if (!salesmenData) {
+      // Get all salesmen
+      const salesmen = await salesmenRepository.getAll();
+      
+      if (!salesmen || salesmen.length === 0) {
         setError('No salesmen found. Please contact your shop owner.');
         setLoading(false);
         return;
       }
-      
-      const salesmen = JSON.parse(salesmenData) as Salesman[];
       
       // Find salesman with matching username
       const salesman = salesmen.find(
