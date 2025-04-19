@@ -4,7 +4,7 @@ import { IDataService } from './DataService';
 // When integrating with an API, you would replace the implementation
 // with actual API calls, but the interface stays the same
 
-export class ApiService<T extends { id: string }> implements IDataService<T> {
+export default class ApiService<T extends { id: string }> implements IDataService<T> {
   constructor(private baseUrl: string, private endpoint: string) {}
 
   // Helper method for handling API responses

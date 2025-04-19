@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ServiceFactory } from '../services/ServiceFactory';
+import ServiceFactory from '../services/ServiceFactory';
 
 // Shop type definition
 export type Shop = {
@@ -8,8 +8,10 @@ export type Shop = {
   gstin: string;
   address?: string;
   ownerName: string;
+  ownerId: string;
   email?: string;
   phone?: string;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -18,11 +20,12 @@ type ShopContextType = {
   shops: Shop[];
   currentShop: Shop | null;
   addShop: (shop: Shop) => Promise<void>;
-  updateShop: (shop: Shop) => Promise<void>;
+  updateShop: (shopId: string, shopData: Partial<Shop>) => Promise<void>;
   deleteShop: (shopId: string) => Promise<void>;
   getShopById: (shopId: string) => Shop | undefined;
   setCurrentShop: (shop: Shop | null) => void;
   loadShops: () => Promise<void>;
+  isLoading: boolean;
 };
 
 const ShopContext = createContext<ShopContextType | undefined>(undefined);
@@ -38,6 +41,7 @@ export const useShop = () => {
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [shops, setShops] = useState<Shop[]>([]);
   const [currentShop, setCurrentShop] = useState<Shop | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   // Get repository instance
   const shopsRepository = ServiceFactory.getShopsRepository();
 
@@ -47,10 +51,13 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loadShops = async () => {
     try {
+      setIsLoading(true);
       const loadedShops = await shopsRepository.getAll();
       setShops(loadedShops);
     } catch (error) {
       console.error('Error loading shops:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -63,17 +70,29 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const updateShop = async (updatedShop: Shop) => {
+  const updateShop = async (shopId: string, shopData: Partial<Shop>) => {
     try {
+      const existingShop = getShopById(shopId);
+      if (!existingShop) {
+        throw new Error(`Shop with ID ${shopId} not found`);
+      }
+      
+      const updatedShop: Shop = {
+        ...existingShop,
+        ...shopData,
+        updatedAt: new Date().toISOString()
+      };
+      
       await shopsRepository.update(updatedShop);
       await loadShops(); // Reload shops after updating
       
       // Update currentShop if it's the one being updated
-      if (currentShop && currentShop.id === updatedShop.id) {
+      if (currentShop && currentShop.id === shopId) {
         setCurrentShop(updatedShop);
       }
     } catch (error) {
       console.error('Error updating shop:', error);
+      throw error;
     }
   };
 
@@ -104,6 +123,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     getShopById,
     setCurrentShop,
     loadShops,
+    isLoading,
   };
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;

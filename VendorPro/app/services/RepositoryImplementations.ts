@@ -1,9 +1,10 @@
-import { ISalesRepository, IProductsRepository, IShopsRepository, ISalesmenRepository } from './DataService';
-import { AsyncStorageService } from './AsyncStorageService';
+import { ISalesRepository, IProductsRepository, IShopsRepository, ISalesmenRepository, IUserRepository } from './DataService';
+import AsyncStorageService from './AsyncStorageService';
 import { Sale } from '../contexts/SalesContext';
 import { Product } from '../contexts/ProductContext';
 import { Shop } from '../contexts/ShopContext';
 import { Salesman } from '../contexts/SalesmenContext';
+import UserRepository, { User } from './UserRepository';
 
 // Sales Repository Implementation
 export class SalesRepository extends AsyncStorageService<Sale> implements ISalesRepository {
@@ -68,4 +69,7 @@ export class SalesmenRepository extends AsyncStorageService<Salesman> implements
   async getShopSalesmen(shopId: string): Promise<Salesman[]> {
     return this.query(salesman => salesman.shopId === shopId);
   }
-} 
+}
+
+// User Repository Implementation
+export { UserRepository }; 

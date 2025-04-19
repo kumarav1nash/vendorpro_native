@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IDataService } from './DataService';
 
 // Base AsyncStorage service implementation
-export class AsyncStorageService<T extends { id: string }> implements IDataService<T> {
+export default class AsyncStorageService<T extends { id: string }> implements IDataService<T> {
   constructor(private storageKey: string) {}
 
   async getAll(): Promise<T[]> {

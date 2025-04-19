@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { ServiceFactory } from '../services/ServiceFactory';
+import ServiceFactory from '../services/ServiceFactory';
 
 export type Salesman = {
   id: string;
@@ -7,7 +7,9 @@ export type Salesman = {
   name: string;
   mobile: string;
   username?: string;
+  password?: string;
   commissionRate: number;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 };

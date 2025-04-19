@@ -1,12 +1,13 @@
-import { ISalesRepository, IProductsRepository, IShopsRepository, ISalesmenRepository } from './DataService';
-import { SalesRepository, ProductsRepository, ShopsRepository, SalesmenRepository } from './RepositoryImplementations';
+import { ISalesRepository, IProductsRepository, IShopsRepository, ISalesmenRepository, IUserRepository } from './DataService';
+import { SalesRepository, ProductsRepository, ShopsRepository, SalesmenRepository, UserRepository } from './RepositoryImplementations';
 
 // Factory for creating repository instances
-export class ServiceFactory {
+export default class ServiceFactory {
   private static salesRepository: ISalesRepository;
   private static productsRepository: IProductsRepository;
   private static shopsRepository: IShopsRepository;
   private static salesmenRepository: ISalesmenRepository;
+  private static userRepository: IUserRepository;
 
   static getSalesRepository(): ISalesRepository {
     if (!this.salesRepository) {
@@ -34,5 +35,12 @@ export class ServiceFactory {
       this.salesmenRepository = new SalesmenRepository();
     }
     return this.salesmenRepository;
+  }
+  
+  static getUserRepository(): IUserRepository {
+    if (!this.userRepository) {
+      this.userRepository = new UserRepository();
+    }
+    return this.userRepository;
   }
 } 

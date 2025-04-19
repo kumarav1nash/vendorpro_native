@@ -13,8 +13,12 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useShop, Shop } from '../contexts/ShopContext';
+import { useUser } from '../contexts/UserContext';
 
 export default function ShopsScreen() {
+  // User context
+  const { currentUser } = useUser();
+  
   // State management
   const { shops, isLoading, addShop, updateShop, deleteShop, setCurrentShop, currentShop, loadShops } = useShop();
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,11 +28,11 @@ export default function ShopsScreen() {
   const [shopForm, setShopForm] = useState({
     name: '',
     address: '',
-    contactNumber: '',
+    phone: '',
     email: '',
     gstin: '',
     isActive: true,
-    ownerId: 'owner-1' // Default owner id
+    ownerId: ''
   });
   const [editingShopId, setEditingShopId] = useState<string | null>(null);
 
@@ -43,7 +47,7 @@ export default function ShopsScreen() {
     } else {
       const filtered = shops.filter(shop => 
         shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        shop.address.toLowerCase().includes(searchQuery.toLowerCase())
+        shop.address?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredShops(filtered);
     }
@@ -54,25 +58,25 @@ export default function ShopsScreen() {
     setShopForm({
       name: '',
       address: '',
-      contactNumber: '',
+      phone: '',
       email: '',
       gstin: '',
       isActive: true,
-      ownerId: 'owner-1'
+      ownerId: ''
     });
     setEditingShopId(null);
   };
 
   // Handle edit shop
-  const handleEditShop = (shop: Shop) => {
+  const handleEditShop = async (shop: Shop) => {
     setShopForm({
       name: shop.name,
-      address: shop.address,
-      contactNumber: shop.contactNumber,
+      address: shop.address || '',
+      phone: shop.phone || '',
       email: shop.email || '',
       gstin: shop.gstin || '',
-      isActive: shop.isActive,
-      ownerId: shop.ownerId
+      isActive: shop.isActive || true,
+      ownerId: shop.ownerId || currentUser?.id || '',
     });
     setEditingShopId(shop.id);
     setShowEditModal(true);
@@ -95,7 +99,7 @@ export default function ShopsScreen() {
       return false;
     }
 
-    if (!shopForm.contactNumber.trim()) {
+    if (!shopForm.phone.trim()) {
       Alert.alert('Error', 'Contact number is required');
       return false;
     }
@@ -108,7 +112,18 @@ export default function ShopsScreen() {
     if (!validateForm()) return;
 
     try {
-      await addShop(shopForm);
+      const userId = currentUser?.id || 'owner-1';
+      const userName = currentUser?.name || 'Shop Owner';
+      
+      await addShop({
+        ...shopForm,
+        ownerId: userId,
+        ownerName: userName,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isActive: true
+      });
       setShowAddModal(false);
       resetForm();
       Alert.alert('Success', 'Shop added successfully');
@@ -175,7 +190,7 @@ export default function ShopsScreen() {
       <View style={styles.shopInfo}>
         <Text style={styles.shopName}>{item.name}</Text>
         <Text style={styles.shopAddress}>{item.address}</Text>
-        <Text style={styles.shopContact}>{item.contactNumber}</Text>
+        <Text style={styles.shopContact}>{item.phone}</Text>
         {item.gstin && <Text style={styles.shopGstin}>GSTIN: {item.gstin}</Text>}
       </View>
       <View style={styles.shopActions}>
@@ -302,8 +317,8 @@ export default function ShopsScreen() {
                 <Text style={styles.label}>Contact Number*</Text>
                 <TextInput
                   style={styles.input}
-                  value={shopForm.contactNumber}
-                  onChangeText={(text) => handleChange('contactNumber', text)}
+                  value={shopForm.phone}
+                  onChangeText={(text) => handleChange('phone', text)}
                   placeholder="Enter contact number"
                   keyboardType="phone-pad"
                 />
@@ -377,8 +392,8 @@ export default function ShopsScreen() {
                 <Text style={styles.label}>Contact Number*</Text>
                 <TextInput
                   style={styles.input}
-                  value={shopForm.contactNumber}
-                  onChangeText={(text) => handleChange('contactNumber', text)}
+                  value={shopForm.phone}
+                  onChangeText={(text) => handleChange('phone', text)}
                   placeholder="Enter contact number"
                   keyboardType="phone-pad"
                 />

@@ -4,7 +4,7 @@ import { IDataService } from './DataService';
 // When integrating with Firebase, you would replace the implementation
 // with actual Firebase code, but the interface stays the same
 
-export class FirebaseService<T extends { id: string }> implements IDataService<T> {
+export default class FirebaseService<T extends { id: string }> implements IDataService<T> {
   constructor(private collectionName: string) {}
 
   // Placeholder methods to be implemented with actual Firebase integration

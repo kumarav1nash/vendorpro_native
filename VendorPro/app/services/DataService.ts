@@ -25,4 +25,10 @@ export interface IShopsRepository extends IDataService<any> {}
 
 export interface ISalesmenRepository extends IDataService<any> {
   getShopSalesmen(shopId: string): Promise<any[]>;
+}
+
+export interface IUserRepository extends IDataService<any> {
+  getCurrentUserId(): Promise<string>;
+  getCurrentUserName(): Promise<string>;
+  getCurrentUser(): Promise<any | null>;
 } 
