@@ -144,8 +144,14 @@ export default function SalesmanDashboardScreen() {
           
           const todaySalesAmount = salesmanSales
             .filter(sale => {
-              const saleDate = sale.createdAt.split('T')[0]; // Get YYYY-MM-DD part
-              return saleDate === todayTimestamp && sale.status !== 'rejected';
+              if (!sale.createdAt) return false;
+              try {
+                const saleDate = new Date(sale.createdAt).toISOString().split('T')[0]; // Get YYYY-MM-DD part
+                return saleDate === todayTimestamp && sale.status !== 'rejected';
+              } catch (error) {
+                console.error('Invalid date format for sale:', sale.id);
+                return false;
+              }
             })
             .reduce((sum, sale) => sum + sale.totalAmount, 0);
           setTodaySales(todaySalesAmount);

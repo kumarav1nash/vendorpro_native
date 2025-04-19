@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { router, Link } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import ServiceFactory from '../services/ServiceFactory';
 
 export default function RegisterScreen() {
