@@ -111,4 +111,9 @@ export const SalesmenProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return <SalesmenContext.Provider value={value}>{children}</SalesmenContext.Provider>;
-}; 
+};
+
+// Add default export for the component to fix the routing error
+export default function SalesmenContextScreen() {
+  return null;
+} 

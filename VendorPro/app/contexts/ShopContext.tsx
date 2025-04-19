@@ -179,4 +179,9 @@ export const useShop = () => {
     throw new Error('useShop must be used within a ShopProvider');
   }
   return context;
-}; 
+};
+
+// Add default export for the component to fix the routing error
+export default function ShopContextScreen() {
+  return null;
+} 

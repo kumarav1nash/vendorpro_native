@@ -90,19 +90,28 @@ export default function SalesmanDashboardScreen() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load salesman data
+      // Load salesman data first
+      let currentSalesman: Salesman | null = null;
       const salesmanData = await AsyncStorage.getItem('currentSalesman');
       if (salesmanData) {
-        const parsedSalesman = JSON.parse(salesmanData) as Salesman;
-        setSalesman(parsedSalesman);
+        currentSalesman = JSON.parse(salesmanData) as Salesman;
+        setSalesman(currentSalesman);
       }
 
-      // Load products
+      // Then load and filter products based on salesman's shop
       const productsData = await AsyncStorage.getItem('products');
       if (productsData) {
         const parsedProducts = JSON.parse(productsData) as Product[];
-        setProducts(parsedProducts);
-        setFilteredProducts(parsedProducts);
+        
+        // Filter products to only show those from the salesman's assigned shop
+        if (currentSalesman && currentSalesman.shopId) {
+          const shopProducts = parsedProducts.filter(product => product.shopId === currentSalesman.shopId);
+          setProducts(shopProducts);
+          setFilteredProducts(shopProducts);
+        } else {
+          setProducts([]);
+          setFilteredProducts([]);
+        }
       }
 
       // Load sales
@@ -112,9 +121,9 @@ export default function SalesmanDashboardScreen() {
         setSales(parsedSales);
 
         // Calculate metrics
-        if (salesman) {
+        if (currentSalesman) {
           // Filter sales for this salesman
-          const salesmanSales = parsedSales.filter(sale => sale.salesmanId === salesman.id);
+          const salesmanSales = parsedSales.filter(sale => sale.salesmanId === currentSalesman.id);
           
           // Pending sales
           setPendingSales(salesmanSales.filter(sale => sale.status === 'pending').length);
