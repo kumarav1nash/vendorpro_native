@@ -1,0 +1,9 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+
+- Do not change the structure of the project
+- do not override env variable until asked
