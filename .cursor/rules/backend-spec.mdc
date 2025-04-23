@@ -1,0 +1,3239 @@
+# VendorPro Backend API Technical Specification
+
+
+## Introduction
+
+This document provides detailed technical specifications for integrating with the VendorPro Backend API. The API follows RESTful principles and uses JSON for request and response payloads.
+
+### Base URL
+```
+https://api.vendorpro.com/v1 - prod, not active
+http:localhost:3000 - localhost base url, use this
+http://localhost:3000/api/docs-json - swagger json endpoint for api related detail, use this to get the all apis related information before integrating
+```
+
+### Common Headers
+All API requests must include the following headers, except for login,register related apis
+```
+Content-Type: application/json
+Authorization: Bearer <access_token>
+```
+
+
+here's json repsonse of swagger ui, will be helpful to understand the api specs
+
+{
+openapi: "3.0.0",
+paths: {
+/: {
+get: {
+operationId: "AppController_getHello",
+parameters: [ ],
+responses: {
+200: {
+description: ""
+}
+},
+tags: [
+"App"
+]
+}
+},
+/auth/request-otp: {
+post: {
+operationId: "OtpController_requestOtp",
+parameters: [ ],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/RequestOtpDto"
+}
+}
+}
+},
+responses: {
+200: {
+description: "OTP sent successfully",
+content: {
+application/json: {
+schema: {
+example: {
+message: "OTP sent successfully",
+phoneNumber: "+919876543210"
+}
+}
+}
+}
+},
+400: {
+description: "Bad request"
+}
+},
+summary: "Request OTP for phone number verification",
+tags: [
+"Authentication"
+]
+}
+},
+/auth/verify-otp: {
+post: {
+operationId: "OtpController_verifyOtp",
+parameters: [ ],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/VerifyOtpDto"
+}
+}
+}
+},
+responses: {
+200: {
+description: "OTP verified successfully",
+content: {
+application/json: {
+schema: {
+example: {
+token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+user: {
+id: "123e4567-e89b-12d3-a456-426614174000",
+email: "user@example.com",
+phoneNumber: "+919876543210",
+role: "SHOP_OWNER"
+}
+}
+}
+}
+}
+},
+400: {
+description: "Bad request or invalid OTP"
+}
+},
+summary: "Verify OTP for phone number",
+tags: [
+"Authentication"
+]
+}
+},
+/auth/login: {
+post: {
+operationId: "AuthController_login",
+parameters: [ ],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/LoginDto"
+}
+}
+}
+},
+responses: {
+200: {
+description: "Login successful",
+content: {
+application/json: {
+schema: {
+example: {
+token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+user: {
+id: "123e4567-e89b-12d3-a456-426614174000",
+phoneNumber: "+919876543213",
+role: "SALESMAN"
+}
+}
+}
+}
+}
+},
+401: {
+description: "Unauthorized"
+}
+},
+summary: "Login with email and password",
+tags: [
+"Authentication"
+]
+}
+},
+/users: {
+post: {
+operationId: "UsersController_create",
+parameters: [ ],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/CreateUserDto"
+}
+}
+}
+},
+responses: {
+201: {
+description: "User created successfully"
+},
+400: {
+description: "Bad request"
+},
+409: {
+description: "User already exists"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Create a new user",
+tags: [
+"Users"
+]
+},
+get: {
+operationId: "UsersController_findAll",
+parameters: [
+{
+name: "includeProfile",
+required: true,
+in: "query",
+schema: {
+type: "boolean"
+}
+}
+],
+responses: {
+200: {
+description: "Return all users"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get all users",
+tags: [
+"Users"
+]
+}
+},
+/users/{id}: {
+get: {
+operationId: "UsersController_findOne",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+},
+{
+name: "includeProfile",
+required: true,
+in: "query",
+schema: {
+type: "boolean"
+}
+}
+],
+responses: {
+200: {
+description: "Return the user"
+},
+404: {
+description: "User not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get a user by ID",
+tags: [
+"Users"
+]
+},
+patch: {
+operationId: "UsersController_update",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+}
+],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/UpdateUserDto"
+}
+}
+}
+},
+responses: {
+200: {
+description: "User updated successfully"
+},
+404: {
+description: "User not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Update a user",
+tags: [
+"Users"
+]
+},
+delete: {
+operationId: "UsersController_remove",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "User deleted successfully"
+},
+404: {
+description: "User not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Delete a user",
+tags: [
+"Users"
+]
+}
+},
+/users/{id}/profile: {
+get: {
+operationId: "UsersController_findOneWithProfile",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Return the user profile"
+},
+404: {
+description: "User not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get a user profile by ID",
+tags: [
+"Users"
+]
+}
+},
+/users/email/{email}: {
+get: {
+operationId: "UsersController_findByEmail",
+parameters: [
+{
+name: "email",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+},
+{
+name: "includeProfile",
+required: true,
+in: "query",
+schema: {
+type: "boolean"
+}
+}
+],
+responses: {
+200: {
+description: "Return the user"
+},
+404: {
+description: "User not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get a user by email",
+tags: [
+"Users"
+]
+}
+},
+/users/phone/{phoneNumber}: {
+get: {
+operationId: "UsersController_findByPhone",
+parameters: [
+{
+name: "phoneNumber",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+},
+{
+name: "includeProfile",
+required: true,
+in: "query",
+schema: {
+type: "boolean"
+}
+}
+],
+responses: {
+200: {
+description: "Return the user"
+},
+404: {
+description: "User not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get a user by phone number",
+tags: [
+"Users"
+]
+}
+},
+/users/role/{role}: {
+get: {
+operationId: "UsersController_findByRole",
+parameters: [
+{
+name: "role",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+},
+{
+name: "includeProfile",
+required: true,
+in: "query",
+schema: {
+type: "boolean"
+}
+}
+],
+responses: {
+200: {
+description: "Return users with the specified role"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get users by role",
+tags: [
+"Users"
+]
+}
+},
+/users/{id}/verify-phone: {
+post: {
+operationId: "UsersController_verifyPhone",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Phone number verified successfully"
+},
+404: {
+description: "User not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Verify user phone number",
+tags: [
+"Users"
+]
+}
+},
+/users/{id}/verify-email: {
+post: {
+operationId: "UsersController_verifyEmail",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Email verified successfully"
+},
+404: {
+description: "User not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Verify user email",
+tags: [
+"Users"
+]
+}
+},
+/user-profiles: {
+post: {
+description: "Creates a new user profile for the authenticated user. The user ID is extracted from the JWT token.",
+operationId: "UserProfileController_create",
+parameters: [ ],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/CreateUserProfileDto"
+}
+}
+}
+},
+responses: {
+201: {
+description: "User profile created successfully"
+},
+400: {
+description: "Bad request"
+},
+409: {
+description: "User profile already exists"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Create a new user profile",
+tags: [
+"User Profiles"
+]
+},
+get: {
+operationId: "UserProfileController_findAll",
+parameters: [ ],
+responses: {
+200: {
+description: "Return all user profiles"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get all user profiles",
+tags: [
+"User Profiles"
+]
+}
+},
+/user-profiles/{id}: {
+get: {
+operationId: "UserProfileController_findOne",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Return the user profile"
+},
+404: {
+description: "User profile not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get a user profile by ID",
+tags: [
+"User Profiles"
+]
+},
+patch: {
+operationId: "UserProfileController_update",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+}
+],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/UpdateUserProfileDto"
+}
+}
+}
+},
+responses: {
+200: {
+description: "User profile updated successfully"
+},
+404: {
+description: "User profile not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Update a user profile",
+tags: [
+"User Profiles"
+]
+},
+delete: {
+operationId: "UserProfileController_remove",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "User profile deleted successfully"
+},
+404: {
+description: "User profile not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Delete a user profile",
+tags: [
+"User Profiles"
+]
+}
+},
+/user-profiles/user/{userId}: {
+get: {
+operationId: "UserProfileController_findByUserId",
+parameters: [
+{
+name: "userId",
+required: true,
+in: "path",
+schema: {
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Return the user profile"
+},
+404: {
+description: "User profile not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get a user profile by user ID",
+tags: [
+"User Profiles"
+]
+}
+},
+/shops: {
+post: {
+description: "Creates a new shop and associates it with the authenticated shop owner.",
+operationId: "ShopsController_create",
+parameters: [ ],
+requestBody: {
+required: true,
+description: "Shop details",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/CreateShopDto"
+},
+examples: {
+example1: {
+value: {
+shopName: "My Electronics Store",
+ownerName: "John Doe",
+email: "john@example.com",
+gstinNumber: "29ABCDE1234F1Z5"
+},
+summary: "A sample shop creation request"
+}
+}
+}
+}
+},
+responses: {
+201: {
+description: "The shop has been successfully created.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Shop"
+}
+}
+}
+},
+400: {
+description: "Bad Request - Invalid input data."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can create shops."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Create a new shop (Shop Owner only)",
+tags: [
+"Shops"
+]
+},
+get: {
+description: "Retrieves a list of all shops in the system.",
+operationId: "ShopsController_findAll",
+parameters: [ ],
+responses: {
+200: {
+description: "Return all shops.",
+content: {
+application/json: {
+schema: {
+type: "array",
+items: {
+$ref: "#/components/schemas/Shop"
+}
+}
+}
+}
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get all shops",
+tags: [
+"Shops"
+]
+}
+},
+/shops/my-shops: {
+get: {
+description: "Retrieves a list of all shops owned by the authenticated shop owner.",
+operationId: "ShopsController_findMyShops",
+parameters: [ ],
+responses: {
+200: {
+description: "Return shops owned by the current user.",
+content: {
+application/json: {
+schema: {
+type: "array",
+items: {
+$ref: "#/components/schemas/Shop"
+}
+}
+}
+}
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can view their shops."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get shops owned by the current user (Shop Owner only)",
+tags: [
+"Shops"
+]
+}
+},
+/shops/{id}: {
+get: {
+description: "Retrieves detailed information about a specific shop by its ID.",
+operationId: "ShopsController_findOne",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the shop",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174000",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Return the shop.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Shop"
+}
+}
+}
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+404: {
+description: "Shop not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get a shop by id",
+tags: [
+"Shops"
+]
+},
+patch: {
+description: "Updates the details of a specific shop. Only the shop owner can update their own shops.",
+operationId: "ShopsController_update",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the shop",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174000",
+type: "string"
+}
+}
+],
+requestBody: {
+required: true,
+description: "Updated shop details",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/UpdateShopDto"
+},
+examples: {
+example1: {
+value: {
+shopName: "Updated Electronics Store",
+email: "updated@example.com"
+},
+summary: "A sample shop update request"
+}
+}
+}
+}
+},
+responses: {
+200: {
+description: "The shop has been successfully updated.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Shop"
+}
+}
+}
+},
+400: {
+description: "Bad Request - Invalid input data."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can update their own shops."
+},
+404: {
+description: "Shop not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Update a shop (Shop Owner only)",
+tags: [
+"Shops"
+]
+},
+delete: {
+description: "Deletes a specific shop. Only the shop owner can delete their own shops.",
+operationId: "ShopsController_remove",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the shop",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174000",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "The shop has been successfully deleted.",
+content: {
+application/json: {
+example: {
+message: "Shop deleted successfully"
+}
+}
+}
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can delete their own shops."
+},
+404: {
+description: "Shop not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Delete a shop (Shop Owner only)",
+tags: [
+"Shops"
+]
+}
+},
+/shops/{id}/assign-salesman: {
+post: {
+description: "Assigns an existing salesman to a specific shop. Only the shop owner can assign salesmen to their shops.",
+operationId: "ShopsController_assignSalesman",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the shop",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174000",
+type: "string"
+}
+}
+],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+type: "object",
+properties: {
+salesmanId: {
+type: "string",
+description: "The unique identifier of the salesman to assign",
+example: "123e4567-e89b-12d3-a456-426614174005"
+}
+},
+required: [
+"salesmanId"
+]
+},
+examples: {
+example1: {
+value: {
+salesmanId: "123e4567-e89b-12d3-a456-426614174005"
+},
+summary: "A sample assign salesman request"
+}
+}
+}
+}
+},
+responses: {
+200: {
+description: "The salesman has been successfully assigned to the shop.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Shop"
+}
+}
+}
+},
+400: {
+description: "Bad Request - Invalid input data."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can assign salesmen to their shops."
+},
+404: {
+description: "Shop or salesman not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Assign a salesman to a shop (Shop Owner only)",
+tags: [
+"Shops"
+]
+}
+},
+/shops/{id}/create-salesman: {
+post: {
+description: "Creates a new salesman user and assigns them to a specific shop. Only the shop owner can create salesmen for their shops.",
+operationId: "ShopsController_createSalesman",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the shop",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174000",
+type: "string"
+}
+}
+],
+requestBody: {
+required: true,
+description: "Salesman details",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/CreateSalesmanDto"
+},
+examples: {
+example1: {
+value: {
+phoneNumber: "+919876543213",
+username: "newsalesman",
+password: "password123",
+email: "salesman@example.com",
+firstName: "New",
+lastName: "Salesman"
+},
+summary: "A sample create salesman request"
+}
+}
+}
+}
+},
+responses: {
+201: {
+description: "The salesman has been successfully created and assigned to the shop.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/User"
+}
+}
+}
+},
+400: {
+description: "Bad Request - Invalid input data."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can create salesmen for their shops."
+},
+404: {
+description: "Shop not found."
+},
+409: {
+description: "Conflict - A user with this phone number already exists."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Create a new salesman and assign to shop (Shop Owner only)",
+tags: [
+"Shops"
+]
+}
+},
+/shops/{id}/salesmen: {
+get: {
+description: "Retrieves a list of all salesmen assigned to a specific shop.",
+operationId: "ShopsController_getShopSalesmen",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the shop",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174000",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Return all salesmen assigned to the shop.",
+content: {
+application/json: {
+schema: {
+type: "array",
+items: {
+$ref: "#/components/schemas/User"
+}
+}
+}
+}
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+404: {
+description: "Shop not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get all salesmen assigned to a shop",
+tags: [
+"Shops"
+]
+}
+},
+/inventory/{shopId}: {
+post: {
+description: "Creates a new inventory item for a specific shop. Only the shop owner can add inventory to their shops.",
+operationId: "InventoryController_create",
+parameters: [
+{
+name: "shopId",
+required: true,
+in: "path",
+description: "The unique identifier of the shop",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174000",
+type: "string"
+}
+}
+],
+requestBody: {
+required: true,
+description: "Product details",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/CreateInventoryDto"
+},
+examples: {
+example1: {
+value: {
+productName: "iPhone 13",
+basePrice: 799.99,
+sellingPrice: 999.99,
+stockQuantity: 50,
+productImageUrl: "https://example.com/images/iphone13.jpg"
+},
+summary: "A sample inventory creation request"
+}
+}
+}
+}
+},
+responses: {
+201: {
+description: "The inventory item has been successfully created.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Inventory"
+}
+}
+}
+},
+400: {
+description: "Bad Request - Invalid input data."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can add inventory to their shops."
+},
+404: {
+description: "Shop not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Add a new product to inventory (Shop Owner only)",
+tags: [
+"Inventory"
+]
+}
+},
+/inventory: {
+get: {
+description: "Retrieves a list of all inventory items, optionally filtered by shop ID.",
+operationId: "InventoryController_findAll",
+parameters: [
+{
+name: "shopId",
+required: false,
+in: "query",
+description: "Filter inventory items by shop ID",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174000",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Return all inventory items.",
+content: {
+application/json: {
+schema: {
+type: "array",
+items: {
+$ref: "#/components/schemas/Inventory"
+}
+}
+}
+}
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get all inventory items",
+tags: [
+"Inventory"
+]
+}
+},
+/inventory/{id}: {
+get: {
+description: "Retrieves detailed information about a specific inventory item by its ID.",
+operationId: "InventoryController_findOne",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the inventory item",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174001",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Return the inventory item.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Inventory"
+}
+}
+}
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+404: {
+description: "Inventory item not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get an inventory item by id",
+tags: [
+"Inventory"
+]
+},
+patch: {
+description: "Updates the details of a specific inventory item. Only the shop owner can update inventory in their shops.",
+operationId: "InventoryController_update",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the inventory item",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174001",
+type: "string"
+}
+}
+],
+requestBody: {
+required: true,
+description: "Updated product details",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/UpdateInventoryDto"
+},
+examples: {
+example1: {
+value: {
+productName: "iPhone 13 Pro",
+sellingPrice: 1099.99,
+stockQuantity: 45
+},
+summary: "A sample inventory update request"
+}
+}
+}
+}
+},
+responses: {
+200: {
+description: "The inventory item has been successfully updated.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Inventory"
+}
+}
+}
+},
+400: {
+description: "Bad Request - Invalid input data."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can update inventory in their shops."
+},
+404: {
+description: "Inventory item not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Update an inventory item (Shop Owner only)",
+tags: [
+"Inventory"
+]
+},
+delete: {
+description: "Deletes a specific inventory item. Only the shop owner can delete inventory from their shops.",
+operationId: "InventoryController_remove",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the inventory item",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174001",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "The inventory item has been successfully deleted.",
+content: {
+application/json: {
+example: {
+message: "Inventory item deleted successfully"
+}
+}
+}
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can delete inventory from their shops."
+},
+404: {
+description: "Inventory item not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Delete an inventory item (Shop Owner only)",
+tags: [
+"Inventory"
+]
+}
+},
+/inventory/{id}/stock: {
+patch: {
+description: "Updates the stock quantity of a specific inventory item. Only the shop owner can update stock in their shops.",
+operationId: "InventoryController_updateStock",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the inventory item",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174001",
+type: "string"
+}
+}
+],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+type: "object",
+properties: {
+quantity: {
+type: "number",
+description: "The new stock quantity",
+example: 45
+}
+},
+required: [
+"quantity"
+]
+},
+examples: {
+example1: {
+value: {
+quantity: 45
+},
+summary: "A sample stock update request"
+}
+}
+}
+}
+},
+responses: {
+200: {
+description: "The stock quantity has been successfully updated.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Inventory"
+}
+}
+}
+},
+400: {
+description: "Bad Request - Invalid input data."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can update stock in their shops."
+},
+404: {
+description: "Inventory item not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Update stock quantity (Shop Owner only)",
+tags: [
+"Inventory"
+]
+}
+},
+/sales: {
+post: {
+description: "Creates a new sale record. Only salesmen assigned to a shop can create sales for that shop.",
+operationId: "SalesController_create",
+parameters: [ ],
+requestBody: {
+required: true,
+description: "Sale details",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/CreateSaleDto"
+},
+examples: {
+example1: {
+value: {
+shopId: "123e4567-e89b-12d3-a456-426614174000",
+productId: "123e4567-e89b-12d3-a456-426614174001",
+quantity: 5,
+salePrice: 99.99
+},
+summary: "A sample sale creation request"
+}
+}
+}
+}
+},
+responses: {
+201: {
+description: "The sale has been successfully created.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Sale"
+}
+}
+}
+},
+400: {
+description: "Bad Request - Invalid input data."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only salesmen can create sales."
+},
+404: {
+description: "Shop or product not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Record a new sale (Salesman only)",
+tags: [
+"Sales"
+]
+},
+get: {
+description: "Retrieves a list of all sales, optionally filtered by shop ID or salesman ID.",
+operationId: "SalesController_findAll",
+parameters: [
+{
+name: "shopId",
+required: false,
+in: "query",
+description: "Filter sales by shop ID",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174000",
+type: "string"
+}
+},
+{
+name: "salesmanId",
+required: false,
+in: "query",
+description: "Filter sales by salesman ID",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174003",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Return all sales.",
+content: {
+application/json: {
+schema: {
+type: "array",
+items: {
+$ref: "#/components/schemas/Sale"
+}
+}
+}
+}
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get all sales",
+tags: [
+"Sales"
+]
+}
+},
+/sales/{id}: {
+get: {
+description: "Retrieves detailed information about a specific sale by its ID.",
+operationId: "SalesController_findOne",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the sale",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174002",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Return the sale.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Sale"
+}
+}
+}
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+404: {
+description: "Sale not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get a sale by id",
+tags: [
+"Sales"
+]
+},
+patch: {
+description: "Updates the details of a specific sale. Only the shop owner can update sales.",
+operationId: "SalesController_update",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the sale",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174002",
+type: "string"
+}
+}
+],
+requestBody: {
+required: true,
+description: "Updated sale details",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/UpdateSaleDto"
+},
+examples: {
+example1: {
+value: {
+quantity: 10,
+salePrice: 149.99
+},
+summary: "A sample sale update request"
+}
+}
+}
+}
+},
+responses: {
+200: {
+description: "The sale has been successfully updated.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Sale"
+}
+}
+}
+},
+400: {
+description: "Bad Request - Invalid input data."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can update sales."
+},
+404: {
+description: "Sale not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Update a sale (Shop Owner only)",
+tags: [
+"Sales"
+]
+},
+delete: {
+description: "Deletes a specific sale. Only the shop owner can delete sales.",
+operationId: "SalesController_remove",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the sale",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174002",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "The sale has been successfully deleted."
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can delete sales."
+},
+404: {
+description: "Sale not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Delete a sale (Shop Owner only)",
+tags: [
+"Sales"
+]
+}
+},
+/sales/{id}/approve: {
+post: {
+description: "Approves a pending sale. Only the shop owner can approve sales.",
+operationId: "SalesController_approve",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the sale",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174002",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "The sale has been successfully approved.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Sale"
+}
+}
+}
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can approve sales."
+},
+404: {
+description: "Sale not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Approve a sale (Shop Owner only)",
+tags: [
+"Sales"
+]
+}
+},
+/sales/{id}/reject: {
+post: {
+description: "Rejects a pending sale. Only the shop owner can reject sales.",
+operationId: "SalesController_reject",
+parameters: [
+{
+name: "id",
+required: true,
+in: "path",
+description: "The unique identifier of the sale",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174002",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "The sale has been successfully rejected.",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Sale"
+}
+}
+}
+},
+401: {
+description: "Unauthorized - JWT token is missing or invalid."
+},
+403: {
+description: "Forbidden - Only shop owners can reject sales."
+},
+404: {
+description: "Sale not found."
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Reject a sale (Shop Owner only)",
+tags: [
+"Sales"
+]
+}
+},
+/commissions/rules: {
+post: {
+description: "Creates a new commission rule for the shop. The rule can be percentage-based, fixed amount, or percentage on difference.",
+operationId: "CommissionController_createCommissionRule",
+parameters: [ ],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/CreateCommissionRuleDto"
+},
+examples: {
+percentageExample: {
+value: {
+type: "PERCENTAGE_OF_SALES",
+value: 10.5,
+description: "10.5% commission on all sales",
+isActive: true
+},
+summary: "Percentage-based commission rule"
+},
+fixedAmountExample: {
+value: {
+type: "FIXED_AMOUNT",
+value: 50,
+description: "Fixed ₹50 commission per sale",
+isActive: true
+},
+summary: "Fixed amount commission rule"
+},
+differenceExample: {
+value: {
+type: "PERCENTAGE_ON_DIFFERENCE",
+value: 20,
+description: "20% commission on the difference between sale price and selling price",
+isActive: true
+},
+summary: "Percentage on difference commission rule"
+}
+}
+}
+}
+},
+responses: {
+201: {
+description: "Commission rule created successfully",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/CommissionRule"
+}
+}
+}
+},
+400: {
+description: "Bad request - Invalid input data"
+},
+401: {
+description: "Unauthorized - Invalid or missing authentication token"
+},
+403: {
+description: "Forbidden - User does not have SHOP_OWNER role"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Create a new commission rule",
+tags: [
+"Commissions"
+]
+},
+get: {
+description: "Retrieves all active commission rules associated with the user.",
+operationId: "CommissionController_getCommissionRules",
+parameters: [ ],
+responses: {
+200: {
+description: "List of commission rules retrieved successfully",
+content: {
+application/json: {
+schema: {
+type: "array",
+items: {
+$ref: "#/components/schemas/CommissionRule"
+}
+}
+}
+}
+},
+401: {
+description: "Unauthorized - Invalid or missing authentication token"
+},
+403: {
+description: "Forbidden - User does not have SHOP_OWNER role"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get all commission rules created by the user",
+tags: [
+"Commissions"
+]
+}
+},
+/commissions/rules/assign: {
+post: {
+description: "Assigns an existing commission rule to a specific salesman in the shop.",
+operationId: "CommissionController_assignCommissionRule",
+parameters: [ ],
+requestBody: {
+required: true,
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/AssignCommissionRuleDto"
+},
+examples: {
+example1: {
+value: {
+salesmanId: "123e4567-e89b-12d3-a456-426614174003",
+commissionRuleId: "123e4567-e89b-12d3-a456-426614174000"
+},
+summary: "Assign commission rule to salesman"
+}
+}
+}
+}
+},
+responses: {
+201: {
+description: "Commission rule assigned successfully",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/SalesmenCommissionRules"
+}
+}
+}
+},
+400: {
+description: "Bad request - Invalid input data"
+},
+401: {
+description: "Unauthorized - Invalid or missing authentication token"
+},
+403: {
+description: "Forbidden - User does not have SHOP_OWNER role"
+},
+404: {
+description: "Commission rule or salesman not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Assign a commission rule to a salesman",
+tags: [
+"Commissions"
+]
+}
+},
+/commissions/salesman/{salesmanId}: {
+get: {
+description: "Retrieves all commissions earned by a specific salesman in the shop.",
+operationId: "CommissionController_getSalesmanCommissions",
+parameters: [
+{
+name: "salesmanId",
+required: true,
+in: "path",
+description: "ID of the salesman",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174003",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "List of commissions for the salesman retrieved successfully",
+content: {
+application/json: {
+schema: {
+type: "array",
+items: {
+$ref: "#/components/schemas/Commission"
+}
+}
+}
+}
+},
+401: {
+description: "Unauthorized - Invalid or missing authentication token"
+},
+403: {
+description: "Forbidden - User does not have SHOP_OWNER role"
+},
+404: {
+description: "Salesman not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get all commissions for a specific salesman",
+tags: [
+"Commissions"
+]
+}
+},
+/commissions/shop/{shopId}: {
+get: {
+description: "Retrieves all commissions earned by all salesmen in the shop.",
+operationId: "CommissionController_getShopCommissions",
+parameters: [
+{
+name: "shopId",
+required: true,
+in: "path",
+description: "ID of the shop",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174001",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "List of all shop commissions retrieved successfully",
+content: {
+application/json: {
+schema: {
+type: "array",
+items: {
+$ref: "#/components/schemas/Commission"
+}
+}
+}
+}
+},
+401: {
+description: "Unauthorized - Invalid or missing authentication token"
+},
+403: {
+description: "Forbidden - User does not have SHOP_OWNER role"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Get all commissions for the shop",
+tags: [
+"Commissions"
+]
+}
+},
+/commissions/{commissionId}/mark-paid: {
+post: {
+description: "Marks a specific commission as paid by the shop owner.",
+operationId: "CommissionController_markCommissionAsPaid",
+parameters: [
+{
+name: "commissionId",
+required: true,
+in: "path",
+description: "ID of the commission to mark as paid",
+schema: {
+example: "123e4567-e89b-12d3-a456-426614174004",
+type: "string"
+}
+}
+],
+responses: {
+200: {
+description: "Commission marked as paid successfully",
+content: {
+application/json: {
+schema: {
+$ref: "#/components/schemas/Commission"
+}
+}
+}
+},
+401: {
+description: "Unauthorized - Invalid or missing authentication token"
+},
+403: {
+description: "Forbidden - User does not have SHOP_OWNER role"
+},
+404: {
+description: "Commission not found"
+}
+},
+security: [
+{
+JWT-auth: [ ]
+}
+],
+summary: "Mark a commission as paid",
+tags: [
+"Commissions"
+]
+}
+}
+},
+info: {
+title: "VendorPro API",
+description: "The VendorPro API documentation",
+version: "1.0",
+contact: { }
+},
+tags: [
+{
+name: "Authentication",
+description: "Authentication endpoints"
+},
+{
+name: "Users",
+description: "User management endpoints"
+},
+{
+name: "User Profiles",
+description: "User profile management endpoints"
+},
+{
+name: "Shops",
+description: "Shop management endpoints"
+},
+{
+name: "Inventory",
+description: "Inventory management endpoints"
+},
+{
+name: "Sales",
+description: "Sales management endpoints"
+},
+{
+name: "Commissions",
+description: "Commission management endpoints"
+}
+],
+servers: [ ],
+components: {
+securitySchemes: {
+JWT-auth: {
+scheme: "bearer",
+bearerFormat: "JWT",
+type: "http",
+name: "JWT",
+description: "Enter JWT token",
+in: "header"
+}
+},
+schemas: {
+RequestOtpDto: {
+type: "object",
+properties: {
+phoneNumber: {
+type: "string",
+description: "Phone number to send OTP to",
+example: "+919876543210"
+}
+},
+required: [
+"phoneNumber"
+]
+},
+VerifyOtpDto: {
+type: "object",
+properties: {
+phoneNumber: {
+type: "string",
+description: "Phone number that received the OTP",
+example: "+919876543210"
+},
+otp: {
+type: "string",
+description: "OTP received on the phone number",
+example: "123456",
+minLength: 6,
+maxLength: 6
+}
+},
+required: [
+"phoneNumber",
+"otp"
+]
+},
+LoginDto: {
+type: "object",
+properties: {
+phoneNumber: {
+type: "string",
+description: "User Phone Number",
+example: "+201012345678"
+},
+password: {
+type: "string",
+description: "User password",
+example: "password123"
+}
+},
+required: [
+"phoneNumber",
+"password"
+]
+},
+CreateUserDto: {
+type: "object",
+properties: {
+email: {
+type: "string",
+description: "Email address of the user",
+example: "john.doe@example.com"
+},
+password: {
+type: "string",
+description: "Password for the user account",
+example: "SecurePassword123!"
+},
+phoneNumber: {
+type: "string",
+description: "Phone number of the user",
+example: "+919876543210"
+},
+role: {
+type: "string",
+description: "Role of the user",
+enum: [
+"SHOP_OWNER",
+"SALESMAN"
+],
+example: "SHOP_OWNER"
+},
+isPhoneVerified: {
+type: "boolean",
+description: "Whether the user's phone number is verified",
+example: false
+}
+},
+required: [
+"phoneNumber",
+"role"
+]
+},
+UpdateUserDto: {
+type: "object",
+properties: { }
+},
+CreateUserProfileDto: {
+type: "object",
+properties: {
+firstName: {
+type: "string",
+description: "First name of the user",
+example: "John"
+},
+lastName: {
+type: "string",
+description: "Last name of the user",
+example: "Doe"
+},
+dateOfBirth: {
+format: "date-time",
+type: "string",
+description: "Date of birth of the user",
+example: "1990-01-01"
+},
+gender: {
+type: "string",
+description: "Gender of the user",
+example: "male"
+},
+address: {
+type: "string",
+description: "Address of the user",
+example: "123 Main St, City, Country"
+},
+city: {
+type: "string",
+description: "City of the user",
+example: "Mumbai"
+},
+state: {
+type: "string",
+description: "State of the user",
+example: "Maharashtra"
+},
+country: {
+type: "string",
+description: "Country of the user",
+example: "India"
+},
+postalCode: {
+type: "string",
+description: "Postal code of the user",
+example: "400001"
+},
+profilePicture: {
+type: "string",
+description: "Profile picture URL of the user",
+example: "https://example.com/profile.jpg"
+},
+bio: {
+type: "string",
+description: "Bio of the user",
+example: "Software developer with 5 years of experience"
+},
+preferences: {
+type: "object",
+description: "User preferences as a key-value object",
+example: {
+theme: "dark",
+notifications: true,
+language: "en"
+},
+additionalProperties: true
+}
+},
+required: [
+"firstName",
+"lastName",
+"preferences"
+]
+},
+UpdateUserProfileDto: {
+type: "object",
+properties: {
+firstName: {
+type: "string",
+description: "First name of the user",
+example: "John"
+},
+lastName: {
+type: "string",
+description: "Last name of the user",
+example: "Doe"
+},
+dateOfBirth: {
+format: "date-time",
+type: "string",
+description: "Date of birth of the user",
+example: "1990-01-01"
+},
+gender: {
+type: "string",
+description: "Gender of the user",
+example: "male"
+},
+address: {
+type: "string",
+description: "Address of the user",
+example: "123 Main St, City, Country"
+},
+city: {
+type: "string",
+description: "City of the user",
+example: "Mumbai"
+},
+state: {
+type: "string",
+description: "State of the user",
+example: "Maharashtra"
+},
+country: {
+type: "string",
+description: "Country of the user",
+example: "India"
+},
+postalCode: {
+type: "string",
+description: "Postal code of the user",
+example: "400001"
+},
+profilePicture: {
+type: "string",
+description: "Profile picture URL of the user",
+example: "https://example.com/profile.jpg"
+},
+bio: {
+type: "string",
+description: "Bio of the user",
+example: "Software developer with 5 years of experience"
+},
+preferences: {
+type: "object",
+description: "User preferences as a key-value object",
+example: {
+theme: "dark",
+notifications: true,
+language: "en"
+},
+additionalProperties: true
+}
+}
+},
+CreateShopDto: {
+type: "object",
+properties: {
+shopName: {
+type: "string",
+description: "The name of the shop"
+},
+ownerName: {
+type: "string",
+description: "The name of the shop owner"
+},
+email: {
+type: "string",
+description: "The email address of the shop"
+},
+gstinNumber: {
+type: "string",
+description: "The GSTIN number of the shop"
+}
+},
+required: [
+"shopName",
+"ownerName"
+]
+},
+UserProfile: {
+type: "object",
+properties: { }
+},
+Inventory: {
+type: "object",
+properties: {
+id: {
+type: "string",
+description: "The unique identifier of the inventory item"
+},
+shop: {
+description: "The shop this inventory item belongs to",
+allOf: [
+{
+$ref: "#/components/schemas/Shop"
+}
+]
+},
+productName: {
+type: "string",
+description: "The name of the product"
+},
+basePrice: {
+type: "number",
+description: "The base price of the product"
+},
+sellingPrice: {
+type: "number",
+description: "The selling price of the product"
+},
+stockQuantity: {
+type: "number",
+description: "The quantity of the product in stock"
+},
+productImageUrl: {
+type: "string",
+description: "The URL of the product image"
+},
+createdAt: {
+format: "date-time",
+type: "string",
+description: "The date when the inventory item was created"
+},
+updatedAt: {
+format: "date-time",
+type: "string",
+description: "The date when the inventory item was last updated"
+}
+},
+required: [
+"id",
+"shop",
+"productName",
+"basePrice",
+"sellingPrice",
+"stockQuantity",
+"createdAt",
+"updatedAt"
+]
+},
+ShopSalesman: {
+type: "object",
+properties: {
+id: {
+type: "string",
+description: "The unique identifier of the shop-salesman relationship"
+},
+shop: {
+description: "The shop this salesman is assigned to",
+allOf: [
+{
+$ref: "#/components/schemas/Shop"
+}
+]
+},
+salesman: {
+description: "The salesman assigned to this shop",
+allOf: [
+{
+$ref: "#/components/schemas/User"
+}
+]
+},
+isActive: {
+type: "boolean",
+description: "Whether this salesman is active in this shop"
+},
+createdAt: {
+format: "date-time",
+type: "string",
+description: "The timestamp when this relationship was created"
+},
+updatedAt: {
+format: "date-time",
+type: "string",
+description: "The timestamp when this relationship was last updated"
+}
+},
+required: [
+"id",
+"shop",
+"salesman",
+"isActive",
+"createdAt",
+"updatedAt"
+]
+},
+Shop: {
+type: "object",
+properties: {
+id: {
+type: "string",
+description: "The unique identifier of the shop"
+},
+shopName: {
+type: "string",
+description: "The name of the shop"
+},
+ownerName: {
+type: "string",
+description: "The name of the shop owner"
+},
+email: {
+type: "string",
+description: "The email address of the shop"
+},
+gstinNumber: {
+type: "string",
+description: "The GSTIN number of the shop"
+},
+owner: {
+description: "The user who owns this shop",
+allOf: [
+{
+$ref: "#/components/schemas/User"
+}
+]
+},
+inventories: {
+description: "The inventory items associated with this shop",
+type: "array",
+items: {
+$ref: "#/components/schemas/Inventory"
+}
+},
+salesmen: {
+description: "The salesmen assigned to this shop",
+type: "array",
+items: {
+$ref: "#/components/schemas/ShopSalesman"
+}
+},
+createdAt: {
+format: "date-time",
+type: "string",
+description: "The timestamp when the shop was created"
+},
+updatedAt: {
+format: "date-time",
+type: "string",
+description: "The timestamp when the shop was last updated"
+}
+},
+required: [
+"id",
+"shopName",
+"ownerName",
+"owner",
+"inventories",
+"salesmen",
+"createdAt",
+"updatedAt"
+]
+},
+User: {
+type: "object",
+properties: {
+profile: {
+$ref: "#/components/schemas/UserProfile"
+},
+shops: {
+type: "array",
+items: {
+$ref: "#/components/schemas/Shop"
+}
+},
+assignedShops: {
+type: "array",
+items: {
+$ref: "#/components/schemas/ShopSalesman"
+}
+}
+},
+required: [
+"profile",
+"shops",
+"assignedShops"
+]
+},
+UpdateShopDto: {
+type: "object",
+properties: {
+shopName: {
+type: "string",
+description: "The name of the shop"
+},
+ownerName: {
+type: "string",
+description: "The name of the shop owner"
+},
+email: {
+type: "string",
+description: "The email address of the shop"
+},
+gstinNumber: {
+type: "string",
+description: "The GSTIN number of the shop"
+}
+}
+},
+CreateSalesmanDto: {
+type: "object",
+properties: {
+phoneNumber: {
+type: "string",
+description: "The phone number of the salesman"
+},
+password: {
+type: "string",
+description: "The password for the salesman"
+},
+email: {
+type: "string",
+description: "The email address of the salesman"
+},
+firstName: {
+type: "string",
+description: "The first name of the salesman"
+},
+lastName: {
+type: "string",
+description: "The last name of the salesman"
+}
+},
+required: [
+"phoneNumber",
+"password"
+]
+},
+CreateInventoryDto: {
+type: "object",
+properties: {
+productName: {
+type: "string",
+description: "The name of the product"
+},
+basePrice: {
+type: "number",
+description: "The base price of the product"
+},
+sellingPrice: {
+type: "number",
+description: "The selling price of the product"
+},
+stockQuantity: {
+type: "number",
+description: "The quantity of the product in stock"
+},
+productImageUrl: {
+type: "string",
+description: "The URL of the product image"
+}
+},
+required: [
+"productName",
+"basePrice",
+"sellingPrice",
+"stockQuantity"
+]
+},
+UpdateInventoryDto: {
+type: "object",
+properties: {
+productName: {
+type: "string",
+description: "The name of the product"
+},
+basePrice: {
+type: "number",
+description: "The base price of the product"
+},
+sellingPrice: {
+type: "number",
+description: "The selling price of the product"
+},
+stockQuantity: {
+type: "number",
+description: "The quantity of the product in stock"
+},
+productImageUrl: {
+type: "string",
+description: "The URL of the product image"
+}
+}
+},
+CreateSaleDto: {
+type: "object",
+properties: {
+shopId: {
+type: "string",
+description: "The ID of the shop where the sale occurred",
+example: "ac47d110-55f6-4f6a-bbb4-f2c0c4768899"
+},
+productId: {
+type: "string",
+description: "The ID of the product that was sold",
+example: "b07c586f-1d4d-43a7-92cf-8a71a8a504a7"
+},
+quantity: {
+type: "number",
+description: "The quantity of the product sold",
+example: 5,
+minimum: 1
+},
+salePrice: {
+type: "number",
+description: "The price at which the product was sold",
+example: 5099.99,
+minimum: 0.01
+}
+},
+required: [
+"shopId",
+"productId",
+"quantity",
+"salePrice"
+]
+},
+SaleStatus: {
+type: "string",
+enum: [
+"pending",
+"approved",
+"rejected"
+],
+description: "The status of the sale"
+},
+Sale: {
+type: "object",
+properties: {
+id: {
+type: "string",
+description: "The unique identifier of the sale",
+example: "123e4567-e89b-12d3-a456-426614174002"
+},
+salesman: {
+description: "The salesman who created the sale",
+allOf: [
+{
+$ref: "#/components/schemas/User"
+}
+]
+},
+shop: {
+description: "The shop where the sale occurred",
+allOf: [
+{
+$ref: "#/components/schemas/Shop"
+}
+]
+},
+product: {
+description: "The product that was sold",
+allOf: [
+{
+$ref: "#/components/schemas/Inventory"
+}
+]
+},
+quantity: {
+type: "number",
+description: "The quantity of the product sold",
+example: 5,
+minimum: 1
+},
+salePrice: {
+type: "number",
+description: "The price at which the product was sold",
+example: 99.99,
+minimum: 0.01
+},
+status: {
+description: "The status of the sale",
+example: "pending",
+allOf: [
+{
+$ref: "#/components/schemas/SaleStatus"
+}
+]
+},
+createdAt: {
+format: "date-time",
+type: "string",
+description: "The date and time when the sale was created",
+example: "2023-06-15T10:30:00.000Z"
+},
+updatedAt: {
+format: "date-time",
+type: "string",
+description: "The date and time when the sale was last updated",
+example: "2023-06-15T10:30:00.000Z"
+}
+},
+required: [
+"id",
+"salesman",
+"shop",
+"product",
+"quantity",
+"salePrice",
+"status",
+"createdAt",
+"updatedAt"
+]
+},
+UpdateSaleDto: {
+type: "object",
+properties: {
+shopId: {
+type: "string",
+description: "The ID of the shop where the sale occurred",
+example: "ac47d110-55f6-4f6a-bbb4-f2c0c4768899"
+},
+productId: {
+type: "string",
+description: "The ID of the product that was sold",
+example: "b07c586f-1d4d-43a7-92cf-8a71a8a504a7"
+},
+quantity: {
+type: "number",
+description: "The quantity of the product sold",
+example: 5,
+minimum: 1
+},
+salePrice: {
+type: "number",
+description: "The price at which the product was sold",
+example: 5099.99,
+minimum: 0.01
+}
+}
+},
+CreateCommissionRuleDto: {
+type: "object",
+properties: { }
+},
+CommissionType: {
+type: "string",
+enum: [
+"PERCENTAGE_OF_SALES",
+"FIXED_AMOUNT",
+"PERCENTAGE_ON_DIFFERENCE"
+],
+description: "Type of commission rule"
+},
+CommissionRule: {
+type: "object",
+properties: {
+id: {
+type: "string",
+description: "Unique identifier of the commission rule",
+example: "123e4567-e89b-12d3-a456-426614174000"
+},
+user: {
+description: "User who created the commission rule",
+allOf: [
+{
+$ref: "#/components/schemas/User"
+}
+]
+},
+type: {
+description: "Type of commission rule",
+example: "PERCENTAGE_OF_SALES",
+allOf: [
+{
+$ref: "#/components/schemas/CommissionType"
+}
+]
+},
+value: {
+type: "number",
+description: "Value for the commission calculation (percentage or fixed amount)",
+example: 10.5,
+minimum: 0
+},
+description: {
+type: "string",
+description: "Description of the commission rule",
+example: "10% commission on all sales"
+},
+isActive: {
+type: "boolean",
+description: "Whether the commission rule is currently active",
+default: true
+},
+commissions: {
+description: "Commissions created using this rule",
+type: "array",
+items: {
+$ref: "#/components/schemas/Commission"
+}
+},
+createdAt: {
+format: "date-time",
+type: "string",
+description: "Timestamp when the commission rule was created",
+example: "2024-04-21T12:00:00Z"
+},
+updatedAt: {
+format: "date-time",
+type: "string",
+description: "Timestamp when the commission rule was last updated",
+example: "2024-04-21T12:00:00Z"
+}
+},
+required: [
+"id",
+"user",
+"type",
+"value",
+"isActive",
+"commissions",
+"createdAt",
+"updatedAt"
+]
+},
+Commission: {
+type: "object",
+properties: {
+id: {
+type: "string",
+description: "Unique identifier of the commission",
+example: "123e4567-e89b-12d3-a456-426614174000"
+},
+commissionRule: {
+description: "Commission rule used to calculate this commission",
+allOf: [
+{
+$ref: "#/components/schemas/CommissionRule"
+}
+]
+},
+commissionRuleId: {
+type: "string",
+description: "ID of the commission rule used",
+example: "123e4567-e89b-12d3-a456-426614174000"
+},
+sale: {
+description: "Sale that generated this commission",
+allOf: [
+{
+$ref: "#/components/schemas/Sale"
+}
+]
+},
+saleId: {
+type: "string",
+description: "ID of the sale that generated this commission",
+example: "123e4567-e89b-12d3-a456-426614174000"
+},
+amount: {
+type: "number",
+description: "Amount of commission earned",
+example: 150.5,
+minimum: 0
+},
+isPaid: {
+type: "boolean",
+description: "Whether the commission has been paid",
+default: false
+},
+createdAt: {
+format: "date-time",
+type: "string",
+description: "Timestamp when the commission was created",
+example: "2024-04-21T12:00:00Z"
+},
+updatedAt: {
+format: "date-time",
+type: "string",
+description: "Timestamp when the commission was last updated",
+example: "2024-04-21T12:00:00Z"
+}
+},
+required: [
+"id",
+"commissionRule",
+"commissionRuleId",
+"sale",
+"saleId",
+"amount",
+"isPaid",
+"createdAt",
+"updatedAt"
+]
+},
+AssignCommissionRuleDto: {
+type: "object",
+properties: { }
+},
+SalesmenCommissionRules: {
+type: "object",
+properties: {
+id: {
+type: "string",
+example: "123e4567-e89b-12d3-a456-426614174000"
+},
+commissionRuleId: {
+type: "string",
+example: "123e4567-e89b-12d3-a456-426614174001"
+},
+salesmanId: {
+type: "string",
+example: "123e4567-e89b-12d3-a456-426614174002"
+},
+ownerId: {
+type: "string",
+example: "123e4567-e89b-12d3-a456-426614174003"
+},
+isActive: {
+type: "boolean",
+example: true
+},
+createdAt: {
+format: "date-time",
+type: "string",
+example: "2024-04-21T12:00:00Z"
+},
+updatedAt: {
+format: "date-time",
+type: "string",
+example: "2024-04-21T12:00:00Z"
+}
+},
+required: [
+"id",
+"commissionRuleId",
+"salesmanId",
+"ownerId",
+"isActive",
+"createdAt",
+"updatedAt"
+]
+}
+}
+}
+}
