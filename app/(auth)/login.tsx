@@ -10,15 +10,14 @@ import {
   Alert,
 } from 'react-native';
 import { router, Link } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import ServiceFactory from '../services/ServiceFactory';
+import { useAuth } from '../../src/contexts/AuthContext';
 
 export default function LoginScreen() {
+  const { requestOtp, verifyOtp, error: authError, isLoading } = useAuth();
   const [step, setStep] = useState(1);
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [timer, setTimer] = useState(0);
 
@@ -42,63 +41,24 @@ export default function LoginScreen() {
       setError('Please enter a valid 10-digit mobile number');
       return;
     }
-    setLoading(true);
     try {
-      // Get user repository
-      const userRepository = ServiceFactory.getUserRepository();
-      
-      // Check if user exists with this mobile number
-      const users = await userRepository.getAll();
-      const existingUser = users.find(user => user.mobile === mobile);
-      
-      if (!existingUser) {
-        // User doesn't exist, prompt to register
-        Alert.alert(
-          'Account Not Found',
-          'No account found with this mobile number. Would you like to register?',
-          [
-            {
-              text: 'Cancel',
-              style: 'cancel',
-              onPress: () => {
-                setLoading(false);
-                setError('');
-              },
-            },
-            {
-              text: 'Register',
-              onPress: () => {
-                setLoading(false);
-                router.push('/register');
-              },
-            },
-          ]
-        );
-        return;
-      }
-
-      // TODO: Implement your OTP sending logic here
+      await requestOtp({ phoneNumber: mobile });
       setError('');
       setStep(2);
       setTimer(30); // Start 30-second timer for resend
     } catch (err) {
-      setError('Failed to send OTP. Please try again.');
-    } finally {
-      setLoading(false);
+      setError(authError || 'Failed to send OTP. Please try again.');
     }
   };
 
   const handleResendOTP = async () => {
     if (timer > 0) return;
-    setLoading(true);
     try {
-      // TODO: Implement your OTP resend logic here
+      await requestOtp({ phoneNumber: mobile });
       setTimer(30); // Restart timer
       setError('');
     } catch (err) {
-      setError('Failed to resend OTP. Please try again.');
-    } finally {
-      setLoading(false);
+      setError(authError || 'Failed to resend OTP. Please try again.');
     }
   };
 
@@ -107,37 +67,11 @@ export default function LoginScreen() {
       setError('Please enter a valid 6-digit OTP');
       return;
     }
-    setLoading(true);
     try {
-      // Get user repository
-      const userRepository = ServiceFactory.getUserRepository();
-      
-      // Get existing user data
-      const users = await userRepository.getAll();
-      const userData = users.find(user => user.mobile === mobile);
-      
-      if (!userData) {
-        setError('User not found. Please try again.');
-        return;
-      }
-      
-      // TODO: Implement your OTP verification logic here
-      
-      // Check if shop details exist
-      const shopDetails = await AsyncStorage.getItem('shopDetails');
-      const onboardingComplete = await AsyncStorage.getItem('onboardingComplete');
-      
-      if (shopDetails && onboardingComplete) {
-        // If onboarding is complete, go to dashboard
-        router.replace('/(tabs)/dashboard');
-      } else {
-        // If onboarding is not complete, redirect to onboarding
-        router.replace('/(onboarding)/shop-details');
-      }
+      await verifyOtp({ phoneNumber: mobile, otp });
+      router.replace('/(tabs)/dashboard');
     } catch (err) {
-      setError('Invalid OTP. Please try again.');
-    } finally {
-      setLoading(false);
+      setError(authError || 'Invalid OTP. Please try again.');
     }
   };
 
@@ -168,9 +102,9 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={styles.button}
             onPress={handleSendOTP}
-            disabled={loading}
+            disabled={isLoading}
           >
-            {loading ? (
+            {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.buttonText}>Send OTP</Text>
@@ -191,9 +125,9 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={styles.button}
             onPress={handleVerifyOTP}
-            disabled={loading}
+            disabled={isLoading}
           >
-            {loading ? (
+            {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.buttonText}>Verify & Login</Text>
@@ -203,7 +137,7 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[styles.resendButton, timer > 0 && styles.resendButtonDisabled]}
             onPress={handleResendOTP}
-            disabled={timer > 0 || loading}
+            disabled={timer > 0 || isLoading}
           >
             <Text style={[styles.resendText, timer > 0 && styles.resendTextDisabled]}>
               {timer > 0 ? `Resend OTP in ${formatTime(timer)}` : 'Resend OTP'}
@@ -212,14 +146,14 @@ export default function LoginScreen() {
         </View>
       )}
 
-      <View style={styles.footer}>
+      {/* <View style={styles.footer}>
         <Text style={styles.footerText}>New to VendorPro? </Text>
         <Link href="/register" asChild>
           <TouchableOpacity>
             <Text style={styles.registerLink}>Register here</Text>
           </TouchableOpacity>
         </Link>
-      </View>
+      </View> */}
 
       <TouchableOpacity style={styles.salesmanLoginButton} onPress={goToSalesmanLogin}>
         <MaterialCommunityIcons name="account-tie" size={20} color="#fff" style={styles.salesmanIcon} />

@@ -33,8 +33,8 @@ export default function Index() {
     );
   }
 
-  // If shop details don't exist, redirect to onboarding
-  if (!hasShopDetails) {
+  // If shop details don't exist, and user is logged in, redirect to onboarding
+  if (!hasShopDetails && false) {
     return <Redirect href="/(onboarding)/shop-details" />;
   }
 

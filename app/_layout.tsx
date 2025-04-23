@@ -7,6 +7,7 @@ import { ProductsProvider } from './contexts/ProductContext';
 import { ShopProvider } from './contexts/ShopContext';
 import { SalesmenProvider } from './contexts/SalesmenContext';
 import { UserProvider } from './contexts/UserContext';
+import { AuthProvider } from '../src/contexts/AuthContext';
 
 // Global layout component that wraps the entire app
 export default function RootLayout() {
@@ -17,6 +18,7 @@ export default function RootLayout() {
       <StatusBar style="auto" />
       
       {/* Context providers for data sharing across the app */}
+      <AuthProvider>
       <UserProvider>
         <ShopProvider>
           <ProductsProvider>
@@ -50,6 +52,7 @@ export default function RootLayout() {
           </ProductsProvider>
         </ShopProvider>
       </UserProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }
