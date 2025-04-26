@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAuthSuccess = async (token: string, refreshToken: string, user: User) => {
     try {
-      await SecureStore.setItemAsync('authToken', token);
+      await SecureStore.setItemAsync('accessToken', token);
       await SecureStore.setItemAsync('refreshToken', refreshToken);
       await SecureStore.setItemAsync('user', JSON.stringify(user));
       authService.setAuthToken(token);
@@ -71,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       setError(null);
       const response = await authService.login(data);
-      await handleAuthSuccess(response.token, response.refreshToken, response.user);
+      await handleAuthSuccess(response.accessToken, response.refreshToken, response.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
       throw err;
@@ -98,7 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       setError(null);
       const response = await authService.verifyOtp(data);
-      await handleAuthSuccess(response.token, response.refreshToken, response.user);
+      await handleAuthSuccess(response.accessToken, response.refreshToken, response.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'OTP verification failed');
       throw err;

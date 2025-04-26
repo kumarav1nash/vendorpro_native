@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { AuthResponse, LoginDto, OtpResponse, RequestOtpDto, VerifyOtpDto, RefreshTokenDto, RefreshTokenResponse, LogoutDto } from '../types/auth';
 
-const API_BASE_URL = 'http://192.168.1.8:3000';
+const API_BASE_URL = 'http://192.168.1.9:3000';
 //const API_LOCAL_URL = 'http://localhost:3000';
 
 // Helper to ensure phone number has +91 country code

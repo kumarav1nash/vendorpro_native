@@ -91,14 +91,19 @@ export default function LoginScreen() {
       {step === 1 ? (
         <View style={styles.form}>
           <Text style={styles.label}>Enter your mobile number</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="10-digit mobile number"
-            value={mobile}
-            onChangeText={setMobile}
-            keyboardType="numeric"
-            maxLength={10}
-          />
+          <View style={styles.inputRow}>
+            <View style={styles.countryCodeBox}>
+              <Text style={styles.countryCodeText}>+91</Text>
+            </View>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="10-digit mobile number"
+              value={mobile}
+              onChangeText={setMobile}
+              keyboardType="numeric"
+              maxLength={10}
+            />
+          </View>
           <TouchableOpacity
             style={styles.button}
             onPress={handleSendOTP}
@@ -203,14 +208,36 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#333',
   },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  countryCodeBox: {
+    paddingVertical: 15,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f0f0',
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRightWidth: 0,
+  },
+  countryCodeText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
     padding: 15,
     borderRadius: 8,
-    marginBottom: 15,
+    marginBottom: 0,
     fontSize: 16,
     backgroundColor: '#f8f8f8',
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
   },
   button: {
     backgroundColor: '#007AFF',
