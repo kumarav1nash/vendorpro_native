@@ -1,0 +1,4311 @@
+# VendorPro Backend API Technical Specification
+
+
+## Introduction
+
+This document provides detailed technical specifications for integrating with the VendorPro Backend API. The API follows RESTful principles and uses JSON for request and response payloads.
+
+### Base URL
+```
+https://api.vendorpro.com/v1 - prod, not active
+http:localhost:3000 - localhost base url, use this
+http://localhost:3000/api/docs-json - swagger json endpoint for api related detail, use this to get the all apis related information before integrating
+```
+
+### Common Headers
+All API requests must include the following headers, except for login,register related apis
+```
+Content-Type: application/json
+Authorization: Bearer <access_token>
+```
+
+
+here's the postman json for all the backend apis available please use this to understand the apis specifications
+
+{
+	"info": {
+		"_postman_id": "bf94dac3-227b-421b-af21-57bc437aea95",
+		"name": "VendorPro",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "12293888"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Request OTP",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phoneNumber\":\"+918920078542\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/auth/request-otp",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"auth",
+								"request-otp"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"phoneNumber\":\"+918920078542\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/auth/request-otp",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"auth",
+										"request-otp"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "35"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"23-YsSrbfhPBo5PNRhpOhArqd7KnMQ\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 17:33:51 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"OTP sent successfully\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Verify OTP",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Parse the response body to extract the access token and refresh token",
+									"const responseBody = pm.response.json();",
+									"const accessToken = responseBody.accessToken;",
+									"const refreshToken = responseBody.refreshToken;",
+									"",
+									"// Store the tokens in collection variables",
+									"pm.collectionVariables.set('accessToken', accessToken);",
+									"pm.collectionVariables.set('refreshToken', refreshToken);",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phoneNumber\":\"+918920078542\",\n    \"otp\":\"738034\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/auth/verify-otp",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"auth",
+								"verify-otp"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"phoneNumber\":\"+918920078542\",\n    \"otp\":\"883382\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/auth/verify-otp",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"auth",
+										"verify-otp"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "678"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2a6-1DR5T16BXMe0TjkII2ky0rnR9k8\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 17:33:59 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkOTIzMi0xNzk1LTQzMzYtYjZkNS04ZDdmNmNkZTY0ZWIiLCJlbWFpbCI6bnVsbCwicGhvbmVOdW1iZXIiOiIrOTE4OTIwMDc4NTQyIiwicm9sZSI6IlNIT1BfT1dORVIiLCJpYXQiOjE3NDU1MTYwMzksImV4cCI6MTc0NTUxNjkzOX0.j0Nj-13TrZjRI80nEQ2Hsno1zJhAT3hCkDZ7oDmjuMA\",\n    \"refreshToken\": \"99275e3113b7b15d4abd41ab296747bfe4b68a2091b83cea3c5758d663f7b2f1a29509b451e70f9c\",\n    \"user\": {\n        \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n        \"email\": null,\n        \"password\": null,\n        \"phoneNumber\": \"+918920078542\",\n        \"role\": \"SHOP_OWNER\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": null,\n        \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n        \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Parse the response body to extract the access token and refresh token",
+									"const responseBody = pm.response.json();",
+									"const accessToken = responseBody.accessToken;",
+									"const refreshToken = responseBody.refreshToken;",
+									"",
+									"// Store the tokens in collection variables",
+									"pm.collectionVariables.set('accessToken', accessToken);",
+									"pm.collectionVariables.set('refreshToken', refreshToken);",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"phoneNumber\": \"+919876543213\",\n    \"password\" :\"password123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/auth/login",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Invalid Creds",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"phoneNumber\": \"+918920078542\",\n    \"password\" :\"password\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/auth/login",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "73"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"49-Fx+yDPXfDSYD3nxIxyU6P47CVX0\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 17:47:00 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"Invalid credentials\",\n    \"error\": \"Unauthorized\",\n    \"statusCode\": 401\n}"
+						},
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"phoneNumber\": \"+919876543213\",\n    \"password\" :\"password123\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/auth/login",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "795"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"31b-kRGfHB8A4v/3EeK+8E9ICPriQHE\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 17:54:59 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiYjQ5ZDVjOC1lZjEyLTQ0YTEtOWU4Ni04YTRjZWVmMzZlZDciLCJlbWFpbCI6InNhbGVzbWFuQGV4YW1wbGUuY29tIiwicGhvbmVOdW1iZXIiOiIrOTE5ODc2NTQzMjEzIiwicm9sZSI6IlNBTEVTTUFOIiwiaWF0IjoxNzQ1NTE3Mjk5LCJleHAiOjE3NDU1MTgxOTl9.fgk3dEXgGLVrZ3ud-gglB496QgYs5h6X-PJCbqF2OI8\",\n    \"refreshToken\": \"627174dae1b4178bfd9e2aead6218f85c9a36a688c82403fee254a06ec7627cd859e61f11cab89a5\",\n    \"user\": {\n        \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n        \"email\": \"salesman@example.com\",\n        \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n        \"phoneNumber\": \"+919876543213\",\n        \"role\": \"SALESMAN\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": \"2025-04-20T20:29:24.719Z\",\n        \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n        \"updatedAt\": \"2025-04-20T14:59:24.724Z\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Refresh Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Parse the response body to extract the access token and refresh token",
+									"const responseBody = pm.response.json();",
+									"const accessToken = responseBody.accessToken;",
+									"const refreshToken = responseBody.refreshToken;",
+									"",
+									"// Store the tokens in collection variables",
+									"pm.collectionVariables.set('accessToken', accessToken);",
+									"pm.collectionVariables.set('refreshToken', refreshToken);",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refreshToken\":\"{{refreshToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/auth/refresh-token",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"auth",
+								"refresh-token"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"refreshToken\":\"99275e3113b7b15d4abd41ab296747bfe4b68a2091b83cea3c5758d663f7b2f1a29509b451e70f9c\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/auth/refresh-token",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"auth",
+										"refresh-token"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "678"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2a6-jK45GXTdHR8pn3XB9Ql+fBe68uI\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 17:49:08 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"accessToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODNkOTIzMi0xNzk1LTQzMzYtYjZkNS04ZDdmNmNkZTY0ZWIiLCJlbWFpbCI6bnVsbCwicGhvbmVOdW1iZXIiOiIrOTE4OTIwMDc4NTQyIiwicm9sZSI6IlNIT1BfT1dORVIiLCJpYXQiOjE3NDU1MTY5NDgsImV4cCI6MTc0NTUxNzg0OH0.fRv657PrgyijknsDy82d4PUXIxHyWzs5D7Y0hlJvYL0\",\n    \"refreshToken\": \"dab7f6540682aaf9fb788350b597e932deb279396e41a0973f020c9ecce5911edb8397c5e193c34c\",\n    \"user\": {\n        \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n        \"email\": null,\n        \"password\": null,\n        \"phoneNumber\": \"+918920078542\",\n        \"role\": \"SHOP_OWNER\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": null,\n        \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n        \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiYjQ5ZDVjOC1lZjEyLTQ0YTEtOWU4Ni04YTRjZWVmMzZlZDciLCJlbWFpbCI6InNhbGVzbWFuQGV4YW1wbGUuY29tIiwicGhvbmVOdW1iZXIiOiIrOTE5ODc2NTQzMjEzIiwicm9sZSI6IlNBTEVTTUFOIiwiaWF0IjoxNzQ1NTE4MjUyLCJleHAiOjE3NDU1MTkxNTJ9.EI0d6b1R3g_1Q3Xzl3BluJO-zu-IWKLZR4LR3mYLrs8",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"refreshToken\":\"{{refreshToken}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/auth/logout",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"refreshToken\":\"dab7f6540682aaf9fb788350b597e932deb279396e41a0973f020c9ecce5911edb8397c5e193c34c\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/auth/logout",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"auth",
+										"logout"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "37"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"25-71uUsMgZY3FdZp9j1h5YMrBIOgg\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 18:11:02 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"Logged out successfully\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "User Profile",
+			"item": [
+				{
+					"name": "Create User Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Baby\",\n  \"lastName\": \"John 3\",\n  \"dateOfBirth\": \"1999-01-01\",\n  \"gender\": \"male\",\n  \"address\": \"123 Main St, City, Country\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"country\": \"India\",\n  \"postalCode\": \"400001\",\n  \"profilePicture\": \"https://example.com/profile.jpg\",\n  \"bio\": \"Software developer with 5 years of experience\",\n  \"preferences\": {\n    \"theme\": \"dark\",\n    \"notifications\": true,\n    \"language\": \"en\"\n  }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/user-profiles",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"user-profiles"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"firstName\": \"Baby\",\n  \"lastName\": \"John\",\n  \"dateOfBirth\": \"1999-01-01\",\n  \"gender\": \"male\",\n  \"address\": \"123 Main St, City, Country\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"country\": \"India\",\n  \"postalCode\": \"400001\",\n  \"profilePicture\": \"https://example.com/profile.jpg\",\n  \"bio\": \"Software developer with 5 years of experience\",\n  \"preferences\": {\n    \"theme\": \"dark\",\n    \"notifications\": true,\n    \"language\": \"en\"\n  }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/user-profiles",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"user-profiles"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "371"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"173-SP7iEP92XRfkgUKtm9YKnL8puxk\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 18:37:39 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"bc3fd8c7-b317-422b-848b-ad62a4e76337\",\n    \"firstName\": \"Baby\",\n    \"lastName\": \"John\",\n    \"phoneNumber\": null,\n    \"dateOfBirth\": \"1999-01-01\",\n    \"address\": \"123 Main St, City, Country\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"postalCode\": \"400001\",\n    \"userId\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n    \"createdAt\": \"2025-04-24T13:07:39.070Z\",\n    \"updatedAt\": \"2025-04-24T13:07:39.070Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get All Users",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/user-profiles",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"user-profiles"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/user-profiles",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"user-profiles"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "775"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"307-F2zwQuYV2JcXgi5umAQfmJxZ77Q\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 18:56:06 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"d8f1005f-5627-4796-a04a-f902eeedcc24\",\n        \"firstName\": \"Baby\",\n        \"lastName\": \"John\",\n        \"phoneNumber\": null,\n        \"dateOfBirth\": \"1989-12-31T18:30:00.000Z\",\n        \"address\": \"123 Main St, City, Country\",\n        \"city\": \"Mumbai\",\n        \"state\": \"Maharashtra\",\n        \"country\": \"India\",\n        \"postalCode\": \"400001\",\n        \"userId\": \"ad8002e1-9ee6-40f5-a4d4-45afbbcabed7\",\n        \"createdAt\": \"2025-04-20T13:37:59.451Z\",\n        \"updatedAt\": \"2025-04-20T13:38:42.608Z\"\n    },\n    {\n        \"id\": \"bc3fd8c7-b317-422b-848b-ad62a4e76337\",\n        \"firstName\": \"Baby\",\n        \"lastName\": \"John 3\",\n        \"phoneNumber\": null,\n        \"dateOfBirth\": \"1998-12-31T18:30:00.000Z\",\n        \"address\": \"123 Main St, City, Country\",\n        \"city\": \"Mumbai\",\n        \"state\": \"Maharashtra\",\n        \"country\": \"India\",\n        \"postalCode\": \"400001\",\n        \"userId\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n        \"createdAt\": \"2025-04-24T13:07:39.070Z\",\n        \"updatedAt\": \"2025-04-24T13:15:45.700Z\"\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Find Profile By User Id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/user-profiles/user/683d9232-1795-4336-b6d5-8d7f6cde64eb",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"user-profiles",
+								"user",
+								"683d9232-1795-4336-b6d5-8d7f6cde64eb"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/user-profiles/user/683d9232-1795-4336-b6d5-8d7f6cde64eb",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"user-profiles",
+										"user",
+										"683d9232-1795-4336-b6d5-8d7f6cde64eb"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "387"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"183-NZWaQbfMtIeigcZ4t3BDcXBcCEM\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 18:56:16 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"bc3fd8c7-b317-422b-848b-ad62a4e76337\",\n    \"firstName\": \"Baby\",\n    \"lastName\": \"John 3\",\n    \"phoneNumber\": null,\n    \"dateOfBirth\": \"1998-12-31T18:30:00.000Z\",\n    \"address\": \"123 Main St, City, Country\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"postalCode\": \"400001\",\n    \"userId\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n    \"createdAt\": \"2025-04-24T13:07:39.070Z\",\n    \"updatedAt\": \"2025-04-24T13:15:45.700Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Find Profile By Profile Id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/user-profiles/bc3fd8c7-b317-422b-848b-ad62a4e76337",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"user-profiles",
+								"bc3fd8c7-b317-422b-848b-ad62a4e76337"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/user-profiles/bc3fd8c7-b317-422b-848b-ad62a4e76337",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"user-profiles",
+										"bc3fd8c7-b317-422b-848b-ad62a4e76337"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "387"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"183-NZWaQbfMtIeigcZ4t3BDcXBcCEM\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 18:56:24 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"bc3fd8c7-b317-422b-848b-ad62a4e76337\",\n    \"firstName\": \"Baby\",\n    \"lastName\": \"John 3\",\n    \"phoneNumber\": null,\n    \"dateOfBirth\": \"1998-12-31T18:30:00.000Z\",\n    \"address\": \"123 Main St, City, Country\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"postalCode\": \"400001\",\n    \"userId\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n    \"createdAt\": \"2025-04-24T13:07:39.070Z\",\n    \"updatedAt\": \"2025-04-24T13:15:45.700Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Profile Profile Id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"firstName\": \"Baby\",\n    \"lastName\": \"Jo\",\n    \"phoneNumber\": null,\n    \"dateOfBirth\": \"1998-12-31T18:30:00.000Z\",\n    \"address\": \"123 Main St, City, Country\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"postalCode\": \"400001\",\n    \"userId\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n    \"createdAt\": \"2025-04-24T13:07:39.070Z\",\n    \"updatedAt\": \"2025-04-24T13:15:45.700Z\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/user-profiles/bc3fd8c7-b317-422b-848b-ad62a4e76337",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"user-profiles",
+								"bc3fd8c7-b317-422b-848b-ad62a4e76337"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"firstName\": \"Baby\",\n    \"lastName\": \"Jo\",\n    \"phoneNumber\": null,\n    \"dateOfBirth\": \"1998-12-31T18:30:00.000Z\",\n    \"address\": \"123 Main St, City, Country\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"postalCode\": \"400001\",\n    \"userId\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n    \"createdAt\": \"2025-04-24T13:07:39.070Z\",\n    \"updatedAt\": \"2025-04-24T13:15:45.700Z\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/user-profiles/bc3fd8c7-b317-422b-848b-ad62a4e76337",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"user-profiles",
+										"bc3fd8c7-b317-422b-848b-ad62a4e76337"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "383"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"17f-LYRF4gykd0ecyjh0/Ow1JPBOf5M\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 18:58:43 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"bc3fd8c7-b317-422b-848b-ad62a4e76337\",\n    \"firstName\": \"Baby\",\n    \"lastName\": \"Jo\",\n    \"phoneNumber\": null,\n    \"dateOfBirth\": \"1998-12-31T18:30:00.000Z\",\n    \"address\": \"123 Main St, City, Country\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"postalCode\": \"400001\",\n    \"userId\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n    \"createdAt\": \"2025-04-24T13:07:39.070Z\",\n    \"updatedAt\": \"2025-04-24T13:28:43.316Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Remove Profile By Id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/user-profiles/bc3fd8c7-b317-422b-848b-ad62a4e76337",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"user-profiles",
+								"bc3fd8c7-b317-422b-848b-ad62a4e76337"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User Profile",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/user-profiles",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"user-profiles"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/user-profiles",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"user-profiles"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "387"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"183-ieitLaoKZJRP5sW/5PANSEfNbY0\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 19:03:24 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"d8f1005f-5627-4796-a04a-f902eeedcc24\",\n        \"firstName\": \"Baby\",\n        \"lastName\": \"John\",\n        \"phoneNumber\": null,\n        \"dateOfBirth\": \"1989-12-31T18:30:00.000Z\",\n        \"address\": \"123 Main St, City, Country\",\n        \"city\": \"Mumbai\",\n        \"state\": \"Maharashtra\",\n        \"country\": \"India\",\n        \"postalCode\": \"400001\",\n        \"userId\": \"ad8002e1-9ee6-40f5-a4d4-45afbbcabed7\",\n        \"createdAt\": \"2025-04-20T13:37:59.451Z\",\n        \"updatedAt\": \"2025-04-20T13:38:42.608Z\"\n    }\n]"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Shop",
+			"item": [
+				{
+					"name": "Create Shop for Logged In User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"shopName\": \"Baby John Shop\",\n  \"ownerName\": \"John\",\n  \"email\": \"john@example.com\",\n  \"gstinNumber\": \"29ABCDE1234F1Z5\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/shops",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"shops"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Create Shop for Logged In User",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"shopName\": \"My Electronics Store\",\n  \"ownerName\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"gstinNumber\": \"29ABCDE1234F1Z5\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/shops",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops"
+									]
+								}
+							},
+							"_postman_previewlanguage": null,
+							"header": null,
+							"cookie": [],
+							"body": null
+						},
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"shopName\": \"Baby John Shop\",\n  \"ownerName\": \"John\",\n  \"email\": \"john@example.com\",\n  \"gstinNumber\": \"29ABCDE1234F1Z5\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/shops",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "283"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"11b-XE/8Af2f5CwO6MAy3mBViNDa4U0\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 19:08:20 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"6787c17f-2103-4125-9710-65f0a81c885e\",\n    \"shopName\": \"Baby John Shop\",\n    \"ownerName\": \"John\",\n    \"email\": \"john@example.com\",\n    \"gstinNumber\": \"29ABCDE1234F1Z5\",\n    \"owner\": {\n        \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\"\n    },\n    \"createdAt\": \"2025-04-24T13:38:20.269Z\",\n    \"updatedAt\": \"2025-04-24T13:38:20.269Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get All the shops",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/shops",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"shops"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/shops",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "1070"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"42e-r0zNY8KBwMv0W1l52ekV3gSTVwc\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 19:07:27 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"ac47d110-55f6-4f6a-bbb4-f2c0c4768899\",\n        \"shopName\": \"Baby John Store\",\n        \"ownerName\": \"John Doe\",\n        \"email\": \"baby@john.com\",\n        \"gstinNumber\": \"29ABCDE1234F1Z5\",\n        \"owner\": {\n            \"id\": \"ad8002e1-9ee6-40f5-a4d4-45afbbcabed7\",\n            \"email\": \"abc@shopowner.com\",\n            \"password\": null,\n            \"phoneNumber\": \"+919876543210\",\n            \"role\": \"SHOP_OWNER\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": null,\n            \"createdAt\": \"2025-04-20T13:32:35.642Z\",\n            \"updatedAt\": \"2025-04-20T13:35:18.051Z\"\n        },\n        \"createdAt\": \"2025-04-20T13:39:43.410Z\",\n        \"updatedAt\": \"2025-04-20T13:40:57.265Z\"\n    },\n    {\n        \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n        \"shopName\": \"My Electronics Store\",\n        \"ownerName\": \"John Doe\",\n        \"email\": \"john@example.com\",\n        \"gstinNumber\": \"29ABCDE1234F1Z5\",\n        \"owner\": {\n            \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n            \"email\": null,\n            \"password\": null,\n            \"phoneNumber\": \"+918920078542\",\n            \"role\": \"SHOP_OWNER\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": null,\n            \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n            \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n        },\n        \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n        \"updatedAt\": \"2025-04-24T13:35:28.310Z\"\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Get All Shop For Logged In User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/shops/my-shops",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"shops",
+								"my-shops"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/shops/my-shops",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops",
+										"my-shops"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "1053"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"41d-IUBv4FLowapYExHoqi8jLZob24g\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 19:09:45 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n        \"shopName\": \"My Electronics Store\",\n        \"ownerName\": \"John Doe\",\n        \"email\": \"john@example.com\",\n        \"gstinNumber\": \"29ABCDE1234F1Z5\",\n        \"owner\": {\n            \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n            \"email\": null,\n            \"password\": null,\n            \"phoneNumber\": \"+918920078542\",\n            \"role\": \"SHOP_OWNER\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": null,\n            \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n            \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n        },\n        \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n        \"updatedAt\": \"2025-04-24T13:35:28.310Z\"\n    },\n    {\n        \"id\": \"6787c17f-2103-4125-9710-65f0a81c885e\",\n        \"shopName\": \"Baby John Shop\",\n        \"ownerName\": \"John\",\n        \"email\": \"john@example.com\",\n        \"gstinNumber\": \"29ABCDE1234F1Z5\",\n        \"owner\": {\n            \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n            \"email\": null,\n            \"password\": null,\n            \"phoneNumber\": \"+918920078542\",\n            \"role\": \"SHOP_OWNER\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": null,\n            \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n            \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n        },\n        \"createdAt\": \"2025-04-24T13:38:20.269Z\",\n        \"updatedAt\": \"2025-04-24T13:38:20.269Z\"\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Get A Shop By Id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/shops/ac47d110-55f6-4f6a-bbb4-f2c0c4768899",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"shops",
+								"ac47d110-55f6-4f6a-bbb4-f2c0c4768899"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/shops/ac47d110-55f6-4f6a-bbb4-f2c0c4768899",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops",
+										"ac47d110-55f6-4f6a-bbb4-f2c0c4768899"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "537"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"219-VNZcHCf9B+rmb8ruAJd/RX20EPQ\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 19:13:09 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"ac47d110-55f6-4f6a-bbb4-f2c0c4768899\",\n    \"shopName\": \"Baby John Store\",\n    \"ownerName\": \"John Doe\",\n    \"email\": \"baby@john.com\",\n    \"gstinNumber\": \"29ABCDE1234F1Z5\",\n    \"owner\": {\n        \"id\": \"ad8002e1-9ee6-40f5-a4d4-45afbbcabed7\",\n        \"email\": \"abc@shopowner.com\",\n        \"password\": null,\n        \"phoneNumber\": \"+919876543210\",\n        \"role\": \"SHOP_OWNER\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": null,\n        \"createdAt\": \"2025-04-20T13:32:35.642Z\",\n        \"updatedAt\": \"2025-04-20T13:35:18.051Z\"\n    },\n    \"createdAt\": \"2025-04-20T13:39:43.410Z\",\n    \"updatedAt\": \"2025-04-20T13:40:57.265Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Owned Shop By Id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"shopName\": \"Boss Baby Shop\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/shops/6787c17f-2103-4125-9710-65f0a81c885e",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"shops",
+								"6787c17f-2103-4125-9710-65f0a81c885e"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"shopName\": \"Boss Baby Shop\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/shops/fe1cdde9-1757-4f59-b048-07a2c597e2c1",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops",
+										"fe1cdde9-1757-4f59-b048-07a2c597e2c1"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "524"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"20c-7HXtLXz6NknVPoiokW0/yKCv0Zc\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 19:17:09 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n    \"shopName\": \"Boss Baby Shop\",\n    \"ownerName\": \"John Doe\",\n    \"email\": \"john@example.com\",\n    \"gstinNumber\": \"29ABCDE1234F1Z5\",\n    \"owner\": {\n        \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n        \"email\": null,\n        \"password\": null,\n        \"phoneNumber\": \"+918920078542\",\n        \"role\": \"SHOP_OWNER\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": null,\n        \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n        \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n    },\n    \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n    \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n}"
+						},
+						{
+							"name": "Not Found",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"shopName\": \"Boss Baby Shop\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/shops/fe1cdde9-1757-4f59-b048-07a2c597e2c2",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops",
+										"fe1cdde9-1757-4f59-b048-07a2c597e2c2"
+									]
+								}
+							},
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "114"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"72-lzVkBNZuLIDS5GtCQ3vnSEiv1Ik\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 19:17:44 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"Shop with ID \\\"fe1cdde9-1757-4f59-b048-07a2c597e2c2\\\" not found\",\n    \"error\": \"Not Found\",\n    \"statusCode\": 404\n}"
+						},
+						{
+							"name": "Not Owned",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"shopName\": \"Boss Baby Shop\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/shops/ac47d110-55f6-4f6a-bbb4-f2c0c4768899",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops",
+										"ac47d110-55f6-4f6a-bbb4-f2c0c4768899"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "85"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"55-OubMatyaaO07nJwJ1tRxPePqsOc\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 19:18:00 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"You can only update your own shops\",\n    \"error\": \"Forbidden\",\n    \"statusCode\": 403\n}"
+						}
+					]
+				},
+				{
+					"name": "assign-salesmen for the given shop id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"salesmanId\":\"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/shops/fe1cdde9-1757-4f59-b048-07a2c597e2c1/assign-salesman",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"shops",
+								"fe1cdde9-1757-4f59-b048-07a2c597e2c1",
+								"assign-salesman"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"salesmanId\":\"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/shops/6787c17f-2103-4125-9710-65f0a81c885e/assign-salesman",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops",
+										"6787c17f-2103-4125-9710-65f0a81c885e",
+										"assign-salesman"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "919"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"397-XdLQKtGuVAnabFxF/TsWpMa9J/Q\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 20:43:30 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"shop\": {\n        \"id\": \"6787c17f-2103-4125-9710-65f0a81c885e\",\n        \"shopName\": \"Boss Baby Shop\",\n        \"ownerName\": \"John\",\n        \"email\": \"john@example.com\",\n        \"gstinNumber\": \"29ABCDE1234F1Z5\",\n        \"owner\": {\n            \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n            \"email\": null,\n            \"password\": null,\n            \"phoneNumber\": \"+918920078542\",\n            \"role\": \"SHOP_OWNER\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": null,\n            \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n            \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n        },\n        \"createdAt\": \"2025-04-24T13:38:20.269Z\",\n        \"updatedAt\": \"2025-04-24T15:11:41.068Z\"\n    },\n    \"salesman\": {\n        \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n        \"email\": \"salesman@example.com\",\n        \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n        \"phoneNumber\": \"+919876543213\",\n        \"role\": \"SALESMAN\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": \"2025-04-24T18:10:52.221Z\",\n        \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n        \"updatedAt\": \"2025-04-24T12:40:52.226Z\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Create New Salesman and assign to shop",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"phoneNumber\": \"+919876543214\",\n  \"username\": \"newsalesman\",\n  \"password\": \"password123\",\n  \"email\": \"salesman@example.com\",\n  \"firstName\": \"New\",\n  \"lastName\": \"Salesman\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/shops/6787c17f-2103-4125-9710-65f0a81c885e/create-salesman",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"shops",
+								"6787c17f-2103-4125-9710-65f0a81c885e",
+								"create-salesman"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"phoneNumber\": \"+919876543214\",\n  \"username\": \"newsalesman\",\n  \"password\": \"password123\",\n  \"email\": \"salesman@example.com\",\n  \"firstName\": \"New\",\n  \"lastName\": \"Salesman\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/shops/6787c17f-2103-4125-9710-65f0a81c885e/create-salesman",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops",
+										"6787c17f-2103-4125-9710-65f0a81c885e",
+										"create-salesman"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "356"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"164-Z/HNFAaK8DmaKi2tGTmSF6RqFFQ\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 20:53:08 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"0942a5d6-4571-46fe-ad37-664ebf275cba\",\n    \"email\": \"salesman@example.com\",\n    \"password\": \"$2b$10$Jobifidot9y/LBBNFoz1zuuaKB7xS6/3T71zMQ51sSeVbvw7pui2e\",\n    \"phoneNumber\": \"+919876543214\",\n    \"role\": \"SALESMAN\",\n    \"isPhoneVerified\": true,\n    \"isEmailVerified\": false,\n    \"isActive\": true,\n    \"lastLogin\": null,\n    \"createdAt\": \"2025-04-24T15:23:08.927Z\",\n    \"updatedAt\": \"2025-04-24T15:23:08.927Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get All Salesmen Assigned to shop",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/shops/fe1cdde9-1757-4f59-b048-07a2c597e2c1/salesmen",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"shops",
+								"fe1cdde9-1757-4f59-b048-07a2c597e2c1",
+								"salesmen"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/shops/6787c17f-2103-4125-9710-65f0a81c885e/salesmen",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops",
+										"6787c17f-2103-4125-9710-65f0a81c885e",
+										"salesmen"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "737"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"2e1-nzBuWAMymBXHb9CpRwSlZFm2ccc\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 20:56:03 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n        \"email\": \"salesman@example.com\",\n        \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n        \"phoneNumber\": \"+919876543213\",\n        \"role\": \"SALESMAN\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": \"2025-04-24T18:10:52.221Z\",\n        \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n        \"updatedAt\": \"2025-04-24T12:40:52.226Z\"\n    },\n    {\n        \"id\": \"0942a5d6-4571-46fe-ad37-664ebf275cba\",\n        \"email\": \"salesman@example.com\",\n        \"password\": \"$2b$10$Jobifidot9y/LBBNFoz1zuuaKB7xS6/3T71zMQ51sSeVbvw7pui2e\",\n        \"phoneNumber\": \"+919876543214\",\n        \"role\": \"SALESMAN\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": null,\n        \"createdAt\": \"2025-04-24T15:23:08.927Z\",\n        \"updatedAt\": \"2025-04-24T15:23:08.927Z\"\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Remove Salesman From Shop",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/shops/6787c17f-2103-4125-9710-65f0a81c885e/remove-salesman/bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"shops",
+								"6787c17f-2103-4125-9710-65f0a81c885e",
+								"remove-salesman",
+								"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/shops/6787c17f-2103-4125-9710-65f0a81c885e/remove-salesman/bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"shops",
+										"6787c17f-2103-4125-9710-65f0a81c885e",
+										"remove-salesman",
+										"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "plain",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 21:01:57 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								},
+								{
+									"key": "Content-Length",
+									"value": "0"
+								}
+							],
+							"cookie": [],
+							"body": null
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Inventory",
+			"item": [
+				{
+					"name": "Create A New Inventory For the Shop",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"productName\": \"Rug ALly X2\",\n  \"basePrice\": 1799.99,\n  \"sellingPrice\": 1999.99,\n  \"stockQuantity\": 50,\n  \"productImageUrl\": \"https://example.com/images/iphone13.jpg\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/inventory/fe1cdde9-1757-4f59-b048-07a2c597e2c1",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"inventory",
+								"fe1cdde9-1757-4f59-b048-07a2c597e2c1"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"productName\": \"Rug ALly X2\",\n  \"basePrice\": 1799.99,\n  \"sellingPrice\": 1999.99,\n  \"stockQuantity\": 50,\n  \"productImageUrl\": \"https://example.com/images/iphone13.jpg\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/inventory/fe1cdde9-1757-4f59-b048-07a2c597e2c1",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"inventory",
+										"fe1cdde9-1757-4f59-b048-07a2c597e2c1"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "278"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"116-GBR4ZAtt53d1ffCRsmG8BkSVx34\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 21:34:11 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"972d5faf-5fe3-4bec-84bd-c72d3d8454dc\",\n    \"productName\": \"Rug ALly X2\",\n    \"basePrice\": 1799.99,\n    \"sellingPrice\": 1999.99,\n    \"stockQuantity\": 50,\n    \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n    \"createdAt\": {},\n    \"updatedAt\": {},\n    \"shop\": {\n        \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\"\n    }\n}"
+						}
+					]
+				},
+				{
+					"name": "Get All Inventory item",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/inventory",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"inventory"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/inventory",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"inventory"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "6731"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"1a4b-A0wt5dLyKhY+ZJsMBuxME6ZNIOI\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 21:36:02 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"b07c586f-1d4d-43a7-92cf-8a71a8a504a7\",\n        \"productName\": \"iPhone 13 Pro\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"1099.99\",\n        \"stockQuantity\": 445,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-20T13:42:24.239Z\",\n        \"updatedAt\": \"2025-04-20T15:58:00.229Z\",\n        \"shop\": {\n            \"id\": \"ac47d110-55f6-4f6a-bbb4-f2c0c4768899\",\n            \"shopName\": \"Baby John Store\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"baby@john.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-20T13:39:43.410Z\",\n            \"updatedAt\": \"2025-04-20T13:40:57.265Z\"\n        }\n    },\n    {\n        \"id\": \"61d9bf7b-4a42-48ea-a47d-248ba9660ca1\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:38:36.931Z\",\n        \"updatedAt\": \"2025-04-24T15:38:36.931Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"cda749ee-b6c4-42f7-b4c1-1d2a2451194c\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:46:26.996Z\",\n        \"updatedAt\": \"2025-04-24T15:46:26.996Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"63942a15-6c69-4e3d-b67a-83a35175c170\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:49:49.686Z\",\n        \"updatedAt\": \"2025-04-24T15:49:49.686Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"c14c1988-af8d-4fe1-963e-336211060afd\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:50:46.245Z\",\n        \"updatedAt\": \"2025-04-24T15:50:46.245Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"5a88bddd-8357-407d-86b4-760d47d69fab\",\n        \"productName\": \"Rug ALly X\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:58:26.839Z\",\n        \"updatedAt\": \"2025-04-24T15:58:26.839Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"1d225ada-c364-4c5e-b4d7-08703735ae86\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:59:48.878Z\",\n        \"updatedAt\": \"2025-04-24T15:59:48.878Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"fa173971-9f63-4a5a-a723-8d22327fb1ea\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:00:33.833Z\",\n        \"updatedAt\": \"2025-04-24T16:00:33.833Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"f3efa1de-0e85-4de0-ae1d-e3dcf7a10aaa\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:00:53.185Z\",\n        \"updatedAt\": \"2025-04-24T16:00:53.185Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"529039b2-baed-48c0-b017-95beaeae587e\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:01:43.742Z\",\n        \"updatedAt\": \"2025-04-24T16:01:43.742Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"4c9aab73-0c75-443a-aa89-8e49b4b2df86\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:02:22.388Z\",\n        \"updatedAt\": \"2025-04-24T16:02:22.388Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"a893301a-9032-4e0d-a491-e3dff14ad68d\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:03:30.984Z\",\n        \"updatedAt\": \"2025-04-24T16:03:30.984Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    },\n    {\n        \"id\": \"972d5faf-5fe3-4bec-84bd-c72d3d8454dc\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:04:11.839Z\",\n        \"updatedAt\": \"2025-04-24T16:04:11.839Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        }\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Get an inventory item by id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/inventory/61d9bf7b-4a42-48ea-a47d-248ba9660ca1",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"inventory",
+								"61d9bf7b-4a42-48ea-a47d-248ba9660ca1"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/inventory/b07c586f-1d4d-43a7-92cf-8a71a8a504a7",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"inventory",
+										"b07c586f-1d4d-43a7-92cf-8a71a8a504a7"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "279"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"117-mH693UyLhMaAdLkLePd4TGA6VSU\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 21:38:20 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"b07c586f-1d4d-43a7-92cf-8a71a8a504a7\",\n    \"productName\": \"iPhone 13 Pro\",\n    \"basePrice\": \"799.99\",\n    \"sellingPrice\": \"1099.99\",\n    \"stockQuantity\": 445,\n    \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n    \"createdAt\": \"2025-04-20T13:42:24.239Z\",\n    \"updatedAt\": \"2025-04-20T15:58:00.229Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update an Item in Inventory",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"stockQuantity\":100\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/inventory/529039b2-baed-48c0-b017-95beaeae587e",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"inventory",
+								"529039b2-baed-48c0-b017-95beaeae587e"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"basePrice\": 1799.99,\n    \"sellingPrice\": 2999.99\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/inventory/61d9bf7b-4a42-48ea-a47d-248ba9660ca1",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"inventory",
+										"61d9bf7b-4a42-48ea-a47d-248ba9660ca1"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "819"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"333-29nCa4fa5XwzV5yZRGmYG9tgvKw\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 21:43:06 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"61d9bf7b-4a42-48ea-a47d-248ba9660ca1\",\n    \"productName\": \"iPhone 13\",\n    \"basePrice\": 1799.99,\n    \"sellingPrice\": 2999.99,\n    \"stockQuantity\": 50,\n    \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n    \"createdAt\": \"2025-04-24T15:38:36.931Z\",\n    \"updatedAt\": \"2025-04-24T16:13:06.439Z\",\n    \"shop\": {\n        \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n        \"shopName\": \"Boss Baby Shop\",\n        \"ownerName\": \"John Doe\",\n        \"email\": \"john@example.com\",\n        \"gstinNumber\": \"29ABCDE1234F1Z5\",\n        \"owner\": {\n            \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n            \"email\": null,\n            \"password\": null,\n            \"phoneNumber\": \"+918920078542\",\n            \"role\": \"SHOP_OWNER\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": null,\n            \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n            \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n        },\n        \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n        \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n    },\n    \"has_shop\": true\n}"
+						}
+					]
+				},
+				{
+					"name": "Delete An Inventory Item",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/inventory/4c9aab73-0c75-443a-aa89-8e49b4b2df86",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"inventory",
+								"4c9aab73-0c75-443a-aa89-8e49b4b2df86"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/inventory/4c9aab73-0c75-443a-aa89-8e49b4b2df86",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"inventory",
+										"4c9aab73-0c75-443a-aa89-8e49b4b2df86"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "plain",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 21:45:57 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								},
+								{
+									"key": "Content-Length",
+									"value": "0"
+								}
+							],
+							"cookie": [],
+							"body": null
+						}
+					]
+				},
+				{
+					"name": "Get Full Inventory By Shop Id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/inventory/shop/fe1cdde9-1757-4f59-b048-07a2c597e2c1",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"inventory",
+								"shop",
+								"fe1cdde9-1757-4f59-b048-07a2c597e2c1"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/inventory/shop/fe1cdde9-1757-4f59-b048-07a2c597e2c1",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"inventory",
+										"shop",
+										"fe1cdde9-1757-4f59-b048-07a2c597e2c1"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "2769"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"ad1-pISwxEskOHHALJJEtScAiT70ZQg\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 21:52:43 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"cda749ee-b6c4-42f7-b4c1-1d2a2451194c\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:46:26.996Z\",\n        \"updatedAt\": \"2025-04-24T15:46:26.996Z\"\n    },\n    {\n        \"id\": \"63942a15-6c69-4e3d-b67a-83a35175c170\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:49:49.686Z\",\n        \"updatedAt\": \"2025-04-24T15:49:49.686Z\"\n    },\n    {\n        \"id\": \"c14c1988-af8d-4fe1-963e-336211060afd\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:50:46.245Z\",\n        \"updatedAt\": \"2025-04-24T15:50:46.245Z\"\n    },\n    {\n        \"id\": \"5a88bddd-8357-407d-86b4-760d47d69fab\",\n        \"productName\": \"Rug ALly X\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:58:26.839Z\",\n        \"updatedAt\": \"2025-04-24T15:58:26.839Z\"\n    },\n    {\n        \"id\": \"1d225ada-c364-4c5e-b4d7-08703735ae86\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:59:48.878Z\",\n        \"updatedAt\": \"2025-04-24T15:59:48.878Z\"\n    },\n    {\n        \"id\": \"fa173971-9f63-4a5a-a723-8d22327fb1ea\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:00:33.833Z\",\n        \"updatedAt\": \"2025-04-24T16:00:33.833Z\"\n    },\n    {\n        \"id\": \"f3efa1de-0e85-4de0-ae1d-e3dcf7a10aaa\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:00:53.185Z\",\n        \"updatedAt\": \"2025-04-24T16:00:53.185Z\"\n    },\n    {\n        \"id\": \"a893301a-9032-4e0d-a491-e3dff14ad68d\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:03:30.984Z\",\n        \"updatedAt\": \"2025-04-24T16:03:30.984Z\"\n    },\n    {\n        \"id\": \"972d5faf-5fe3-4bec-84bd-c72d3d8454dc\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:04:11.839Z\",\n        \"updatedAt\": \"2025-04-24T16:04:11.839Z\"\n    },\n    {\n        \"id\": \"529039b2-baed-48c0-b017-95beaeae587e\",\n        \"productName\": \"Rug ALly X2\",\n        \"basePrice\": \"1799.99\",\n        \"sellingPrice\": \"1999.99\",\n        \"stockQuantity\": 100,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T16:01:43.742Z\",\n        \"updatedAt\": \"2025-04-24T16:17:20.033Z\"\n    }\n]"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Sales",
+			"item": [
+				{
+					"name": "Create New Sale",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"shopId\": \"6787c17f-2103-4125-9710-65f0a81c885e\",\n  \"productId\": \"7c84fcdc-45d3-42a0-88e1-a1ced0b3dc50\",\n  \"quantity\": 4,\n  \"salePrice\": 8500\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/sales",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"sales"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"shopId\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n  \"productId\": \"cda749ee-b6c4-42f7-b4c1-1d2a2451194c\",\n  \"quantity\": 5,\n  \"salePrice\": 119999.99\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/sales",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"sales"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "1635"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"663-r21JcThrZ1fVUCd/X73rjvOrI0M\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 22:10:30 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e\",\n    \"salesman\": {\n        \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n        \"email\": \"salesman@example.com\",\n        \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n        \"phoneNumber\": \"+919876543213\",\n        \"role\": \"SALESMAN\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": \"2025-04-24T22:03:03.564Z\",\n        \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n        \"updatedAt\": \"2025-04-24T16:33:03.571Z\"\n    },\n    \"shop\": {\n        \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n        \"shopName\": \"Boss Baby Shop\",\n        \"ownerName\": \"John Doe\",\n        \"email\": \"john@example.com\",\n        \"gstinNumber\": \"29ABCDE1234F1Z5\",\n        \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n        \"updatedAt\": \"2025-04-24T13:47:09.769Z\",\n        \"owner\": {\n            \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n            \"email\": null,\n            \"password\": null,\n            \"phoneNumber\": \"+918920078542\",\n            \"role\": \"SHOP_OWNER\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": null,\n            \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n            \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n        }\n    },\n    \"product\": {\n        \"id\": \"cda749ee-b6c4-42f7-b4c1-1d2a2451194c\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:46:26.996Z\",\n        \"updatedAt\": \"2025-04-24T15:46:26.996Z\",\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\",\n            \"owner\": {}\n        }\n    },\n    \"quantity\": 5,\n    \"salePrice\": 119999.99,\n    \"status\": \"pending\",\n    \"createdAt\": \"2025-04-24T16:40:30.550Z\",\n    \"updatedAt\": \"2025-04-24T16:40:30.550Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get All Sales filter by shop id or salesmen id",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/sales",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"sales"
+							],
+							"query": [
+								{
+									"key": "salesmanId",
+									"value": "bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/sales?salesmanId=bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"sales"
+									],
+									"query": [
+										{
+											"key": "shopId",
+											"value": "fe1cdde9-1757-4f59-b048-07a2c597e2c1",
+											"disabled": true
+										},
+										{
+											"key": "salesmanId",
+											"value": "bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "4380"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"111c-DQJlVOlarrnP5uVxS6Ev1OxJUCM\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 22:14:20 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"30efb2fa-6d01-4b9e-bcd1-e0c318c94af9\",\n        \"salesman\": {\n            \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n            \"email\": \"salesman@example.com\",\n            \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n            \"phoneNumber\": \"+919876543213\",\n            \"role\": \"SALESMAN\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": \"2025-04-24T22:03:03.564Z\",\n            \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n            \"updatedAt\": \"2025-04-24T16:33:03.571Z\"\n        },\n        \"shop\": {\n            \"id\": \"ac47d110-55f6-4f6a-bbb4-f2c0c4768899\",\n            \"shopName\": \"Baby John Store\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"baby@john.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-20T13:39:43.410Z\",\n            \"updatedAt\": \"2025-04-20T13:40:57.265Z\"\n        },\n        \"product\": {\n            \"id\": \"b07c586f-1d4d-43a7-92cf-8a71a8a504a7\",\n            \"productName\": \"iPhone 13 Pro\",\n            \"basePrice\": \"799.99\",\n            \"sellingPrice\": \"1099.99\",\n            \"stockQuantity\": 445,\n            \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n            \"createdAt\": \"2025-04-20T13:42:24.239Z\",\n            \"updatedAt\": \"2025-04-20T15:58:00.229Z\"\n        },\n        \"quantity\": 5,\n        \"salePrice\": \"5099.99\",\n        \"status\": \"approved\",\n        \"createdAt\": \"2025-04-20T15:54:34.895Z\",\n        \"updatedAt\": \"2025-04-20T15:58:00.234Z\"\n    },\n    {\n        \"id\": \"92dbe5b4-c15e-4c3e-8ff9-ad3530f53c27\",\n        \"salesman\": {\n            \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n            \"email\": \"salesman@example.com\",\n            \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n            \"phoneNumber\": \"+919876543213\",\n            \"role\": \"SALESMAN\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": \"2025-04-24T22:03:03.564Z\",\n            \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n            \"updatedAt\": \"2025-04-24T16:33:03.571Z\"\n        },\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        },\n        \"product\": {\n            \"id\": \"cda749ee-b6c4-42f7-b4c1-1d2a2451194c\",\n            \"productName\": \"iPhone 13\",\n            \"basePrice\": \"799.99\",\n            \"sellingPrice\": \"999.99\",\n            \"stockQuantity\": 50,\n            \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n            \"createdAt\": \"2025-04-24T15:46:26.996Z\",\n            \"updatedAt\": \"2025-04-24T15:46:26.996Z\"\n        },\n        \"quantity\": 5,\n        \"salePrice\": \"99.99\",\n        \"status\": \"pending\",\n        \"createdAt\": \"2025-04-24T16:34:07.297Z\",\n        \"updatedAt\": \"2025-04-24T16:34:07.297Z\"\n    },\n    {\n        \"id\": \"cd6b9dd9-da9a-4b3f-8c8c-43b10538705c\",\n        \"salesman\": {\n            \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n            \"email\": \"salesman@example.com\",\n            \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n            \"phoneNumber\": \"+919876543213\",\n            \"role\": \"SALESMAN\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": \"2025-04-24T22:03:03.564Z\",\n            \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n            \"updatedAt\": \"2025-04-24T16:33:03.571Z\"\n        },\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        },\n        \"product\": {\n            \"id\": \"cda749ee-b6c4-42f7-b4c1-1d2a2451194c\",\n            \"productName\": \"iPhone 13\",\n            \"basePrice\": \"799.99\",\n            \"sellingPrice\": \"999.99\",\n            \"stockQuantity\": 50,\n            \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n            \"createdAt\": \"2025-04-24T15:46:26.996Z\",\n            \"updatedAt\": \"2025-04-24T15:46:26.996Z\"\n        },\n        \"quantity\": 5,\n        \"salePrice\": \"119999.99\",\n        \"status\": \"pending\",\n        \"createdAt\": \"2025-04-24T16:34:53.918Z\",\n        \"updatedAt\": \"2025-04-24T16:34:53.918Z\"\n    },\n    {\n        \"id\": \"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e\",\n        \"salesman\": {\n            \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n            \"email\": \"salesman@example.com\",\n            \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n            \"phoneNumber\": \"+919876543213\",\n            \"role\": \"SALESMAN\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": \"2025-04-24T22:03:03.564Z\",\n            \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n            \"updatedAt\": \"2025-04-24T16:33:03.571Z\"\n        },\n        \"shop\": {\n            \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n            \"shopName\": \"Boss Baby Shop\",\n            \"ownerName\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"gstinNumber\": \"29ABCDE1234F1Z5\",\n            \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n            \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n        },\n        \"product\": {\n            \"id\": \"cda749ee-b6c4-42f7-b4c1-1d2a2451194c\",\n            \"productName\": \"iPhone 13\",\n            \"basePrice\": \"799.99\",\n            \"sellingPrice\": \"999.99\",\n            \"stockQuantity\": 50,\n            \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n            \"createdAt\": \"2025-04-24T15:46:26.996Z\",\n            \"updatedAt\": \"2025-04-24T15:46:26.996Z\"\n        },\n        \"quantity\": 5,\n        \"salePrice\": \"119999.99\",\n        \"status\": \"pending\",\n        \"createdAt\": \"2025-04-24T16:40:30.550Z\",\n        \"updatedAt\": \"2025-04-24T16:40:30.550Z\"\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Get a sale by id",
+					"request": {
+						"method": "GET",
+						"header": []
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/sales/1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"sales",
+										"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "1094"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"446-5TnA4bY0n0HJoTqYpEsi1GkWH7Y\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 22:16:52 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e\",\n    \"salesman\": {\n        \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n        \"email\": \"salesman@example.com\",\n        \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n        \"phoneNumber\": \"+919876543213\",\n        \"role\": \"SALESMAN\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": \"2025-04-24T22:03:03.564Z\",\n        \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n        \"updatedAt\": \"2025-04-24T16:33:03.571Z\"\n    },\n    \"shop\": {\n        \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n        \"shopName\": \"Boss Baby Shop\",\n        \"ownerName\": \"John Doe\",\n        \"email\": \"john@example.com\",\n        \"gstinNumber\": \"29ABCDE1234F1Z5\",\n        \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n        \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n    },\n    \"product\": {\n        \"id\": \"cda749ee-b6c4-42f7-b4c1-1d2a2451194c\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:46:26.996Z\",\n        \"updatedAt\": \"2025-04-24T15:46:26.996Z\"\n    },\n    \"quantity\": 5,\n    \"salePrice\": \"119999.99\",\n    \"status\": \"pending\",\n    \"createdAt\": \"2025-04-24T16:40:30.550Z\",\n    \"updatedAt\": \"2025-04-24T16:40:30.550Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update sale only by shop owner",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n        \"quantity\": 1\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/sales/1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"sales",
+								"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "403",
+							"originalRequest": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n        \"quantity\": 1\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/sales/1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"sales",
+										"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "91"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"5b-Ls7B33ynLoeLgCtAp2P5DsKS3WQ\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 22:20:00 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"Only shop owners can perform this action\",\n    \"error\": \"Forbidden\",\n    \"statusCode\": 403\n}"
+						}
+					]
+				},
+				{
+					"name": "Delete a sale only by shop owner",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/sales/1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"sales",
+								"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "403",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/sales/1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"sales",
+										"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "91"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"5b-Ls7B33ynLoeLgCtAp2P5DsKS3WQ\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 22:20:51 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"Only shop owners can perform this action\",\n    \"error\": \"Forbidden\",\n    \"statusCode\": 403\n}"
+						}
+					]
+				},
+				{
+					"name": "Approve a sale",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/sales/8017d640-c81a-4327-9081-cdc24535db0d/approve",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"sales",
+								"8017d640-c81a-4327-9081-cdc24535db0d",
+								"approve"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "403",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/sales/d1aa522d-0c14-4d57-afef-e2176e31aa58/approve",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"sales",
+										"d1aa522d-0c14-4d57-afef-e2176e31aa58",
+										"approve"
+									]
+								}
+							},
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "81"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"51-bNTE3FCeO6ZuMe/Q2V//lVDbCqQ\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 22:58:49 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"message\": \"Can only approve pending sales\",\n    \"error\": \"Forbidden\",\n    \"statusCode\": 403\n}"
+						}
+					]
+				},
+				{
+					"name": "Reject a sale",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/sales/1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e/reject",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"sales",
+								"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e",
+								"reject"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/sales/1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e/reject",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"sales",
+										"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e",
+										"reject"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "1386"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"56a-XiIhszfDYPnHESG1AfFv56BQIC0\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 22:59:54 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"1f1fbf1b-4a8c-4158-b115-d5ff5d9db16e\",\n    \"salesman\": {\n        \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n        \"email\": \"salesman@example.com\",\n        \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n        \"phoneNumber\": \"+919876543213\",\n        \"role\": \"SALESMAN\",\n        \"isPhoneVerified\": true,\n        \"isEmailVerified\": false,\n        \"isActive\": true,\n        \"lastLogin\": \"2025-04-24T22:42:09.055Z\",\n        \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n        \"updatedAt\": \"2025-04-24T17:12:09.060Z\"\n    },\n    \"shop\": {\n        \"id\": \"fe1cdde9-1757-4f59-b048-07a2c597e2c1\",\n        \"shopName\": \"Boss Baby Shop\",\n        \"ownerName\": \"John Doe\",\n        \"email\": \"john@example.com\",\n        \"gstinNumber\": \"29ABCDE1234F1Z5\",\n        \"owner\": {\n            \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n            \"email\": null,\n            \"password\": null,\n            \"phoneNumber\": \"+918920078542\",\n            \"role\": \"SHOP_OWNER\",\n            \"isPhoneVerified\": true,\n            \"isEmailVerified\": false,\n            \"isActive\": true,\n            \"lastLogin\": null,\n            \"createdAt\": \"2025-04-22T09:43:43.688Z\",\n            \"updatedAt\": \"2025-04-22T09:43:43.688Z\"\n        },\n        \"createdAt\": \"2025-04-24T13:35:28.310Z\",\n        \"updatedAt\": \"2025-04-24T13:47:09.769Z\"\n    },\n    \"product\": {\n        \"id\": \"cda749ee-b6c4-42f7-b4c1-1d2a2451194c\",\n        \"productName\": \"iPhone 13\",\n        \"basePrice\": \"799.99\",\n        \"sellingPrice\": \"999.99\",\n        \"stockQuantity\": 50,\n        \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n        \"createdAt\": \"2025-04-24T15:46:26.996Z\",\n        \"updatedAt\": \"2025-04-24T15:46:26.996Z\"\n    },\n    \"quantity\": 5,\n    \"salePrice\": \"119999.99\",\n    \"status\": \"rejected\",\n    \"createdAt\": \"2025-04-24T16:40:30.550Z\",\n    \"updatedAt\": \"2025-04-24T17:29:54.662Z\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Commission",
+			"item": [
+				{
+					"name": "Create Commission Rule",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"type\": \"PERCENTAGE_ON_DIFFERENCE\",\n  \"value\": 50,\n  \"description\": \"50% commission on price difference on sold item and selling price\",\n  \"isActive\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/commissions/rules",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"commissions",
+								"rules"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"type\": \"PERCENTAGE_ON_DIFFERENCE\",\n  \"value\": 50,\n  \"description\": \"50% commission on price difference on sold item and selling price\",\n  \"isActive\": true\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/commissions/rules",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"commissions",
+										"rules"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "319"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"13f-WkxeMzKmtaoDEYY9/sUwBQTYMho\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 23:14:33 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"5e29b664-548f-4cc3-8c11-335bfc698c27\",\n    \"user\": {\n        \"id\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\"\n    },\n    \"type\": \"PERCENTAGE_ON_DIFFERENCE\",\n    \"value\": 50,\n    \"description\": \"50% commission on price difference on sold item and selling price\",\n    \"isActive\": true,\n    \"createdAt\": \"2025-04-24T17:44:33.068Z\",\n    \"updatedAt\": \"2025-04-24T17:44:33.068Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get All the Commission Rules",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/commissions/rules",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"commissions",
+								"rules"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/commissions/rules",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"commissions",
+										"rules"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "273"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"111-si7T3EgbyV/1BjbPIJTpcF8vyI0\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 23:15:19 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "[\n    {\n        \"id\": \"5e29b664-548f-4cc3-8c11-335bfc698c27\",\n        \"type\": \"PERCENTAGE_ON_DIFFERENCE\",\n        \"value\": \"50.00\",\n        \"description\": \"50% commission on price difference on sold item and selling price\",\n        \"isActive\": true,\n        \"createdAt\": \"2025-04-24T17:44:33.068Z\",\n        \"updatedAt\": \"2025-04-24T17:44:33.068Z\"\n    }\n]"
+						}
+					]
+				},
+				{
+					"name": "Assign a commission rule to a salesman",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"commissionRuleId\":\"bcdaf144-ea13-4f0f-9d32-05a8185cef79\",\n    \"salesmanId\":\"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/commissions/rules/assign",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"commissions",
+								"rules",
+								"assign"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"commissionRuleId\":\"5e29b664-548f-4cc3-8c11-335bfc698c27\",\n    \"salesmanId\":\"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/commissions/rules/assign",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"commissions",
+										"rules",
+										"assign"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "298"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"12a-JQR/x5vjn5XuCiksVSq6mjdh00w\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 23:17:39 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"4f5032bd-2c56-4dca-9576-6e35eb2045a8\",\n    \"commissionRuleId\": \"5e29b664-548f-4cc3-8c11-335bfc698c27\",\n    \"salesmanId\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n    \"ownerId\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n    \"isActive\": true,\n    \"createdAt\": \"2025-04-24T17:47:39.613Z\",\n    \"updatedAt\": \"2025-04-24T17:47:39.613Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get all commissions for a specific salesman",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/commissions/salesman/bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"commissions",
+								"salesman",
+								"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"commissionRuleId\":\"5e29b664-548f-4cc3-8c11-335bfc698c27\",\n    \"salesmanId\":\"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/commissions/rules/assign",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"commissions",
+										"rules",
+										"assign"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "298"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"12a-JQR/x5vjn5XuCiksVSq6mjdh00w\""
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 24 Apr 2025 23:17:39 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"4f5032bd-2c56-4dca-9576-6e35eb2045a8\",\n    \"commissionRuleId\": \"5e29b664-548f-4cc3-8c11-335bfc698c27\",\n    \"salesmanId\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n    \"ownerId\": \"683d9232-1795-4336-b6d5-8d7f6cde64eb\",\n    \"isActive\": true,\n    \"createdAt\": \"2025-04-24T17:47:39.613Z\",\n    \"updatedAt\": \"2025-04-24T17:47:39.613Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Shop Commission",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/commissions/shop/6787c17f-2103-4125-9710-65f0a81c885e",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"commissions",
+								"shop",
+								"6787c17f-2103-4125-9710-65f0a81c885e"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/commissions/shop/6787c17f-2103-4125-9710-65f0a81c885e",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"commissions",
+										"shop",
+										"6787c17f-2103-4125-9710-65f0a81c885e"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "975"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"3cf-nZONfpYQU+NdIN1Aj/L0lf+1AfQ\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 25 Apr 2025 00:36:52 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"totalCommission\": {\n        \"totalCommission\": 295000,\n        \"approvedSalesCommission\": 295000,\n        \"pendingSalesCommission\": 0\n    },\n    \"sales\": [\n        {\n            \"id\": \"d1aa522d-0c14-4d57-afef-e2176e31aa58\",\n            \"salesman\": {\n                \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n                \"email\": \"salesman@example.com\",\n                \"password\": \"$2b$10$YQJ216FvB0vJUAs9RvYzS.fevofM0IW/oKmqySpq0JWgl9JpNygB.\",\n                \"phoneNumber\": \"+919876543213\",\n                \"role\": \"SALESMAN\",\n                \"isPhoneVerified\": true,\n                \"isEmailVerified\": false,\n                \"isActive\": true,\n                \"lastLogin\": \"2025-04-24T22:42:09.055Z\",\n                \"createdAt\": \"2025-04-20T13:41:40.153Z\",\n                \"updatedAt\": \"2025-04-24T17:12:09.060Z\"\n            },\n            \"product\": {\n                \"id\": \"7c84fcdc-45d3-42a0-88e1-a1ced0b3dc50\",\n                \"productName\": \"Rug ALly X2\",\n                \"basePrice\": \"1799.99\",\n                \"sellingPrice\": \"1999.99\",\n                \"stockQuantity\": 45,\n                \"productImageUrl\": \"https://example.com/images/iphone13.jpg\",\n                \"createdAt\": \"2025-04-24T17:10:23.172Z\",\n                \"updatedAt\": \"2025-04-24T17:28:09.702Z\"\n            },\n            \"quantity\": 5,\n            \"salePrice\": \"119999.99\",\n            \"status\": \"approved\",\n            \"createdAt\": \"2025-04-24T17:14:47.835Z\",\n            \"updatedAt\": \"2025-04-24T17:28:09.713Z\"\n        }\n    ]\n}"
+						}
+					]
+				},
+				{
+					"name": "Create a Commission",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"salesmanId\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n  \"shopId\": \"6787c17f-2103-4125-9710-65f0a81c885e\",\n  \"commissionRuleId\": \"bcdaf144-ea13-4f0f-9d32-05a8185cef79\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{BaseUrl}}/commissions/create",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"commissions",
+								"create"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"amount\": 100,\n  \"salesmanId\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\",\n  \"shopId\": \"6787c17f-2103-4125-9710-65f0a81c885e\",\n  \"commissionRuleId\": \"bcdaf144-ea13-4f0f-9d32-05a8185cef79\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{BaseUrl}}/commissions/create",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"commissions",
+										"create"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "324"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"144-lSB6DuMEjnZL3gF4efjhRj2BC+s\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 25 Apr 2025 01:04:32 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"b6e7909b-641d-448e-aad8-682451d64951\",\n    \"salesman\": {\n        \"id\": \"bb49d5c8-ef12-44a1-9e86-8a4ceef36ed7\"\n    },\n    \"shop\": {\n        \"id\": \"6787c17f-2103-4125-9710-65f0a81c885e\"\n    },\n    \"commissionRule\": {\n        \"id\": \"bcdaf144-ea13-4f0f-9d32-05a8185cef79\"\n    },\n    \"amount\": 100,\n    \"isPaid\": false,\n    \"createdAt\": \"2025-04-24T19:34:32.506Z\",\n    \"updatedAt\": \"2025-04-24T19:34:32.506Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Mark as Paid",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/commissions/b6e7909b-641d-448e-aad8-682451d64951/mark-paid",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"commissions",
+								"b6e7909b-641d-448e-aad8-682451d64951",
+								"mark-paid"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{BaseUrl}}/commissions/b6e7909b-641d-448e-aad8-682451d64951/mark-paid",
+									"host": [
+										"{{BaseUrl}}"
+									],
+									"path": [
+										"commissions",
+										"b6e7909b-641d-448e-aad8-682451d64951",
+										"mark-paid"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "X-Powered-By",
+									"value": "Express"
+								},
+								{
+									"key": "Vary",
+									"value": "Origin"
+								},
+								{
+									"key": "Access-Control-Allow-Credentials",
+									"value": "true"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json; charset=utf-8"
+								},
+								{
+									"key": "Content-Length",
+									"value": "155"
+								},
+								{
+									"key": "ETag",
+									"value": "W/\"9b-ifCPdDCeipp7jPIo1NSBCcWTn9U\""
+								},
+								{
+									"key": "Date",
+									"value": "Fri, 25 Apr 2025 01:05:38 GMT"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Keep-Alive",
+									"value": "timeout=5"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"id\": \"b6e7909b-641d-448e-aad8-682451d64951\",\n    \"amount\": \"100.00\",\n    \"isPaid\": true,\n    \"createdAt\": \"2025-04-24T19:34:32.506Z\",\n    \"updatedAt\": \"2025-04-24T19:35:38.337Z\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Commission By Date Range",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{BaseUrl}}/commissions/date-range?startDate=20-APR-2025&endDate=26-APR-2025",
+							"host": [
+								"{{BaseUrl}}"
+							],
+							"path": [
+								"commissions",
+								"date-range"
+							],
+							"query": [
+								{
+									"key": "startDate",
+									"value": "20-APR-2025"
+								},
+								{
+									"key": "endDate",
+									"value": "26-APR-2025"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "swagger_json",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{BaseUrl}}/api/docs-json",
+					"host": [
+						"{{BaseUrl}}"
+					],
+					"path": [
+						"api",
+						"docs-json"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "accessToken",
+			"value": ""
+		},
+		{
+			"key": "refreshToken",
+			"value": ""
+		}
+	]
+}

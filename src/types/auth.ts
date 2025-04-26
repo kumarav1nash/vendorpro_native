@@ -19,11 +19,26 @@ export interface User {
 }
 
 export interface AuthResponse {
-  token: string;
+  accessToken: string; // accessToken
+  refreshToken: string;
   user: User;
 }
 
 export interface OtpResponse {
   message: string;
   phoneNumber: string;
+}
+
+export interface RefreshTokenDto {
+  refreshToken: string;
+}
+
+export interface RefreshTokenResponse {
+  token: string;
+  refreshToken: string;
+  user: User;
+}
+
+export interface LogoutDto {
+  refreshToken: string;
 } 

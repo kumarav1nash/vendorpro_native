@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 function useSalesmanProtectedRoute() {
   const segments = useSegments();
@@ -9,7 +9,7 @@ function useSalesmanProtectedRoute() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const isAuthenticated = await AsyncStorage.getItem('salesmanAuthenticated');
+      const isAuthenticated = await SecureStore.getItemAsync('salesmanAuthenticated');
       const isAuthSegment = segments[0] === '(auth)';
       
       if (isAuthenticated !== 'true' && segments[0] === '(salesman)') {

@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import * as SecureStore from 'expo-secure-store';
 import { User, LoginDto, RequestOtpDto, VerifyOtpDto } from '../types/auth';
 import { authService } from '../services/auth.service';
 
@@ -12,9 +12,10 @@ interface AuthContextType {
   requestOtp: (data: RequestOtpDto) => Promise<void>;
   verifyOtp: (data: VerifyOtpDto) => Promise<void>;
   logout: () => Promise<void>;
+  refreshAccessToken: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -33,10 +34,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check for stored auth token on mount
     const loadStoredAuth = async () => {
       try {
-        const token = await AsyncStorage.getItem('authToken');
+        const token = await SecureStore.getItemAsync('authToken');
         if (token) {
           authService.setAuthToken(token);
-          const storedUser = await AsyncStorage.getItem('user');
+          const storedUser = await SecureStore.getItemAsync('user');
           if (storedUser) {
             setUser(JSON.parse(storedUser));
           }
@@ -51,10 +52,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loadStoredAuth();
   }, []);
 
-  const handleAuthSuccess = async (token: string, user: User) => {
+  const handleAuthSuccess = async (token: string, refreshToken: string, user: User) => {
     try {
-      await AsyncStorage.setItem('authToken', token);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
+      await SecureStore.setItemAsync('accessToken', token);
+      await SecureStore.setItemAsync('refreshToken', refreshToken);
+      await SecureStore.setItemAsync('user', JSON.stringify(user));
       authService.setAuthToken(token);
       setUser(user);
       setError(null);
@@ -69,7 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       setError(null);
       const response = await authService.login(data);
-      await handleAuthSuccess(response.token, response.user);
+      await handleAuthSuccess(response.accessToken, response.refreshToken, response.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
       throw err;
@@ -96,8 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(true);
       setError(null);
       const response = await authService.verifyOtp(data);
-      console.log('response', response);
-      await handleAuthSuccess(response.token, response.user);
+      await handleAuthSuccess(response.accessToken, response.refreshToken, response.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'OTP verification failed');
       throw err;
@@ -108,8 +109,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('authToken');
-      await AsyncStorage.removeItem('user');
+      const refreshToken = await SecureStore.getItemAsync('refreshToken');
+      if (refreshToken) {
+        await authService.logout({ refreshToken });
+      }
+      await SecureStore.deleteItemAsync('authToken');
+      await SecureStore.deleteItemAsync('refreshToken');
+      await SecureStore.deleteItemAsync('user');
+      await SecureStore.deleteItemAsync('salesmanAuthenticated');
       authService.removeAuthToken();
       setUser(null);
     } catch (err) {
@@ -118,9 +125,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshAccessToken = async () => {
+    try {
+      const refreshToken = await SecureStore.getItemAsync('refreshToken');
+      if (!refreshToken) throw new Error('No refresh token found');
+      const response = await authService.refreshToken({ refreshToken });
+      await handleAuthSuccess(response.token, response.refreshToken, response.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Token refresh failed');
+      throw err;
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{
+      value={useMemo(() => ({
         user,
         isAuthenticated: !!user,
         isLoading,
@@ -129,7 +148,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         requestOtp,
         verifyOtp,
         logout,
-      }}
+        refreshAccessToken,
+      }), [user, isLoading, error, login, requestOtp, verifyOtp, logout, refreshAccessToken])}
     >
       {children}
     </AuthContext.Provider>

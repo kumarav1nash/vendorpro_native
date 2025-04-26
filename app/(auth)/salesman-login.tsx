@@ -11,85 +11,32 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Salesman } from '../contexts/SalesmenContext';
-import ServiceFactory from '../services/ServiceFactory';
+import { useAuth } from '../../src/contexts/AuthContext';
+import * as SecureStore from 'expo-secure-store';
 
 export default function SalesmanLoginScreen() {
-  const [username, setUsername] = useState('');
+  const { login, isLoading } = useAuth();
+  const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    // Check if salesman is already logged in
-    const checkAuth = async () => {
-      try {
-        const isAuthenticated = await AsyncStorage.getItem('salesmanAuthenticated');
-        if (isAuthenticated === 'true') {
-          console.log('Salesman already authenticated, redirecting to dashboard');
-          router.replace('/(salesman)/dashboard');
-        }
-      } catch (error) {
-        console.error('Error checking authentication:', error);
-      }
-    };
-    
-    checkAuth();
-  }, []);
-
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
-      setError('Please enter both username and password');
+    if (!mobile.trim() || !password.trim()) {
+      setError('Please enter both mobile number and password');
       return;
     }
-    
     setLoading(true);
     setError('');
-    
     try {
-      // Get repository instance
-      const salesmenRepository = ServiceFactory.getSalesmenRepository();
-      
-      // Get all salesmen
-      const salesmen = await salesmenRepository.getAll();
-      
-      if (!salesmen || salesmen.length === 0) {
-        setError('No salesmen found. Please contact your shop owner.');
-        setLoading(false);
-        return;
-      }
-      
-      // Find salesman with matching username
-      const salesman = salesmen.find(
-        s => s.username.toLowerCase() === username.toLowerCase() && s.isActive
-      );
-      
-      if (!salesman) {
-        setError('Salesman not found or account is inactive');
-        setLoading(false);
-        return;
-      }
-      
-      // Verify password (in a real app, this would use secure password verification)
-      if (salesman.password !== password) {
-        setError('Invalid password');
-        setLoading(false);
-        return;
-      }
-      
-      // Set current salesman and authentication status
-      await AsyncStorage.setItem('currentSalesman', JSON.stringify(salesman));
-      await AsyncStorage.setItem('salesmanAuthenticated', 'true');
-      
-      // Navigate to salesman dashboard
+      await login({ phoneNumber: mobile, password });
+      await SecureStore.setItemAsync('salesmanAuthenticated', 'true');
       router.replace('/(salesman)/dashboard');
-    } catch (error) {
-      console.error('Error during login:', error);
-      setError('An error occurred during login. Please try again.');
+    } catch (err) {
+      setError('Invalid credentials or login failed.');
     } finally {
       setLoading(false);
     }
@@ -109,15 +56,19 @@ export default function SalesmanLoginScreen() {
       <View style={styles.formContainer}>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         
-        <View style={styles.inputContainer}>
-          <MaterialCommunityIcons name="account" size={24} color="#999" style={styles.inputIcon} />
+        <View style={styles.inputRow}>
+          <View style={styles.countryCodeBox}>
+            <Text style={styles.countryCodeText}>+91</Text>
+          </View>
           <TextInput
-            style={styles.input}
-            placeholder="Username"
-            value={username}
-            onChangeText={setUsername}
+            style={[styles.input, { flex: 1 }]}
+            placeholder="10-digit mobile number"
+            value={mobile}
+            onChangeText={setMobile}
             autoCapitalize="none"
             autoCorrect={false}
+            keyboardType="numeric"
+            maxLength={10}
           />
         </View>
         
@@ -145,7 +96,7 @@ export default function SalesmanLoginScreen() {
         <TouchableOpacity
           style={styles.loginButton}
           onPress={handleLogin}
-          disabled={loading}
+          disabled={loading || isLoading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -196,6 +147,42 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    paddingHorizontal: 0,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  countryCodeBox: {
+    paddingVertical: 15,
+    paddingHorizontal: 12,
+    backgroundColor: '#f0f0f0',
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+    borderRightWidth: 0,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  countryCodeText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  input: {
+    flex: 1,
+    height: 50,
+    fontSize: 16,
+    borderWidth: 0,
+    borderRadius: 8,
+    backgroundColor: '#f8f8f8',
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+    padding: 15,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -208,11 +195,6 @@ const styles = StyleSheet.create({
   },
   inputIcon: {
     marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    height: 50,
-    fontSize: 16,
   },
   eyeIcon: {
     padding: 8,
