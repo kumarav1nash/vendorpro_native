@@ -12,18 +12,21 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSales, Sale } from '../../contexts/SalesContext';
-import { useProducts, Product } from '../../contexts/ProductContext';
-import { useSalesmen, Salesman } from '../../contexts/SalesmenContext';
+import { Sale, CreateSaleDto, UpdateSaleDto } from '../../../src/types/sales';
 
+import { useInventory } from '../../../src/contexts/InventoryContext';
+import { useSales } from '../../../src/contexts/SalesContext';
+import { useShop } from '../../../src/contexts/ShopContext';
+import { Inventory } from '@/src/types/inventory';
+import { getUserById } from '@/src/services/user.service';
 type SalesTabProps = {
   shopId: string;
 };
 
 export default function SalesTab({ shopId }: SalesTabProps) {
-  const { sales, addSale, updateSale, getShopSales } = useSales();
-  const { products, getProductById } = useProducts();
-  const { salesmen, getSalesmanById } = useSalesmen();
+  const { sales, loading, error, fetchAllSales, createSale, updateSale, approveSale, rejectSale } = useSales();
+  const { inventory, fetchInventoryById,fetchInventoryByShopId } = useInventory();
+  const { getShopSalesmen } = useShop();
   
   const [shopSales, setShopSales] = useState<Sale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,73 +34,58 @@ export default function SalesTab({ shopId }: SalesTabProps) {
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [sortField, setSortField] = useState<'date' | 'amount' | 'createdAt'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [showModal, setShowModal] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Inventory | null>(null);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [saleToReject, setSaleToReject] = useState<string | null>(null);
-  const [saleForm, setSaleForm] = useState({
+  const [saleForm, setSaleForm] = useState<CreateSaleDto>({
+    shopId,
     productId: '',
+    salesmanId: '',
     quantity: 1,
     salePrice: 0,
   });
   
   useEffect(() => {
-    loadSales();
-  }, [shopId, sales]);
+    const load = async () => {
+      setIsLoading(true);
+      await fetchAllSales({ shopId });
+      setIsLoading(false);
+    };
+    load();
+  }, [shopId]);
   
   useEffect(() => {
-    if (shopSales.length > 0) {
-      let filtered = [...shopSales];
-      
-      // Apply status filter
-      if (filterStatus !== 'all') {
-        filtered = filtered.filter(sale => sale.status === filterStatus);
-      }
-      
-      // Apply search filter
-      if (searchQuery.trim() !== '') {
-        filtered = filtered.filter(sale => {
-          const customer = sale.customerName.toLowerCase();
-          const product = getProductById(sale.productId)?.name.toLowerCase() || '';
-          const salesman = getSalesmanById(sale.salesmanId)?.name.toLowerCase() || '';
-          const query = searchQuery.toLowerCase();
-          
-          return customer.includes(query) || 
-                 product.includes(query) || 
-                 salesman.includes(query);
-        });
-      }
-      
-      // Apply sorting
-      filtered.sort((a, b) => {
-        if (sortField === 'date') {
-          return sortDirection === 'asc' 
-            ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        } else if (sortField === 'amount') {
-          return sortDirection === 'asc' 
-            ? a.totalAmount - b.totalAmount
-            : b.totalAmount - a.totalAmount;
-        } else {
-          return sortDirection === 'asc' 
-            ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        }
-      });
-      
-      setFilteredSales(filtered);
+    let filtered = sales.filter(sale => sale.shopId === shopId);
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(sale => sale.status === filterStatus);
     }
-  }, [searchQuery, shopSales, sortField, sortDirection, filterStatus]);
-  
-  const loadSales = () => {
-    setIsLoading(true);
-    const salesForShop = getShopSales(shopId);
-    setShopSales(salesForShop);
-    setFilteredSales(salesForShop);
-    setIsLoading(false);
-  };
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(sale =>
+        sale.productId.toLowerCase().includes(query) ||
+        sale.salesmanId.toLowerCase().includes(query)
+      );
+    }
+    filtered.sort((a, b) => {
+      if (sortField === 'date') {
+        return sortDirection === 'asc'
+          ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      } else if (sortField === 'amount') {
+        return sortDirection === 'asc'
+          ? a.salePrice - b.salePrice
+          : b.salePrice - a.salePrice;
+      } else {
+        return sortDirection === 'asc'
+          ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    });
+    setFilteredSales(filtered);
+  }, [sales, shopId, searchQuery, sortField, sortDirection, filterStatus]);
   
   const handleSort = (field: 'date' | 'amount') => {
     if (sortField === field) {
@@ -108,21 +96,17 @@ export default function SalesTab({ shopId }: SalesTabProps) {
     }
   };
   
-  const handleStatusFilter = (status: 'all' | 'pending' | 'completed' | 'rejected') => {
+  const handleStatusFilter = (status: 'all' | 'pending' | 'approved' | 'rejected') => {
     setFilterStatus(status);
   };
   
-  const handleMarkAsCompleted = (saleId: string) => {
-    const sale = shopSales.find(sale => sale.id === saleId);
-    if (sale) {
-      const updatedSale: Sale = { 
-        ...sale, 
-        status: 'completed',
-        updatedAt: new Date().toISOString() 
-      };
-      updateSale(updatedSale);
-      Alert.alert('Success', 'Sale marked as completed');
-      loadSales();
+  const handleMarkAsApproved = async (saleId: string) => {
+    try {
+      await approveSale(saleId);
+      Alert.alert('Success', 'Sale approved');
+      await fetchAllSales({ shopId });
+    } catch (err) {
+      Alert.alert('Error', 'Failed to approve sale');
     }
   };
 
@@ -132,22 +116,17 @@ export default function SalesTab({ shopId }: SalesTabProps) {
     setShowRejectionModal(true);
   };
 
-  const handleRejectConfirm = () => {
+  const handleRejectConfirm = async () => {
     if (saleToReject) {
-      const sale = shopSales.find(sale => sale.id === saleToReject);
-      if (sale) {
-        const updatedSale: Sale = { 
-          ...sale, 
-          status: 'rejected',
-          rejectionReason: rejectionReason || 'No reason provided',
-          updatedAt: new Date().toISOString() 
-        };
-        updateSale(updatedSale);
+      try {
+        await rejectSale(saleToReject);
         Alert.alert('Success', 'Sale rejected');
-        loadSales();
+        setShowRejectionModal(false);
+        setSaleToReject(null);
+        await fetchAllSales({ shopId });
+      } catch (err) {
+        Alert.alert('Error', 'Failed to reject sale');
       }
-      setShowRejectionModal(false);
-      setSaleToReject(null);
     }
   };
   
@@ -164,68 +143,66 @@ export default function SalesTab({ shopId }: SalesTabProps) {
   const getSummaryData = () => {
     const totalSales = filteredSales.length;
     const pendingSales = filteredSales.filter(sale => sale.status === 'pending').length;
-    const completedSales = filteredSales.filter(sale => sale.status === 'completed').length;
+    const approvedSales = filteredSales.filter(sale => sale.status === 'approved').length;
     const totalRevenue = filteredSales
-      .filter(sale => sale.status === 'completed')
-      .reduce((sum, sale) => sum + sale.totalAmount, 0);
+      .filter(sale => sale.status === 'approved')
+      .reduce((sum, sale) => sum + sale.salePrice, 0);
     
-    return { totalSales, pendingSales, completedSales, totalRevenue };
+    return { totalSales, pendingSales, approvedSales, totalRevenue };
   };
   
   const renderSaleItem = ({ item }: { item: Sale }) => {
-    const product = getProductById(item.productId);
-    const salesman = getSalesmanById(item.salesmanId);
+    const product = fetchInventoryById(item.productId);
+    const salesman = getUserById(item.salesmanId);
     
     return (
-      <View style={[styles.saleCard, item.status === 'completed' ? styles.completedSale : null]}>
+      <View style={[styles.saleCard, item.status === 'approved' ? styles.completedSale : null]}>
         <View style={styles.saleHeader}>
           <View>
             <Text style={styles.customerId}>Order #{item.id.slice(-6)}</Text>
-            <Text style={styles.customerName}>{item.customerName}</Text>
+            <Text style={styles.customerName}>{item.productId}</Text>
           </View>
-          <View style={[styles.statusBadge, 
-            item.status === 'completed' ? styles.completedBadge : 
-            item.status === 'rejected' ? styles.rejectedBadge : styles.pendingBadge]}>
+          <View style={[
+            styles.statusBadge,
+            item.status === 'approved'
+              ? styles.completedBadge
+              : item.status === 'rejected'
+              ? styles.rejectedBadge
+              : styles.pendingBadge,
+          ]}>
             <Text style={styles.statusText}>{item.status}</Text>
           </View>
         </View>
         
         <View style={styles.saleDetails}>
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Product:</Text>
-            <Text style={styles.detailValue}>{product ? product.name : 'Unknown Product'}</Text>
+            <Text style={styles.detailLabel}>Product ID:</Text>
+            <Text style={styles.detailValue}>{item.productId}</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Quantity:</Text>
-            <Text style={styles.detailValue}>{item.quantity} {product ? product.unit || '' : ''}</Text>
+            <Text style={styles.detailValue}>{item.quantity}</Text>
           </View>
           
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Salesman:</Text>
-            <Text style={styles.detailValue}>{salesman ? salesman.name : 'Unassigned'}</Text>
+            <Text style={styles.detailLabel}>Salesman ID:</Text>
+            <Text style={styles.detailValue}>{item.salesmanId}</Text>
           </View>
           
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Commission:</Text>
-            <Text style={styles.detailValue}>₹{item.commission.toFixed(2)}</Text>
+            <Text style={styles.detailLabel}>Sale Price:</Text>
+            <Text style={styles.detailValue}>₹{item.salePrice.toFixed(2)}</Text>
           </View>
           
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Date:</Text>
             <Text style={styles.detailValue}>{formatDate(item.createdAt)}</Text>
           </View>
-
-          {item.status === 'rejected' && item.rejectionReason && (
-            <View style={styles.rejectionContainer}>
-              <Text style={styles.rejectionLabel}>Rejection Reason:</Text>
-              <Text style={styles.rejectionText}>{item.rejectionReason}</Text>
-            </View>
-          )}
         </View>
         
         <View style={styles.saleFooter}>
-          <Text style={styles.totalAmount}>₹{item.totalAmount.toFixed(2)}</Text>
+          <Text style={styles.totalAmount}>₹{item.salePrice.toFixed(2)}</Text>
           
           {item.status === 'pending' && (
             <View style={styles.actionButtons}>
@@ -238,7 +215,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.actionButton, styles.completeButton]}
-                onPress={() => handleMarkAsCompleted(item.id)}
+                onPress={() => handleMarkAsApproved(item.id)}
               >
                 <MaterialCommunityIcons name="check-circle" size={16} color="#fff" />
                 <Text style={styles.actionButtonText}>Approve</Text>
@@ -307,14 +284,14 @@ export default function SalesTab({ shopId }: SalesTabProps) {
           <TouchableOpacity 
             style={[
               styles.filterChip, 
-              filterStatus === 'completed' ? styles.activeChip : null
+              filterStatus === 'approved' ? styles.activeChip : null
             ]}
-            onPress={() => handleStatusFilter('completed')}
+            onPress={() => handleStatusFilter('approved')}
           >
             <Text style={[
               styles.filterChipText,
-              filterStatus === 'completed' ? styles.activeChipText : null
-            ]}>Completed</Text>
+              filterStatus === 'approved' ? styles.activeChipText : null
+            ]}>Approved</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -335,7 +312,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
       {/* Summary cards */}
       <View style={styles.summaryContainer}>
         {(() => {
-          const { totalSales, pendingSales, completedSales, totalRevenue } = getSummaryData();
+          const { totalSales, pendingSales, approvedSales, totalRevenue } = getSummaryData();
           return (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={[styles.summaryCard, { backgroundColor: '#E3F2FD' }]}>
@@ -349,8 +326,8 @@ export default function SalesTab({ shopId }: SalesTabProps) {
               </View>
               
               <View style={[styles.summaryCard, { backgroundColor: '#E8F5E9' }]}>
-                <Text style={styles.summaryValue}>{completedSales}</Text>
-                <Text style={styles.summaryLabel}>Completed</Text>
+                <Text style={styles.summaryValue}>{approvedSales}</Text>
+                <Text style={styles.summaryLabel}>Approved</Text>
               </View>
               
               <View style={[styles.summaryCard, { backgroundColor: '#F3E5F5' }]}>

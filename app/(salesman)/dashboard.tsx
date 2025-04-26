@@ -13,10 +13,12 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { Product } from '../contexts/ProductContext';
-import { Sale } from '../contexts/SalesContext';
-import { Salesman } from '../contexts/SalesmenContext';
+import { useInventory } from '../../src/contexts/InventoryContext';
+import { useSales } from '../../src/contexts/SalesContext';
+import { useShop } from '../../src/contexts/ShopContext';
 import { router } from 'expo-router';
+import { Inventory } from '@/src/types/inventory';
+import { useCommission } from '../../src/contexts/CommissionContext';
 
 type SaleForm = {
   productId: string;
@@ -28,19 +30,20 @@ type SaleForm = {
 };
 
 export default function SalesmanDashboardScreen() {
-  // State management
+  const { user: salesman, logout } = useAuth();
+  const { shop } = useShop();
+  const { inventories, fetchInventoryByShopId } = useInventory();
+  const { sales, fetchAllSales, createSale } = useSales();
+  const { commissions, fetchCommissionsBySalesman } = useCommission();
+
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [salesman, setSalesman] = useState<Salesman | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Inventory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [saleForm, setSaleForm] = useState<SaleForm>({
+  const [selectedProduct, setSelectedProduct] = useState<Inventory | null>(null);
+  const [saleForm, setSaleForm] = useState({
     productId: '',
     productName: '',
-    customerName: '',
     quantity: 1,
     sellingPrice: 0,
     totalAmount: 0,
@@ -51,18 +54,16 @@ export default function SalesmanDashboardScreen() {
   const [totalCommission, setTotalCommission] = useState(0);
   const [todaySales, setTodaySales] = useState(0);
 
-  const { logout } = useAuth();
-
   useEffect(() => {
     loadData();
-  }, []);
+  }, [salesman, shop]);
 
   useEffect(() => {
     if (selectedProduct) {
       setSaleForm(prev => ({
         ...prev,
         productId: selectedProduct.id,
-        productName: selectedProduct.name,
+        productName: selectedProduct.productName,
         sellingPrice: selectedProduct.sellingPrice,
         totalAmount: selectedProduct.sellingPrice * prev.quantity
       }));
@@ -70,7 +71,6 @@ export default function SalesmanDashboardScreen() {
   }, [selectedProduct]);
 
   useEffect(() => {
-    // Update total amount when quantity or selling price changes
     setSaleForm(prev => ({
       ...prev,
       totalAmount: prev.sellingPrice * prev.quantity
@@ -78,92 +78,45 @@ export default function SalesmanDashboardScreen() {
   }, [saleForm.quantity, saleForm.sellingPrice]);
 
   useEffect(() => {
-    // Filter products based on search query
     if (searchQuery.trim() === '') {
-      setFilteredProducts(products);
+      setFilteredProducts(inventories);
     } else {
-      const filtered = products.filter(product => 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase())
+      const filtered = inventories.filter(product => 
+        product.productName.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredProducts(filtered);
     }
-  }, [searchQuery, products]);
+  }, [searchQuery, inventories]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load salesman data first
-      let currentSalesman: Salesman | null = null;
-      const salesmanData = await AsyncStorage.getItem('currentSalesman');
-      if (salesmanData) {
-        currentSalesman = JSON.parse(salesmanData) as Salesman;
-        setSalesman(currentSalesman);
-      }
-
-      // Then load and filter products based on salesman's shop
-      const productsData = await AsyncStorage.getItem('products');
-      if (productsData) {
-        const parsedProducts = JSON.parse(productsData) as Product[];
-        
-        // Filter products to only show those from the salesman's assigned shop
-        if (currentSalesman && currentSalesman.shopId) {
-          const shopProducts = parsedProducts.filter(product => product.shopId === currentSalesman.shopId);
-          setProducts(shopProducts);
-          setFilteredProducts(shopProducts);
-        } else {
-          setProducts([]);
-          setFilteredProducts([]);
+      if (shop?.id) {
+        await fetchInventoryByShopId(shop.id);
+        await fetchAllSales({ salesmanId: salesman?.id });
+        if (salesman?.id) {
+          await fetchCommissionsBySalesman(salesman.id);
         }
       }
-
-      // Load sales
-      const salesData = await AsyncStorage.getItem('sales');
-      if (salesData) {
-        const parsedSales = JSON.parse(salesData) as Sale[];
-        setSales(parsedSales);
-
-        // Calculate metrics
-        if (currentSalesman) {
-          // Filter sales for this salesman
-          const salesmanSales = parsedSales.filter(sale => sale.salesmanId === currentSalesman.id);
-          
-          // Pending sales
-          setPendingSales(salesmanSales.filter(sale => sale.status === 'pending').length);
-          
-          // Completed sales
-          setCompletedSales(salesmanSales.filter(sale => sale.status === 'completed').length);
-          
-          // Total commission
-          const totalComm = salesmanSales
-            .filter(sale => sale.status === 'completed')
-            .reduce((sum, sale) => sum + (sale.commission || 0), 0);
-          setTotalCommission(totalComm);
-          
-          // Today's sales
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const todayTimestamp = today.toISOString().split('T')[0]; // Get YYYY-MM-DD part
-          
-          const todaySalesAmount = salesmanSales
-            .filter(sale => {
-              if (!sale.createdAt) return false;
-              try {
-                const saleDate = new Date(sale.createdAt).toISOString().split('T')[0]; // Get YYYY-MM-DD part
-                return saleDate === todayTimestamp && sale.status !== 'rejected';
-              } catch (error) {
-                console.error('Invalid date format for sale:', sale.id);
-                return false;
-              }
-            })
-            .reduce((sum, sale) => sum + sale.totalAmount, 0);
-          setTodaySales(todaySalesAmount);
-        }
-      }
+      updateMetrics();
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const updateMetrics = () => {
+    if (!salesman) return;
+    const salesmanSales = sales.filter(sale => sale.salesmanId === salesman.id);
+    setPendingSales(salesmanSales.filter(sale => sale.status === 'pending').length);
+    setCompletedSales(salesmanSales.filter(sale => sale.status === 'approved').length);
+    const totalComm = commissions.reduce((sum, c) => sum + (c.amount || 0), 0);
+    setTotalCommission(totalComm);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    setTodaySales(salesmanSales.filter(sale => sale.status !== 'rejected' && sale.createdAt.split('T')[0] === todayStr).reduce((sum, sale) => sum + sale.salePrice * sale.quantity, 0));
   };
 
   const onRefresh = async () => {
@@ -173,11 +126,9 @@ export default function SalesmanDashboardScreen() {
   };
 
   const handleOpenSaleForm = () => {
-    // Reset form
     setSaleForm({
       productId: '',
       productName: '',
-      customerName: '',
       quantity: 1,
       sellingPrice: 0,
       totalAmount: 0,
@@ -187,31 +138,23 @@ export default function SalesmanDashboardScreen() {
     setShowModal(true);
   };
 
-  const handleSelectProduct = (product: Product) => {
+  const handleSelectProduct = (product: Inventory) => {
     setSelectedProduct(product);
     setSearchQuery('');
   };
 
   const handleQuantityChange = (text: string) => {
     const quantity = text.trim() === '' ? 0 : parseInt(text, 10);
-    
-    if (selectedProduct && quantity > selectedProduct.quantity) {
-      Alert.alert('Error', `Only ${selectedProduct.quantity} units available in stock`);
+    if (selectedProduct && quantity > selectedProduct.stockQuantity) {
+      Alert.alert('Error', `Only ${selectedProduct.stockQuantity} units available in stock`);
       return;
     }
-    
-    setSaleForm(prev => ({
-      ...prev,
-      quantity
-    }));
+    setSaleForm(prev => ({ ...prev, quantity }));
   };
 
   const handleSellingPriceChange = (text: string) => {
     const sellingPrice = text.trim() === '' ? 0 : parseFloat(text);
-    setSaleForm(prev => ({
-      ...prev,
-      sellingPrice
-    }));
+    setSaleForm(prev => ({ ...prev, sellingPrice }));
   };
 
   const validateSaleForm = () => {
@@ -219,74 +162,39 @@ export default function SalesmanDashboardScreen() {
       Alert.alert('Error', 'Please select a product');
       return false;
     }
-    
-    if (!saleForm.customerName.trim()) {
-      Alert.alert('Error', 'Customer name is required');
-      return false;
-    }
-    
+   
     if (saleForm.quantity <= 0) {
       Alert.alert('Error', 'Quantity must be greater than 0');
       return false;
     }
-    
     if (saleForm.sellingPrice <= 0) {
       Alert.alert('Error', 'Selling price must be greater than 0');
       return false;
     }
-    
     return true;
   };
 
   const handleSubmitSale = async () => {
     if (!validateSaleForm() || !salesman || !selectedProduct) return;
-    
     try {
-      // Create new sale
-      const timestamp = Date.now();
-      const currentDate = new Date().toISOString();
-      const commission = saleForm.totalAmount * (salesman.commissionRate / 100);
-      
-      const newSale: Sale = {
-        id: `sale-${timestamp}`,
-        shopId: salesman.shopId,
-        customerName: saleForm.customerName,
+      await createSale({
+        shopId: shop?.id || '',
         productId: selectedProduct.id,
         salesmanId: salesman.id,
         quantity: saleForm.quantity,
-        totalAmount: saleForm.totalAmount,
-        commission,
-        status: 'pending',
-        createdAt: currentDate,
-        updatedAt: currentDate
-      };
-      
-      // Update sales in AsyncStorage
-      const updatedSales = [...sales, newSale];
-      await AsyncStorage.setItem('sales', JSON.stringify(updatedSales));
-      
-      // Update local state
-      setSales(updatedSales);
-      setPendingSales(prev => prev + 1);
-      
-      // Close modal
+        salePrice: saleForm.sellingPrice,
+      });
       setShowModal(false);
-      Alert.alert(
-        'Sale Recorded', 
-        'Your sale has been recorded and is pending approval. You will earn ₹' + 
-        commission.toFixed(2) + ' in commission when approved.'
-      );
-      
-      // Reset form
+      Alert.alert('Sale Recorded', 'Your sale has been recorded and is pending approval.');
       setSaleForm({
         productId: '',
         productName: '',
-        customerName: '',
         quantity: 1,
         sellingPrice: 0,
         totalAmount: 0,
       });
       setSelectedProduct(null);
+      await loadData();
     } catch (error) {
       console.error('Error recording sale:', error);
       Alert.alert('Error', 'Failed to record sale');
@@ -298,10 +206,7 @@ export default function SalesmanDashboardScreen() {
       'Logout',
       'Are you sure you want to logout?',
       [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Logout',
           style: 'destructive',
@@ -338,7 +243,7 @@ export default function SalesmanDashboardScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.welcomeText}>
-              Welcome, {salesman?.name ?? 'Salesman'}
+              Welcome, {salesman?.id ?? 'Salesman'}
             </Text>
             <Text style={styles.dateText}>
               {new Date().toDateString()}
@@ -398,23 +303,21 @@ export default function SalesmanDashboardScreen() {
               .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
               .slice(0, 5)
               .map((sale) => {
-                const product = products.find(p => p.id === sale.productId);
+                const product = inventories.find(p => p.id === sale.productId);
                 return (
                   <View key={sale.id} style={styles.saleItem}>
                     <View style={styles.saleInfo}>
-                      <Text style={styles.saleProductName}>{product ? product.name : 'Unknown Product'}</Text>
-                      <Text style={styles.saleDetail}>
-                        Customer: {sale.customerName}
-                      </Text>
+                      <Text style={styles.saleProductName}>{product ? product.productName : 'Unknown Product'}</Text>
+                    
                       <Text style={styles.saleDetail}>
                         {new Date(sale.createdAt).toLocaleDateString()}
                       </Text>
                     </View>
                     <View style={styles.saleDetails}>
-                      <Text style={styles.saleAmount}>₹{sale.totalAmount.toFixed(2)}</Text>
+                      <Text style={styles.saleAmount}>₹{sale.salePrice.toFixed(2)}</Text>
                       <View style={[
                         styles.statusBadge, 
-                        sale.status === 'completed' ? styles.statusCompleted : 
+                        sale.status === 'approved' ? styles.statusCompleted : 
                         sale.status === 'rejected' ? styles.statusRejected : 
                         styles.statusPending
                       ]}>
@@ -471,12 +374,12 @@ export default function SalesmanDashboardScreen() {
                         onPress={() => handleSelectProduct(product)}
                       >
                         <View style={styles.productInfo}>
-                          <Text style={styles.productName}>{product.name}</Text>
+                          <Text style={styles.productName}>{product.productName}</Text>
                           <Text style={styles.productDetail}>
                             Selling Price: ₹{product.sellingPrice.toFixed(2)}
                           </Text>
                           <Text style={styles.productDetail}>
-                            Available: {product.quantity} units
+                            Available: {product.stockQuantity} units
                           </Text>
                         </View>
                         <MaterialCommunityIcons name="chevron-right" size={24} color="#999" />
@@ -489,9 +392,9 @@ export default function SalesmanDashboardScreen() {
                 <>
                   <View style={styles.selectedProduct}>
                     <View style={styles.selectedProductInfo}>
-                      <Text style={styles.selectedProductName}>{selectedProduct.name}</Text>
+                      <Text style={styles.selectedProductName}>{selectedProduct.productName}</Text>
                       <Text style={styles.selectedProductDetail}>
-                        Available: {selectedProduct.quantity} units
+                        Available: {selectedProduct.stockQuantity} units
                       </Text>
                     </View>
                     <TouchableOpacity 
@@ -501,16 +404,7 @@ export default function SalesmanDashboardScreen() {
                       <Text style={styles.changeProductText}>Change</Text>
                     </TouchableOpacity>
                   </View>
-                  
-                  <View style={styles.formGroup}>
-                    <Text style={styles.label}>Customer Name*</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={saleForm.customerName}
-                      onChangeText={(text) => setSaleForm(prev => ({ ...prev, customerName: text }))}
-                      placeholder="Enter customer name"
-                    />
-                  </View>
+              
                   
                   <View style={styles.formRow}>
                     <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
@@ -541,14 +435,10 @@ export default function SalesmanDashboardScreen() {
                     <Text style={styles.totalAmount}>₹{saleForm.totalAmount.toFixed(2)}</Text>
                   </View>
                   
-                  {salesman && (
-                    <View style={styles.commissionPreview}>
-                      <Text style={styles.commissionLabel}>Your Commission ({salesman.commissionRate}%):</Text>
-                      <Text style={styles.commissionAmount}>
-                        ₹{(saleForm.totalAmount * (salesman.commissionRate / 100)).toFixed(2)}
-                      </Text>
-                    </View>
-                  )}
+                  <View style={styles.commissionPreview}>
+                    <Text style={styles.commissionLabel}>Your Total Commission:</Text>
+                    <Text style={styles.commissionAmount}>₹{totalCommission.toFixed(2)}</Text>
+                  </View>
                   
                   <TouchableOpacity
                     style={styles.submitButton}

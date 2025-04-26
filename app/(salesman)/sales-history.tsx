@@ -10,76 +10,67 @@ import {
   TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Sale } from '../contexts/SalesContext';
-import { Salesman } from '../contexts/SalesmenContext';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { useSales } from '../../src/contexts/SalesContext';
+import { useInventory } from '../../src/contexts/InventoryContext';
 import { router } from 'expo-router';
-
+import { Sale } from '@/src/types/sales';
 export default function SalesHistoryScreen() {
+  const { user: salesman } = useAuth();
+  const { sales, fetchAllSales } = useSales();
+  const { inventories, fetchInventoryByShopId } = useInventory();
+
   const [isLoading, setIsLoading] = useState(true);
-  const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
-  const [salesman, setSalesman] = useState<Salesman | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
-  const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [salesman]);
 
   useEffect(() => {
-    // Apply filters and sorting
     if (sales.length > 0 && salesman) {
       let filtered = sales.filter(sale => sale.salesmanId === salesman.id);
-      
-      // Apply status filter
       if (statusFilter !== 'all') {
         filtered = filtered.filter(sale => sale.status === statusFilter);
       }
-      
-      // Apply search filter
       if (searchQuery.trim() !== '') {
         const query = searchQuery.toLowerCase();
         filtered = filtered.filter(
-          sale =>
-            sale.productName.toLowerCase().includes(query) ||
-            sale.customerName.toLowerCase().includes(query)
+          sale => {
+            const product = inventories.find(p => p.id === sale.productId);
+            return (
+              (product?.productName?.toLowerCase().includes(query) ?? false) ||
+              sale.id.toLowerCase().includes(query)
+            );
+          }
         );
       }
-      
-      // Apply sorting
       const sorted = [...filtered].sort((a, b) => {
         if (sortBy === 'date') {
-          return sortOrder === 'asc' ? a.date - b.date : b.date - a.date;
+          return sortOrder === 'asc'
+            ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         } else {
           return sortOrder === 'asc'
-            ? a.totalAmount - b.totalAmount
-            : b.totalAmount - a.totalAmount;
+            ? a.salePrice * a.quantity - b.salePrice * b.quantity
+            : b.salePrice * b.quantity - a.salePrice * a.quantity;
         }
       });
-      
       setFilteredSales(sorted);
     }
-  }, [sales, salesman, searchQuery, statusFilter, sortBy, sortOrder]);
+  }, [sales, salesman, searchQuery, statusFilter, sortBy, sortOrder, inventories]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      // Load salesman data
-      const salesmanData = await AsyncStorage.getItem('currentSalesman');
-      if (salesmanData) {
-        const parsedSalesman = JSON.parse(salesmanData) as Salesman;
-        setSalesman(parsedSalesman);
+      if (salesman?.id) {
+        await fetchAllSales({ salesmanId: salesman.id });
       }
-
-      // Load sales
-      const salesData = await AsyncStorage.getItem('sales');
-      if (salesData) {
-        const parsedSales = JSON.parse(salesData) as Sale[];
-        setSales(parsedSales);
-      }
+      // Optionally fetch inventories for product names
     } catch (error) {
       console.error('Error loading data:', error);
       Alert.alert('Error', 'Failed to load sales history');
@@ -90,7 +81,7 @@ export default function SalesHistoryScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed':
+      case 'approved':
         return '#4CAF50';
       case 'pending':
         return '#FF9800';
@@ -101,61 +92,38 @@ export default function SalesHistoryScreen() {
     }
   };
 
-  const getTotalCommission = () => {
-    if (!salesman) return 0;
-    
-    return filteredSales
-      .filter(sale => sale.status === 'completed')
-      .reduce((sum, sale) => sum + (sale.commission || 0), 0);
-  };
-
   const getTotalSales = () => {
     if (!salesman) return 0;
-    
     return filteredSales.reduce((sum, sale) => {
       if (sale.status !== 'rejected') {
-        return sum + sale.totalAmount;
+        return sum + sale.salePrice * sale.quantity;
       }
       return sum;
     }, 0);
   };
 
   const renderSaleItem = ({ item }: { item: Sale }) => {
+    const product = inventories.find(p => p.id === item.productId);
     return (
       <View style={styles.saleItem}>
         <View style={styles.saleHeader}>
-          <Text style={styles.productName}>{item.productName}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <Text style={styles.productName}>{product ? product.productName : 'Unknown Product'}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}> 
             <Text style={styles.statusText}>{item.status}</Text>
           </View>
         </View>
-        
         <View style={styles.saleDetails}>
           <View style={styles.saleInfo}>
-            <Text style={styles.saleInfoText}>Customer: {item.customerName}</Text>
+            <Text style={styles.saleInfoText}>Customer: {item.id}</Text>
             <Text style={styles.saleInfoText}>Quantity: {item.quantity}</Text>
             <Text style={styles.saleInfoText}>
-              Date: {new Date(item.date).toLocaleDateString()}
+              Date: {new Date(item.createdAt).toLocaleDateString()}
             </Text>
           </View>
-          
           <View style={styles.saleAmount}>
-            <Text style={styles.amountText}>₹{item.totalAmount.toFixed(2)}</Text>
-            {item.status === 'completed' && (
-              <Text style={styles.commissionText}>
-                Commission: ₹{(item.commission || 0).toFixed(2)}
-              </Text>
-            )}
+            <Text style={styles.amountText}>₹{(item.salePrice * item.quantity).toFixed(2)}</Text>
           </View>
         </View>
-        
-        {item.status === 'rejected' && item.rejectionReason && (
-          <View style={styles.rejectionReason}>
-            <Text style={styles.rejectionReasonText}>
-              Reason: {item.rejectionReason}
-            </Text>
-          </View>
-        )}
       </View>
     );
   };
@@ -172,11 +140,6 @@ export default function SalesHistoryScreen() {
           <View style={styles.statBox}>
             <Text style={styles.statValue}>₹{getTotalSales().toFixed(2)}</Text>
             <Text style={styles.statLabel}>Total Sales</Text>
-          </View>
-          
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>₹{getTotalCommission().toFixed(2)}</Text>
-            <Text style={styles.statLabel}>Commission</Text>
           </View>
         </View>
         
@@ -237,17 +200,17 @@ export default function SalesHistoryScreen() {
                 <TouchableOpacity
                   style={[
                     styles.pill,
-                    statusFilter === 'completed' && styles.pillActive,
+                    statusFilter === 'approved' && styles.pillActive,
                   ]}
-                  onPress={() => setStatusFilter('completed')}
+                  onPress={() => setStatusFilter('approved')}
                 >
                   <Text
                     style={[
                       styles.pillText,
-                      statusFilter === 'completed' && styles.pillTextActive,
+                      statusFilter === 'approved' && styles.pillTextActive,
                     ]}
                   >
-                    Completed
+                    Approved
                   </Text>
                 </TouchableOpacity>
                 
@@ -582,21 +545,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-  },
-  commissionText: {
-    fontSize: 14,
-    color: '#4CAF50',
-    marginTop: 4,
-  },
-  rejectionReason: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#ffebee',
-    borderRadius: 8,
-  },
-  rejectionReasonText: {
-    fontSize: 14,
-    color: '#F44336',
   },
   emptyContainer: {
     alignItems: 'center',
