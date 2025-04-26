@@ -10,9 +10,9 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useUser } from '../contexts/UserContext';
+import { useAuth } from '../../src/contexts/AuthContext';
 
 type UserProfile = {
   name: string;
@@ -26,6 +26,7 @@ type UserProfile = {
 
 export default function ProfileScreen() {
   const { currentUser, updateUser, loadUser } = useUser();
+  const { logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
     name: '',
@@ -76,7 +77,7 @@ export default function ProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('user');
+              await logout();
               router.replace('/(auth)/login');
             } catch (error) {
               console.error('Error during logout:', error);
@@ -204,7 +205,6 @@ export default function ProfileScreen() {
                   onPress: async () => {
                     try {
                       // Remove onboarding complete flag to trigger setup flow
-                      await AsyncStorage.removeItem('onboardingComplete');
                       router.replace('/(onboarding)/shop-details');
                     } catch (error) {
                       console.error('Error initiating setup:', error);

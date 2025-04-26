@@ -12,11 +12,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { Product } from '../contexts/ProductContext';
 import { Sale } from '../contexts/SalesContext';
 import { Salesman } from '../contexts/SalesmenContext';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type SaleForm = {
   productId: string;
@@ -50,6 +51,8 @@ export default function SalesmanDashboardScreen() {
   const [completedSales, setCompletedSales] = useState(0);
   const [totalCommission, setTotalCommission] = useState(0);
   const [todaySales, setTodaySales] = useState(0);
+
+  const { logout } = useAuth();
 
   useEffect(() => {
     loadData();
@@ -305,8 +308,7 @@ export default function SalesmanDashboardScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await AsyncStorage.removeItem('currentSalesman');
-              await AsyncStorage.removeItem('salesmanAuthenticated');
+              await logout();
               router.replace('/(auth)/salesman-login');
             } catch (error) {
               console.error('Error during logout:', error);
