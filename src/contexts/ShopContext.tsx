@@ -3,6 +3,7 @@ import { shopService } from '../services/shop.service';
 import { Shop, CreateShopDto, AssignSalesmanDto, CreateSalesmanDto } from '../types/shop';
 
 interface ShopContextType {
+  shop: Shop | null;
   shops: Shop[];
   isLoading: boolean;
   error: string | null;
@@ -14,6 +15,7 @@ interface ShopContextType {
   createSalesman: (shopId: string, data: CreateSalesmanDto) => Promise<any>;
   getShopSalesmen: (shopId: string) => Promise<any[]>;
   removeSalesman: (shopId: string, salesmanId: string) => Promise<any>;
+  deleteShop: (shopId: string) => Promise<any>;
 }
 
 const ShopContext = createContext<ShopContextType>({} as ShopContextType);
@@ -27,6 +29,7 @@ export const useShop = () => {
 };
 
 export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [shop, setShop] = useState<Shop | null>(null);
   const [shops, setShops] = useState<Shop[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,10 +142,25 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const deleteShopContext = async (shopId: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      return await shopService.deleteShop(shopId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete shop');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const value = useMemo(() => ({
+    shop,
     shops,
     isLoading,
     error,
+    useShop,
     fetchAllShops,
     fetchMyShops,
     createShop,
@@ -151,7 +169,8 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     createSalesman,
     getShopSalesmen,
     removeSalesman,
-  }), [shops, isLoading, error]);
+    deleteShop: deleteShopContext
+  }), [shops, isLoading, error, shop]);
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;
 }; 

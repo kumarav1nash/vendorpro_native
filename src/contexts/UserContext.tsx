@@ -168,6 +168,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     users,
     loading,
     error,
+    useUser,
     fetchUser,
     fetchAllUsers,
     updateUser: updateUserContext,

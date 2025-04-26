@@ -17,7 +17,6 @@ import { Product } from '../contexts/ProductContext';
 import { Sale } from '../contexts/SalesContext';
 import { Salesman } from '../contexts/SalesmenContext';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type SaleForm = {
   productId: string;

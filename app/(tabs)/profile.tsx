@@ -8,53 +8,36 @@ import {
   Switch,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../../src/contexts/UserContext';
 import { useAuth } from '../../src/contexts/AuthContext';
-
-type UserProfile = {
-  name: string;
-  mobile: string;
-  email?: string;
-  shopName?: string;
-  gstin?: string;
-  language?: 'en' | 'hi';
-  notificationsEnabled: boolean;
-};
+import { useUserProfile } from '../../src/contexts/UserProfileContext';
+import { useShop } from '../../src/contexts/ShopContext';
+import { UserProfile, UserProfilePreferences } from '@/src/types/user';
 
 export default function ProfileScreen() {
-  const { currentUser, updateUser, loadUser } = useUser();
+  const { user } = useUser();
   const { logout } = useAuth();
+  const { profile, updateProfile, fetchMyProfile } = useUserProfile();
+  const { shop } = useShop();
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState<UserProfile>({
-    name: '',
-    mobile: '',
-    email: '',
-    shopName: '',
-    gstin: '',
-    language: 'en',
-    notificationsEnabled: true,
-  });
+  const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    if (currentUser) {
-      setProfile({
-        name: currentUser.name,
-        mobile: currentUser.mobile,
-        email: currentUser.email || '',
-        shopName: currentUser.shopName || '',
-        gstin: currentUser.gstin || '',
-        language: (currentUser.language as 'en' | 'hi') || 'en',
-        notificationsEnabled: currentUser.notificationsEnabled || true,
-      });
+    if (!profile && user) {
+      fetchMyProfile();
+    } else if (profile) {
+      setLocalProfile(profile);
     }
-  }, [currentUser]);
+  }, [profile, user]);
 
   const handleSave = async () => {
+    if (!localProfile) return;
     try {
-      await updateUser(profile);
+      await updateProfile(localProfile.id, localProfile);
       setIsEditing(false);
       Alert.alert('Success', 'Profile updated successfully');
     } catch (error) {
@@ -63,46 +46,45 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              router.replace('/(auth)/login');
-            } catch (error) {
-              console.error('Error during logout:', error);
-            }
-          },
-        },
-      ],
-    );
+  const handleFieldChange = (key: keyof UserProfile, value: string) => {
+    if (!localProfile) return;
+    setLocalProfile({ ...localProfile, [key]: value });
   };
 
-  const renderField = (label: string, value: string, key: keyof UserProfile) => (
+  const handlePreferencesChange = (key: keyof UserProfilePreferences, value: string | boolean) => {
+    if (!localProfile) return;
+    setLocalProfile({
+      ...localProfile,
+      preferences: {
+        ...localProfile.preferences,
+        [key]: value,
+      },
+    });
+  };
+
+  const renderField = (label: string, value: string, key: keyof UserProfile, editable = true) => (
     <View style={styles.fieldContainer}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      {isEditing ? (
+      {isEditing && editable ? (
         <TextInput
           style={styles.input}
           value={value}
-          onChangeText={(text) => setProfile(prev => ({ ...prev, [key]: text }))}
-          editable={key !== 'mobile'} // Mobile number cannot be edited
+          onChangeText={(text) => handleFieldChange(key, text)}
         />
       ) : (
         <Text style={styles.fieldValue}>{value || 'Not set'}</Text>
       )}
     </View>
   );
+
+  if (!localProfile) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -119,17 +101,36 @@ export default function ProfileScreen() {
           )}
         </View>
       </View>
-
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Personal Information</Text>
-        {renderField('Name', profile.name, 'name')}
-        {renderField('Mobile', profile.mobile, 'mobile')}
-        {renderField('Email', profile.email || '', 'email')}
-        
+        {renderField('First Name', localProfile.firstName, 'firstName')}
+        {renderField('Last Name', localProfile.lastName, 'lastName')}
+        {renderField('Date of Birth', localProfile.dateOfBirth, 'dateOfBirth')}
+        {renderField('Gender', localProfile.gender, 'gender')}
+        {renderField('Address', localProfile.address, 'address')}
+        {renderField('City', localProfile.city, 'city')}
+        {renderField('State', localProfile.state, 'state')}
+        {renderField('Country', localProfile.country, 'country')}
+        {renderField('Postal Code', localProfile.postalCode, 'postalCode')}
+        {renderField('Bio', localProfile.bio, 'bio')}
+        <Text style={styles.sectionTitle}>Contact</Text>
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Email</Text>
+          <Text style={styles.fieldValue}>{user?.email || 'Not set'}</Text>
+        </View>
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Phone Number</Text>
+          <Text style={styles.fieldValue}>{user?.phoneNumber || 'Not set'}</Text>
+        </View>
         <Text style={styles.sectionTitle}>Shop Information</Text>
-        {renderField('Shop Name', profile.shopName || '', 'shopName')}
-        {renderField('GSTIN (Optional)', profile.gstin || '', 'gstin')}
-
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Shop Name</Text>
+          <Text style={styles.fieldValue}>{shop?.shopName || 'Not set'}</Text>
+        </View>
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>GSTIN</Text>
+          <Text style={styles.fieldValue}>{shop?.gstinNumber || 'Not set'}</Text>
+        </View>
         <Text style={styles.sectionTitle}>Preferences</Text>
         <View style={styles.preferenceContainer}>
           <Text style={styles.preferenceLabel}>Language</Text>
@@ -137,46 +138,48 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={[
                 styles.languageButton,
-                profile.language === 'en' && styles.languageButtonActive,
+                localProfile.preferences.language === 'en' && styles.languageButtonActive,
               ]}
-              onPress={() => setProfile(prev => ({ ...prev, language: 'en' }))}
+              disabled={!isEditing}
+              onPress={() => handlePreferencesChange('language', 'en')}
             >
               <Text style={[
                 styles.languageButtonText,
-                profile.language === 'en' && styles.languageButtonTextActive,
+                localProfile.preferences.language === 'en' && styles.languageButtonTextActive,
               ]}>English</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.languageButton,
-                profile.language === 'hi' && styles.languageButtonActive,
+                localProfile.preferences.language === 'hi' && styles.languageButtonActive,
               ]}
-              onPress={() => setProfile(prev => ({ ...prev, language: 'hi' }))}
+              disabled={!isEditing}
+              onPress={() => handlePreferencesChange('language', 'hi')}
             >
               <Text style={[
                 styles.languageButtonText,
-                profile.language === 'hi' && styles.languageButtonTextActive,
+                localProfile.preferences.language === 'hi' && styles.languageButtonTextActive,
               ]}>हिंदी</Text>
             </TouchableOpacity>
           </View>
         </View>
-
         <View style={styles.preferenceContainer}>
           <Text style={styles.preferenceLabel}>Notifications</Text>
           <Switch
-            value={profile.notificationsEnabled}
-            onValueChange={(value) =>
-              setProfile(prev => ({ ...prev, notificationsEnabled: value }))
-            }
+            value={!!localProfile.preferences.notifications}
+            onValueChange={(value) => handlePreferencesChange('notifications', value)}
             trackColor={{ false: '#767577', true: '#007AFF' }}
+            disabled={!isEditing}
           />
         </View>
-
         {isEditing && (
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
-              onPress={() => setIsEditing(false)}
+              onPress={() => {
+                setIsEditing(false);
+                setLocalProfile(profile);
+              }}
             >
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
@@ -188,7 +191,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         )}
-
         <TouchableOpacity
           style={[styles.actionButton, styles.setupButton]}
           onPress={() => {
@@ -204,7 +206,6 @@ export default function ProfileScreen() {
                   text: 'Continue',
                   onPress: async () => {
                     try {
-                      // Remove onboarding complete flag to trigger setup flow
                       router.replace('/(onboarding)/shop-details');
                     } catch (error) {
                       console.error('Error initiating setup:', error);
@@ -219,10 +220,29 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="store-settings" size={20} color="#007AFF" />
           <Text style={styles.setupButtonText}>Shop Setup</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.logoutButton}
-          onPress={handleLogout}
+          onPress={() => {
+            Alert.alert(
+              'Logout',
+              'Are you sure you want to logout?',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Logout',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      await logout();
+                      router.replace('/(auth)/login');
+                    } catch (error) {
+                      console.error('Error during logout:', error);
+                    }
+                  },
+                },
+              ]
+            );
+          }}
         >
           <MaterialCommunityIcons name="logout" size={20} color="#FF3B30" />
           <Text style={styles.logoutText}>Logout</Text>
@@ -378,5 +398,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

@@ -48,4 +48,9 @@ export const shopService = {
     const response = await axios.delete(`${API_BASE_URL}/shops/${shopId}/remove-salesman/${salesmanId}`);
     return response.data;
   },
+
+  deleteShop: async (shopId: string): Promise<any> => {
+    const response = await axios.delete(`${API_BASE_URL}/shops/${shopId}`);
+    return response.data;
+  }
 }; 

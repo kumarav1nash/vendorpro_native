@@ -10,111 +10,98 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useShop } from '../contexts/ShopContext';
-import { useProducts } from '../contexts/ProductContext';
-import { useSales } from '../contexts/SalesContext';
-import { useSalesmen } from '../contexts/SalesmenContext';
+import { useShop } from '../../src/contexts/ShopContext';
+import { useUser } from '../../src/contexts/UserContext';
+import { useUserProfile } from '../../src/contexts/UserProfileContext';
+import { useInventory } from '../../src/contexts/InventoryContext';
+import { useSales } from '../../src/contexts/SalesContext';
 
-type User = {
-  name?: string;
-  mobile: string;
-};
-
-type KPICard = {
+// Explicit KPI type
+interface KPICard {
   title: string;
-  value: string | number;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  value: number;
+  icon: string;
   color: string;
-};
+}
 
 export default function DashboardScreen() {
-  const { shops, currentShop, loadShops } = useShop();
-  const { products, loadProducts } = useProducts();
-  const { sales, loadSales, getTotalRevenue, getPendingSales, getCompletedSales } = useSales();
-  const { salesmen, loadSalesmen } = useSalesmen();
-  
-  const [user, setUser] = useState<User | null>(null);
+  const { user } = useUser();
+  const { profile, fetchMyProfile } = useUserProfile();
+  const { shop, fetchAllShops, getShopSalesmen } = useShop();
+  const { inventories, fetchInventoryByShopId } = useInventory();
+  const { sales, fetchAllSales } = useSales();
+
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [kpiData, setKpiData] = useState<KPICard[]>([]);
-  
+  const [salesmen, setSalesmen] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
     loadInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  
+
   useEffect(() => {
     if (!isLoading) {
       updateKPIData();
     }
-  }, [isLoading, sales, products, salesmen, currentShop]);
-  
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, sales, inventories, salesmen, shop]);
+
   const loadInitialData = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      // Load user data
-      const userData = await AsyncStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
+      const shopId = shop?.id;
+      if (!shopId) {
+        throw new Error('Shop ID is undefined');
       }
-      
-      // Load all required data
       await Promise.all([
-        loadShops(),
-        loadProducts(),
-        loadSales(),
-        loadSalesmen()
+        fetchMyProfile(),
+        fetchAllShops(),
+        fetchInventoryByShopId(shopId),
+        fetchAllSales(),
       ]);
-      
+      const salesmenData = await getShopSalesmen(shopId);
+      setSalesmen(salesmenData);
       setIsLoading(false);
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load dashboard data');
       setIsLoading(false);
     }
   };
-  
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadInitialData();
     setRefreshing(false);
   };
-  
+
   const updateKPIData = () => {
-    const shopId = currentShop?.id;
-    
+    const shopId = shop?.id;
     const kpis: KPICard[] = [
       {
-        title: 'Total Revenue',
-        value: `₹${getTotalRevenue(shopId).toFixed(2)}`,
-        icon: 'cash-multiple',
-        color: '#4CAF50',
-      },
-      {
         title: 'Total Products',
-        value: shopId 
-          ? products.filter(p => p.shopId === shopId).length
-          : products.length,
+        value: shopId ? inventories.length : 0,
         icon: 'package-variant',
         color: '#2196F3',
       },
       {
         title: 'Total Sales',
         value: shopId
-          ? sales.filter(s => s.shopId === shopId).length
+          ? sales.filter((s: any) => s.shopId === shopId).length
           : sales.length,
         icon: 'cart',
         color: '#FF9800',
       },
       {
         title: 'Salesmen',
-        value: shopId
-          ? salesmen.filter(s => s.shopId === shopId).length
-          : salesmen.length,
+        value: salesmen.length,
         icon: 'account-group',
         color: '#9C27B0',
       },
     ];
-    
     setKpiData(kpis);
   };
 
@@ -125,7 +112,7 @@ export default function DashboardScreen() {
       router.push('/(tabs)/shops');
     }
   };
-  
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -134,7 +121,20 @@ export default function DashboardScreen() {
       </View>
     );
   }
-  
+
+  if (error) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>{error}</Text>
+      </View>
+    );
+  }
+
+  // Greeting logic: prefer profile, then user, then fallback
+  const greetingName = profile
+    ? `${profile.firstName} ${profile.lastName}`
+    : user?.email || 'Shop Owner';
+
   return (
     <ScrollView
       style={styles.container}
@@ -145,67 +145,60 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Hello,</Text>
-          <Text style={styles.userName}>{user?.name || 'Shop Owner'}</Text>
+          <Text style={styles.userName}>{greetingName}</Text>
         </View>
-        {currentShop && (
+        {shop && (
           <TouchableOpacity 
             style={styles.currentShopButton}
-            onPress={() => navigateToShop(currentShop.id)}
+            onPress={() => navigateToShop(shop.id)}
           >
             <Text style={styles.currentShopText} numberOfLines={1}>
-              {currentShop.name}
+              {shop.shopName}
             </Text>
             <MaterialCommunityIcons name="chevron-right" size={20} color="#007AFF" />
           </TouchableOpacity>
         )}
       </View>
-      
       <View style={styles.kpiContainer}>
         {kpiData.map((kpi, index) => (
           <View key={index} style={styles.kpiCard}>
-            <View style={[styles.iconContainer, { backgroundColor: kpi.color }]}>
-              <MaterialCommunityIcons name={kpi.icon} size={24} color="#fff" />
+            <View style={[styles.iconContainer, { backgroundColor: kpi.color }]}> 
+              <MaterialCommunityIcons name={kpi.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={24} color="#fff" />
             </View>
             <Text style={styles.kpiValue}>{kpi.value}</Text>
             <Text style={styles.kpiTitle}>{kpi.title}</Text>
           </View>
         ))}
       </View>
-      
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
       </View>
-      
       <View style={styles.quickActions}>
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => navigateToShop()}
         >
-          <View style={[styles.actionIcon, { backgroundColor: '#2196F3' }]}>
+          <View style={[styles.actionIcon, { backgroundColor: '#2196F3' }]}> 
             <MaterialCommunityIcons name="store" size={24} color="#fff" />
           </View>
           <Text style={styles.actionText}>Manage Shops</Text>
         </TouchableOpacity>
-        
-        {currentShop && (
-          <>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={() => navigateToShop(currentShop.id)}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: '#4CAF50' }]}>
-                <MaterialCommunityIcons name="view-dashboard" size={24} color="#fff" />
-              </View>
-              <Text style={styles.actionText}>Shop Dashboard</Text>
-            </TouchableOpacity>
-          </>
+        {shop && (
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigateToShop(shop.id)}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: '#4CAF50' }]}> 
+              <MaterialCommunityIcons name="view-dashboard" size={24} color="#fff" />
+            </View>
+            <Text style={styles.actionText}>Shop Dashboard</Text>
+          </TouchableOpacity>
         )}
-        
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => router.push('/(tabs)/profile')}
         >
-          <View style={[styles.actionIcon, { backgroundColor: '#9C27B0' }]}>
+          <View style={[styles.actionIcon, { backgroundColor: '#9C27B0' }]}> 
             <MaterialCommunityIcons name="account-circle" size={24} color="#fff" />
           </View>
           <Text style={styles.actionText}>My Profile</Text>
