@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useShop } from '../contexts/ShopContext';
-import { useProducts } from '../contexts/ProductContext';
-import { useSales } from '../contexts/SalesContext';
-import { useSalesmen } from '../contexts/SalesmenContext';
+import { useShop } from '../../src/contexts/ShopContext';
+import { useInventory } from '../../src/contexts/InventoryContext';
+import { useSales } from '../../src/contexts/SalesContext';
+import { UserProfileProvider } from '../../src/contexts/UserProfileContext';
 
 // Tab components
 import InventoryTab from '../components/shop/InventoryTab';
@@ -25,7 +25,7 @@ type TabType = 'inventory' | 'sales' | 'salesmen';
 export default function ShopDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { shops, setCurrentShop } = useShop();
+  const { shops, fetchMyShops, setShops } = useShop();
   
   const [activeTab, setActiveTab] = useState<TabType>('inventory');
   const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +36,6 @@ export default function ShopDetailScreen() {
   useEffect(() => {
     if (shop) {
       // Set as current shop
-      setCurrentShop(shop);
       setIsLoading(false);
     } else {
       // If shop not found, go back to shops list
@@ -63,10 +62,10 @@ export default function ShopDetailScreen() {
   }
   
   return (
-    <>
+    <UserProfileProvider>
       <Stack.Screen 
         options={{ 
-          title: shop.name,
+          title: shop.shopName,
           headerBackTitle: 'Shops'
         }} 
       />
@@ -78,18 +77,14 @@ export default function ShopDetailScreen() {
           >
             <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.title}>{shop.name}</Text>
+          <Text style={styles.title}>{shop.shopName}</Text>
           <View style={{ width: 24 }} />
         </View>
         
         <View style={styles.shopInfoCard}>
           <View style={styles.shopInfoRow}>
-            <MaterialCommunityIcons name="map-marker" size={18} color="#666" />
-            <Text style={styles.shopInfoText}>{shop.address}</Text>
-          </View>
-          <View style={styles.shopInfoRow}>
-            <MaterialCommunityIcons name="phone" size={18} color="#666" />
-            <Text style={styles.shopInfoText}>{shop.phone}</Text>
+            <MaterialCommunityIcons name="store" size={18} color="#666" />
+            <Text style={styles.shopInfoText}>Owner: {shop.ownerName}</Text>
           </View>
           {shop.email && (
             <View style={styles.shopInfoRow}>
@@ -97,10 +92,10 @@ export default function ShopDetailScreen() {
               <Text style={styles.shopInfoText}>{shop.email}</Text>
             </View>
           )}
-          {shop.gstin && (
+          {shop.gstinNumber && (
             <View style={styles.shopInfoRow}>
               <MaterialCommunityIcons name="file-document" size={18} color="#666" />
-              <Text style={styles.shopInfoText}>GSTIN: {shop.gstin}</Text>
+              <Text style={styles.shopInfoText}>GSTIN: {shop.gstinNumber}</Text>
             </View>
           )}
         </View>
@@ -170,7 +165,7 @@ export default function ShopDetailScreen() {
           {activeTab === 'salesmen' && <SalesmenTab shopId={shop.id} />}
         </View>
       </SafeAreaView>
-    </>
+    </UserProfileProvider>
   );
 }
 

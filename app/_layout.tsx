@@ -8,6 +8,7 @@ import { ShopProvider } from '../src/contexts/ShopContext';
 import { UserProvider } from '../src/contexts/UserContext';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { CommissionProvider } from '../src/contexts/CommissionContext';
+import { UserProfileProvider } from '../src/contexts/UserProfileContext';
 
 // Global layout component that wraps the entire app
 export default function RootLayout() {
@@ -20,7 +21,8 @@ export default function RootLayout() {
       {/* Context providers for data sharing across the app */}
       <AuthProvider>
       <UserProvider>
-        <ShopProvider>
+        <UserProfileProvider>
+          <ShopProvider>
             <InventoryProvider>
               <SalesProvider>
                 <CommissionProvider>
@@ -50,7 +52,8 @@ export default function RootLayout() {
                 </CommissionProvider>
               </SalesProvider>
             </InventoryProvider>
-        </ShopProvider>
+          </ShopProvider>
+        </UserProfileProvider>
       </UserProvider>
       </AuthProvider>
     </SafeAreaProvider>

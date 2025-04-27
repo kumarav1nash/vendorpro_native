@@ -1,5 +1,4 @@
-import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import apiClient from './api-client';
 import {
   Commission,
   CommissionRule,
@@ -9,69 +8,73 @@ import {
   CommissionDateRangeResult
 } from '../types/commission';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
-
-async function getAuthHeaders() {
-  const token = await SecureStore.getItemAsync('accessToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export async function createCommission(data: CreateCommissionDto): Promise<Commission> {
-  const headers = await getAuthHeaders();
-  const res = await axios.post<Commission>(`${API_BASE}/commissions/create`, data, { headers });
+  const res = await apiClient.post<Commission>('commissions/create', data);
   return res.data;
 }
 
 export async function getAllCommissions(): Promise<Commission[]> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<Commission[]>(`${API_BASE}/commissions`, { headers });
+  const res = await apiClient.get<Commission[]>('commissions');
   return res.data;
 }
 
 export async function getCommissionById(id: string): Promise<Commission> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<Commission>(`${API_BASE}/commissions/${id}`, { headers });
+  const res = await apiClient.get<Commission>(`commissions/${id}`);
   return res.data;
 }
 
 export async function createCommissionRule(data: CreateCommissionRuleDto): Promise<CommissionRule> {
-  const headers = await getAuthHeaders();
-  const res = await axios.post<CommissionRule>(`${API_BASE}/commissions/rules`, data, { headers });
+  const res = await apiClient.post<CommissionRule>('commissions/rules', data);
   return res.data;
 }
 
 export async function getAllCommissionRules(): Promise<CommissionRule[]> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<CommissionRule[]>(`${API_BASE}/commissions/rules`, { headers });
+  const res = await apiClient.get<CommissionRule[]>('commissions/rules');
   return res.data;
 }
 
 export async function assignCommissionRule(data: AssignCommissionRuleDto): Promise<any> {
-  const headers = await getAuthHeaders();
-  const res = await axios.post(`${API_BASE}/commissions/rules/assign`, data, { headers });
+  const res = await apiClient.post('commissions/rules/assign', data);
   return res.data;
 }
 
 export async function getCommissionsBySalesman(salesmanId: string): Promise<Commission[]> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<Commission[]>(`${API_BASE}/commissions/salesman/${salesmanId}`, { headers });
-  return res.data;
+  try {
+    console.log(`Fetching commissions for salesman ID: ${salesmanId}`);
+    const res = await apiClient.get<Commission[]>(`commissions/salesman/${salesmanId}`);
+    console.log(`Commissions fetch successful, count: ${res.data.length}`);
+    return res.data;
+  } catch (error) {
+    console.error(`Error fetching commissions for salesman ${salesmanId}:`, error);
+    throw error;
+  }
 }
 
 export async function getCommissionsByShop(shopId: string): Promise<Commission[]> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<Commission[]>(`${API_BASE}/commissions/shop/${shopId}`, { headers });
-  return res.data;
+  try {
+    console.log(`Fetching commissions for shop ID: ${shopId}`);
+    const res = await apiClient.get<Commission[]>(`commissions/shop/${shopId}`);
+    console.log(`Commissions fetch successful, count: ${res.data.length}`);
+    return res.data;
+  } catch (error) {
+    console.error(`Error fetching commissions for shop ${shopId}:`, error);
+    throw error;
+  }
 }
 
 export async function markCommissionAsPaid(commissionId: string): Promise<Commission> {
-  const headers = await getAuthHeaders();
-  const res = await axios.post<Commission>(`${API_BASE}/commissions/${commissionId}/mark-paid`, {}, { headers });
+  const res = await apiClient.post<Commission>(`commissions/${commissionId}/mark-paid`, {});
   return res.data;
 }
 
 export async function getCommissionsByDateRange(params: { startDate: string; endDate: string; salesmanId?: string; shopId?: string }): Promise<CommissionDateRangeResult> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<CommissionDateRangeResult>(`${API_BASE}/commissions/date-range`, { headers, params });
-  return res.data;
+  try {
+    console.log('Fetching commissions by date range with params:', params);
+    const res = await apiClient.get<CommissionDateRangeResult>('commissions/date-range', { params });
+    console.log('Commissions by date range fetch successful');
+    return res.data;
+  } catch (error) {
+    console.error('Error fetching commissions by date range:', error);
+    throw error;
+  }
 } 

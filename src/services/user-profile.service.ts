@@ -1,51 +1,50 @@
-import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import apiClient from './api-client';
 import { UserProfile, CreateUserProfileDto, UpdateUserProfileDto } from '../types/user';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
-
-async function getAuthHeaders() {
-  const token = await SecureStore.getItemAsync('accessToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export async function createUserProfile(data: CreateUserProfileDto): Promise<UserProfile> {
-  const headers = await getAuthHeaders();
-  const res = await axios.post<UserProfile>(`${API_BASE}/user-profiles`, data, { headers });
+  const res = await apiClient.post<UserProfile>('user-profiles', data);
   return res.data;
 }
 
 export async function getAllUserProfiles(): Promise<UserProfile[]> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<UserProfile[]>(`${API_BASE}/user-profiles`, { headers });
+  const res = await apiClient.get<UserProfile[]>('user-profiles');
   return res.data;
 }
 
 export async function getUserProfileById(id: string): Promise<UserProfile> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<UserProfile>(`${API_BASE}/user-profiles/${id}`, { headers });
+  const res = await apiClient.get<UserProfile>(`user-profiles/${id}`);
   return res.data;
 }
 
 export async function updateUserProfile(id: string, data: UpdateUserProfileDto): Promise<UserProfile> {
-  const headers = await getAuthHeaders();
-  const res = await axios.patch<UserProfile>(`${API_BASE}/user-profiles/${id}`, data, { headers });
+  const res = await apiClient.patch<UserProfile>(`user-profiles/${id}`, data);
   return res.data;
 }
 
 export async function deleteUserProfile(id: string): Promise<void> {
-  const headers = await getAuthHeaders();
-  await axios.delete(`${API_BASE}/user-profiles/${id}`, { headers });
+  await apiClient.delete(`user-profiles/${id}`);
 }
 
 export async function getMyUserProfile(): Promise<UserProfile> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<UserProfile>(`${API_BASE}/user-profiles/my-profile`, { headers });
-  return res.data;
+  console.log("Calling getMyUserProfile API");
+  try {
+    const res = await apiClient.get<UserProfile>('user-profiles/my-profile');
+    console.log("getMyUserProfile response:", res.status);
+    return res.data;
+  } catch (error) {
+    console.error("getMyUserProfile error:", error);
+    throw error;
+  }
 }
 
 export async function getUserProfileByUserId(userId: string): Promise<UserProfile> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<UserProfile>(`${API_BASE}/user-profiles/user/${userId}`, { headers });
-  return res.data;
+  console.log("Calling getUserProfileByUserId API for userId:", userId);
+  try {
+    const res = await apiClient.get<UserProfile>(`user-profiles/user/${userId}`);
+    console.log("getUserProfileByUserId response:", res.status);
+    return res.data;
+  } catch (error) {
+    console.error("getUserProfileByUserId error:", error);
+    throw error;
+  }
 } 

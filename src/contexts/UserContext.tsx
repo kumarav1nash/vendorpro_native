@@ -11,6 +11,7 @@ import {
   verifyUserPhone,
   verifyUserEmail
 } from '../services/user.service';
+import { useAuth } from './AuthContext';
 
 interface UserContextType {
   user: User | null;
@@ -39,10 +40,19 @@ export const useUser = () => {
 };
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
+  const { user: authUser, isAuthenticated } = useAuth();
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Initialize user data from auth context
+  useEffect(() => {
+    if (authUser) {
+      console.log("UserContext: Initializing user from AuthContext:", authUser.id);
+      setUser(authUser);
+    }
+  }, [authUser]);
 
   const fetchUser = async (id: string) => {
     setLoading(true);
@@ -168,7 +178,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     users,
     loading,
     error,
-    useUser,
     fetchUser,
     fetchAllUsers,
     updateUser: updateUserContext,

@@ -30,7 +30,7 @@ export interface RefreshTokenDto {
 }
 
 export interface RefreshTokenResponse {
-  token: string;
+  accessToken: string;
   refreshToken: string;
   user: User;
 }

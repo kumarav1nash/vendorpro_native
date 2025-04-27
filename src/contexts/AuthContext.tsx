@@ -4,6 +4,11 @@ import { LoginDto, RequestOtpDto, VerifyOtpDto } from '../types/auth';
 import { authService } from '../services/auth.service';
 import { User } from '../types/user';
 
+// Token storage keys
+const ACCESS_TOKEN_KEY = 'accessToken';
+const REFRESH_TOKEN_KEY = 'refreshToken';
+const USER_KEY = 'user';
+
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
@@ -35,10 +40,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Check for stored auth token on mount
     const loadStoredAuth = async () => {
       try {
-        const token = await SecureStore.getItemAsync('authToken');
+        // Check for access token and stored user data
+        const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
         if (token) {
-          authService.setAuthToken(token);
-          const storedUser = await SecureStore.getItemAsync('user');
+          const storedUser = await SecureStore.getItemAsync(USER_KEY);
           if (storedUser) {
             setUser(JSON.parse(storedUser));
           }
@@ -55,10 +60,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const handleAuthSuccess = async (token: string, refreshToken: string, user: User) => {
     try {
-      await SecureStore.setItemAsync('accessToken', token);
-      await SecureStore.setItemAsync('refreshToken', refreshToken);
-      await SecureStore.setItemAsync('user', JSON.stringify(user));
-      authService.setAuthToken(token);
+      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, token);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
       setUser(user);
       setError(null);
     } catch (err) {
@@ -110,28 +114,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      const refreshToken = await SecureStore.getItemAsync('refreshToken');
+      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
       if (refreshToken) {
         await authService.logout({ refreshToken });
       }
-      await SecureStore.deleteItemAsync('authToken');
-      await SecureStore.deleteItemAsync('refreshToken');
-      await SecureStore.deleteItemAsync('user');
+      // Clear all auth-related storage
+      await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(USER_KEY);
       await SecureStore.deleteItemAsync('salesmanAuthenticated');
-      authService.removeAuthToken();
       setUser(null);
     } catch (err) {
       console.error('Error during logout:', err);
+      // Even if API call fails, clear tokens and user data
+      await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+      await SecureStore.deleteItemAsync(USER_KEY);
+      setUser(null);
       throw err;
     }
   };
 
   const refreshAccessToken = async () => {
     try {
-      const refreshToken = await SecureStore.getItemAsync('refreshToken');
+      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
       if (!refreshToken) throw new Error('No refresh token found');
       const response = await authService.refreshToken({ refreshToken });
-      await handleAuthSuccess(response.token, response.refreshToken, response.user);
+      await handleAuthSuccess(response.accessToken, response.refreshToken, response.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Token refresh failed');
       throw err;
@@ -150,7 +159,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         verifyOtp,
         logout,
         refreshAccessToken,
-      }), [user, isLoading, error, login, requestOtp, verifyOtp, logout, refreshAccessToken])}
+      }), [user, isLoading, error])}
     >
       {children}
     </AuthContext.Provider>

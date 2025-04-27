@@ -5,6 +5,7 @@ import { Shop, CreateShopDto, AssignSalesmanDto, CreateSalesmanDto } from '../ty
 interface ShopContextType {
   shop: Shop | null;
   shops: Shop[];
+  setShops: (shops: Shop[]) => void;
   isLoading: boolean;
   error: string | null;
   fetchAllShops: () => Promise<void>;
@@ -158,6 +159,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = useMemo(() => ({
     shop,
     shops,
+    setShops,
     isLoading,
     error,
     useShop,

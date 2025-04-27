@@ -1,45 +1,38 @@
-import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import apiClient from './api-client';
 import { Inventory, CreateInventoryDto, UpdateInventoryDto } from '../types/inventory';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
-
-async function getAuthHeaders() {
-  const token = await SecureStore.getItemAsync('accessToken');
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
-
 export async function createInventory(shopId: string, data: CreateInventoryDto): Promise<Inventory> {
-  const headers = await getAuthHeaders();
-  const res = await axios.post<Inventory>(`${API_BASE}/inventory/${shopId}`, data, { headers });
+  const res = await apiClient.post<Inventory>(`inventory/${shopId}`, data);
   return res.data;
 }
 
 export async function getAllInventory(): Promise<Inventory[]> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<Inventory[]>(`${API_BASE}/inventory`, { headers });
+  const res = await apiClient.get<Inventory[]>('inventory');
   return res.data;
 }
 
 export async function getInventoryById(id: string): Promise<Inventory> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<Inventory>(`${API_BASE}/inventory/${id}`, { headers });
+  const res = await apiClient.get<Inventory>(`inventory/${id}`);
   return res.data;
 }
 
 export async function updateInventory(id: string, data: UpdateInventoryDto): Promise<Inventory> {
-  const headers = await getAuthHeaders();
-  const res = await axios.patch<Inventory>(`${API_BASE}/inventory/${id}`, data, { headers });
+  const res = await apiClient.patch<Inventory>(`inventory/${id}`, data);
   return res.data;
 }
 
 export async function deleteInventory(id: string): Promise<void> {
-  const headers = await getAuthHeaders();
-  await axios.delete(`${API_BASE}/inventory/${id}`, { headers });
+  await apiClient.delete(`inventory/${id}`);
 }
 
 export async function getInventoryByShopId(shopId: string): Promise<Inventory[]> {
-  const headers = await getAuthHeaders();
-  const res = await axios.get<Inventory[]>(`${API_BASE}/inventory/shop/${shopId}`, { headers });
-  return res.data;
+  try {
+    console.log(`Fetching inventory for shop ID: ${shopId}`);
+    const res = await apiClient.get<Inventory[]>(`inventory/shop/${shopId}`);
+    console.log(`Inventory fetch successful, items count: ${res.data.length}`);
+    return res.data;
+  } catch (error) {
+    console.error(`Error fetching inventory for shop ${shopId}:`, error);
+    throw error;
+  }
 } 
