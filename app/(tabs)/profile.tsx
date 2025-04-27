@@ -58,7 +58,7 @@ export default function ProfileScreen() {
       preferences: {
         ...localProfile.preferences,
         [key]: value,
-      },
+        },
     });
   };
 

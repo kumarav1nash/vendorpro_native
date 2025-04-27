@@ -36,19 +36,19 @@ export default function DashboardScreen() {
   const [kpiData, setKpiData] = useState<KPICard[]>([]);
   const [salesmen, setSalesmen] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
-
+  
   useEffect(() => {
     loadInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
+  
   useEffect(() => {
     if (!isLoading) {
       updateKPIData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, sales, inventories, salesmen, shop]);
-
+  
   const loadInitialData = async () => {
     setIsLoading(true);
     setError(null);
@@ -71,13 +71,13 @@ export default function DashboardScreen() {
       setIsLoading(false);
     }
   };
-
+  
   const onRefresh = async () => {
     setRefreshing(true);
     await loadInitialData();
     setRefreshing(false);
   };
-
+  
   const updateKPIData = () => {
     const shopId = shop?.id;
     const kpis: KPICard[] = [
@@ -112,7 +112,7 @@ export default function DashboardScreen() {
       router.push('/(tabs)/shops');
     }
   };
-
+  
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -121,7 +121,7 @@ export default function DashboardScreen() {
       </View>
     );
   }
-
+  
   if (error) {
     return (
       <View style={styles.loadingContainer}>
@@ -162,7 +162,7 @@ export default function DashboardScreen() {
       <View style={styles.kpiContainer}>
         {kpiData.map((kpi, index) => (
           <View key={index} style={styles.kpiCard}>
-            <View style={[styles.iconContainer, { backgroundColor: kpi.color }]}> 
+            <View style={[styles.iconContainer, { backgroundColor: kpi.color }]}>
               <MaterialCommunityIcons name={kpi.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={24} color="#fff" />
             </View>
             <Text style={styles.kpiValue}>{kpi.value}</Text>
@@ -178,27 +178,27 @@ export default function DashboardScreen() {
           style={styles.actionButton}
           onPress={() => navigateToShop()}
         >
-          <View style={[styles.actionIcon, { backgroundColor: '#2196F3' }]}> 
+          <View style={[styles.actionIcon, { backgroundColor: '#2196F3' }]}>
             <MaterialCommunityIcons name="store" size={24} color="#fff" />
           </View>
           <Text style={styles.actionText}>Manage Shops</Text>
         </TouchableOpacity>
         {shop && (
-          <TouchableOpacity 
-            style={styles.actionButton}
+            <TouchableOpacity 
+              style={styles.actionButton}
             onPress={() => navigateToShop(shop.id)}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: '#4CAF50' }]}> 
-              <MaterialCommunityIcons name="view-dashboard" size={24} color="#fff" />
-            </View>
-            <Text style={styles.actionText}>Shop Dashboard</Text>
-          </TouchableOpacity>
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#4CAF50' }]}>
+                <MaterialCommunityIcons name="view-dashboard" size={24} color="#fff" />
+              </View>
+              <Text style={styles.actionText}>Shop Dashboard</Text>
+            </TouchableOpacity>
         )}
         <TouchableOpacity 
           style={styles.actionButton}
           onPress={() => router.push('/(tabs)/profile')}
         >
-          <View style={[styles.actionIcon, { backgroundColor: '#9C27B0' }]}> 
+          <View style={[styles.actionIcon, { backgroundColor: '#9C27B0' }]}>
             <MaterialCommunityIcons name="account-circle" size={24} color="#fff" />
           </View>
           <Text style={styles.actionText}>My Profile</Text>

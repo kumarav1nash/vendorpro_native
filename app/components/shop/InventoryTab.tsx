@@ -14,31 +14,32 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useProducts, Product } from '../../contexts/ProductContext';
+import { useInventory } from '../../../src/contexts/InventoryContext';
+import { Inventory, CreateInventoryDto, UpdateInventoryDto } from '../../../src/types/inventory';
 
 type InventoryTabProps = {
   shopId: string;
 };
 
 export default function InventoryTab({ shopId }: InventoryTabProps) {
-  const { products, addProduct, updateProduct, deleteProduct, getShopProducts } = useProducts();
+  const { inventories, createInventory, updateInventory, deleteInventory, fetchInventoryByShopId, loading } = useInventory();
   
   // State management
-  const [shopProducts, setShopProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [shopProducts, setShopProducts] = useState<Inventory[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Inventory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+  const [currentProduct, setCurrentProduct] = useState<Inventory | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [sortBy, setSortBy] = useState<'name' | 'price' | 'quantity'>('name');
+  const [sortBy, setSortBy] = useState<'productName' | 'sellingPrice' | 'stockQuantity'>('productName');
   const [filterLowStock, setFilterLowStock] = useState(false);
   const [productForm, setProductForm] = useState({
-    name: '',
+    productName: '',
     basePrice: '',
     sellingPrice: '',
-    quantity: '',
-    imageUri: '',
+    stockQuantity: '',
+    productImageUrl: '',
     category: '',
     description: '',
     unit: '',
@@ -50,7 +51,14 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   // Load products on component mount
   useEffect(() => {
     loadInventory();
-  }, [shopId, products]);
+  }, [shopId]);
+
+  // Update local state when inventory changes
+  useEffect(() => {
+    if (inventories.length > 0) {
+      setShopProducts(inventories.filter(item => item.shopId === shopId));
+    }
+  }, [inventories, shopId]);
 
   // Filter products when search query changes
   useEffect(() => {
@@ -60,14 +68,13 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       // Apply search filter
       if (searchQuery.trim() !== '') {
         filtered = filtered.filter(product => 
-          product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (product.category?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+          product.productName.toLowerCase().includes(searchQuery.toLowerCase())
         );
       }
       
       // Apply low stock filter
       if (filterLowStock) {
-        filtered = filtered.filter(product => product.quantity <= LOW_STOCK_THRESHOLD);
+        filtered = filtered.filter(product => product.stockQuantity <= LOW_STOCK_THRESHOLD);
       }
       
       setFilteredProducts(filtered);
@@ -77,12 +84,12 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   // Sort products when sort criteria changes
   useEffect(() => {
     const sortedProducts = [...filteredProducts].sort((a, b) => {
-      if (sortBy === 'name') {
-        return a.name.localeCompare(b.name);
-      } else if (sortBy === 'price') {
+      if (sortBy === 'productName') {
+        return a.productName.localeCompare(b.productName);
+      } else if (sortBy === 'sellingPrice') {
         return a.sellingPrice - b.sellingPrice;
       } else {
-        return a.quantity - b.quantity;
+        return a.stockQuantity - b.stockQuantity;
       }
     });
     
@@ -90,12 +97,10 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   }, [sortBy]);
 
   // Load inventory from context
-  const loadInventory = () => {
+  const loadInventory = async () => {
     setIsLoading(true);
     try {
-      const productsForShop = getShopProducts(shopId);
-      setShopProducts(productsForShop);
-      setFilteredProducts(productsForShop);
+      await fetchInventoryByShopId(shopId);
     } catch (error) {
       console.error('Error loading products:', error);
       Alert.alert('Error', 'Failed to load products');
@@ -112,7 +117,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   // Form validation
   const validateForm = () => {
     // Validate the form
-    if (!productForm.name.trim()) {
+    if (!productForm.productName.trim()) {
       Alert.alert('Error', 'Product name is required');
       return false;
     }
@@ -127,7 +132,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       return false;
     }
     
-    if (!productForm.quantity || isNaN(parseInt(productForm.quantity)) || parseInt(productForm.quantity) < 0) {
+    if (!productForm.stockQuantity || isNaN(parseInt(productForm.stockQuantity)) || parseInt(productForm.stockQuantity) < 0) {
       Alert.alert('Error', 'Quantity cannot be negative');
       return false;
     }
@@ -136,47 +141,44 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   };
 
   // Submit form
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
-
-    const timestamp = new Date().toISOString();
     
     if (isEditing && currentProduct) {
       // Update existing product
-      const updatedProduct: Product = {
-        ...currentProduct,
-        name: productForm.name,
+      const updateData: UpdateInventoryDto = {
+        productName: productForm.productName,
         basePrice: parseFloat(productForm.basePrice),
         sellingPrice: parseFloat(productForm.sellingPrice),
-        quantity: parseInt(productForm.quantity),
-        imageUri: productForm.imageUri || undefined,
-        category: productForm.category || undefined,
-        description: productForm.description || undefined,
-        unit: productForm.unit || undefined,
-        updatedAt: timestamp
+        stockQuantity: parseInt(productForm.stockQuantity),
+        productImageUrl: productForm.productImageUrl || '',
       };
       
-      updateProduct(updatedProduct);
-      Alert.alert('Success', 'Product updated successfully');
+      try {
+        await updateInventory(currentProduct.id, updateData);
+        Alert.alert('Success', 'Product updated successfully');
+      } catch (error) {
+        console.error('Error updating product:', error);
+        Alert.alert('Error', 'Failed to update product');
+      }
     } else {
       // Add new product
-      const newProduct: Product = {
-        id: Date.now().toString(),
-        shopId: shopId,
-        name: productForm.name,
+      const newProduct: CreateInventoryDto = {
+        productName: productForm.productName,
         basePrice: parseFloat(productForm.basePrice),
         sellingPrice: parseFloat(productForm.sellingPrice),
-        quantity: parseInt(productForm.quantity),
-        imageUri: productForm.imageUri || undefined,
-        category: productForm.category || undefined,
-        description: productForm.description || undefined,
-        unit: productForm.unit || undefined,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+        stockQuantity: parseInt(productForm.stockQuantity),
+        productImageUrl: productForm.productImageUrl || '',
+        shopId: shopId,
       };
       
-      addProduct(newProduct);
-      Alert.alert('Success', 'Product added successfully');
+      try {
+        await createInventory(shopId, newProduct);
+        Alert.alert('Success', 'Product added successfully');
+      } catch (error) {
+        console.error('Error adding product:', error);
+        Alert.alert('Error', 'Failed to add product');
+      }
     }
     
     setShowModal(false);
@@ -185,7 +187,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   };
 
   // Delete a product
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     Alert.alert(
       'Delete Product',
       'Are you sure you want to delete this product? This action cannot be undone.',
@@ -197,10 +199,15 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            deleteProduct(id);
-            Alert.alert('Success', 'Product deleted successfully');
-            loadInventory();
+          onPress: async () => {
+            try {
+              await deleteInventory(id);
+              Alert.alert('Success', 'Product deleted successfully');
+              loadInventory();
+            } catch (error) {
+              console.error('Error deleting product:', error);
+              Alert.alert('Error', 'Failed to delete product');
+            }
           },
         },
       ]
@@ -208,17 +215,17 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   };
 
   // Edit a product
-  const handleEdit = (product: Product) => {
+  const handleEdit = (product: Inventory) => {
     setCurrentProduct(product);
     setProductForm({
-      name: product.name,
+      productName: product.productName,
       basePrice: product.basePrice.toString(),
       sellingPrice: product.sellingPrice.toString(),
-      quantity: product.quantity.toString(),
-      imageUri: product.imageUri || '',
-      category: product.category || '',
-      description: product.description || '',
-      unit: product.unit || '',
+      stockQuantity: product.stockQuantity.toString(),
+      productImageUrl: product.productImageUrl || '',
+      category: '',
+      description: '',
+      unit: '',
     });
     setIsEditing(true);
     setShowModal(true);
@@ -227,11 +234,11 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   // Reset the form
   const resetForm = () => {
     setProductForm({
-      name: '',
+      productName: '',
       basePrice: '',
       sellingPrice: '',
-      quantity: '',
-      imageUri: '',
+      stockQuantity: '',
+      productImageUrl: '',
       category: '',
       description: '',
       unit: '',
@@ -258,7 +265,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        handleInputChange('imageUri', result.assets[0].uri);
+        handleInputChange('productImageUrl', result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -267,8 +274,8 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   };
 
   // Render a product item
-  const renderProductItem = ({ item }: { item: Product }) => {
-    const isLowStock = item.quantity <= LOW_STOCK_THRESHOLD;
+  const renderProductItem = ({ item }: { item: Inventory }) => {
+    const isLowStock = item.stockQuantity <= LOW_STOCK_THRESHOLD;
     
     return (
       <TouchableOpacity
@@ -276,15 +283,15 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         onPress={() => handleEdit(item)}
       >
         <View style={styles.productImageContainer}>
-          {item.imageUri ? (
-            <Image source={{ uri: item.imageUri }} style={styles.productImage} />
+          {item.productImageUrl ? (
+            <Image source={{ uri: item.productImageUrl }} style={styles.productImage} />
           ) : (
             <MaterialCommunityIcons name="package-variant" size={40} color="#ccc" />
           )}
         </View>
         
         <View style={styles.productDetails}>
-          <Text style={styles.productName}>{item.name}</Text>
+          <Text style={styles.productName}>{item.productName}</Text>
           <Text style={styles.productPrice}>₹{item.sellingPrice.toFixed(2)} <Text style={styles.basePrice}>(Base: ₹{item.basePrice.toFixed(2)})</Text></Text>
           <View style={styles.quantityContainer}>
             <Text 
@@ -293,7 +300,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                 isLowStock && styles.lowStockText
               ]}
             >
-              Qty: {item.quantity} {item.unit || ''}
+              Qty: {item.stockQuantity}
             </Text>
             {isLowStock && (
               <View style={styles.lowStockBadge}>
@@ -338,14 +345,14 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           <TouchableOpacity
             style={[
               styles.filterButton,
-              sortBy === 'name' && styles.filterButtonActive
+              sortBy === 'productName' && styles.filterButtonActive
             ]}
-            onPress={() => setSortBy('name')}
+            onPress={() => setSortBy('productName')}
           >
             <Text 
               style={[
                 styles.filterButtonText,
-                sortBy === 'name' && styles.filterButtonTextActive
+                sortBy === 'productName' && styles.filterButtonTextActive
               ]}
             >
               Name
@@ -355,14 +362,14 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           <TouchableOpacity
             style={[
               styles.filterButton,
-              sortBy === 'price' && styles.filterButtonActive
+              sortBy === 'sellingPrice' && styles.filterButtonActive
             ]}
-            onPress={() => setSortBy('price')}
+            onPress={() => setSortBy('sellingPrice')}
           >
             <Text 
               style={[
                 styles.filterButtonText,
-                sortBy === 'price' && styles.filterButtonTextActive
+                sortBy === 'sellingPrice' && styles.filterButtonTextActive
               ]}
             >
               Price
@@ -372,14 +379,14 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           <TouchableOpacity
             style={[
               styles.filterButton,
-              sortBy === 'quantity' && styles.filterButtonActive
+              sortBy === 'stockQuantity' && styles.filterButtonActive
             ]}
-            onPress={() => setSortBy('quantity')}
+            onPress={() => setSortBy('stockQuantity')}
           >
             <Text 
               style={[
                 styles.filterButtonText,
-                sortBy === 'quantity' && styles.filterButtonTextActive
+                sortBy === 'stockQuantity' && styles.filterButtonTextActive
               ]}
             >
               Quantity
@@ -412,7 +419,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         </ScrollView>
       </View>
       
-      {isLoading ? (
+      {isLoading || loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Loading products...</Text>
@@ -480,8 +487,8 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                 <Text style={styles.label}>Product Name*</Text>
                 <TextInput
                   style={styles.input}
-                  value={productForm.name}
-                  onChangeText={(text) => handleInputChange('name', text)}
+                  value={productForm.productName}
+                  onChangeText={(text) => handleInputChange('productName', text)}
                   placeholder="Enter product name"
                 />
               </View>
@@ -515,8 +522,8 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                   <Text style={styles.label}>Quantity*</Text>
                   <TextInput
                     style={styles.input}
-                    value={productForm.quantity}
-                    onChangeText={(text) => handleInputChange('quantity', text)}
+                    value={productForm.stockQuantity}
+                    onChangeText={(text) => handleInputChange('stockQuantity', text)}
                     keyboardType="numeric"
                     placeholder="0"
                   />
@@ -557,15 +564,15 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Product Image (Optional)</Text>
                 <View style={styles.imagePickerContainer}>
-                  {productForm.imageUri ? (
+                  {productForm.productImageUrl ? (
                     <View style={styles.imagePreviewContainer}>
                       <Image 
-                        source={{ uri: productForm.imageUri }} 
+                        source={{ uri: productForm.productImageUrl }} 
                         style={styles.imagePreview} 
                       />
                       <TouchableOpacity 
                         style={styles.removeImageButton}
-                        onPress={() => handleInputChange('imageUri', '')}
+                        onPress={() => handleInputChange('productImageUrl', '')}
                       >
                         <MaterialCommunityIcons name="close-circle" size={24} color="#FF3B30" />
                       </TouchableOpacity>
@@ -585,7 +592,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                   onPress={pickImage}
                 >
                   <Text style={styles.imagePickerLinkText}>
-                    {productForm.imageUri ? 'Change Image' : 'Add Image from Gallery'}
+                    {productForm.productImageUrl ? 'Change Image' : 'Add Image from Gallery'}
                   </Text>
                 </TouchableOpacity>
               </View>

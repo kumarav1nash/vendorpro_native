@@ -162,7 +162,7 @@ export default function SalesmanDashboardScreen() {
       Alert.alert('Error', 'Please select a product');
       return false;
     }
-   
+    
     if (saleForm.quantity <= 0) {
       Alert.alert('Error', 'Quantity must be greater than 0');
       return false;
@@ -404,7 +404,7 @@ export default function SalesmanDashboardScreen() {
                       <Text style={styles.changeProductText}>Change</Text>
                     </TouchableOpacity>
                   </View>
-              
+                  
                   
                   <View style={styles.formRow}>
                     <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
@@ -435,10 +435,10 @@ export default function SalesmanDashboardScreen() {
                     <Text style={styles.totalAmount}>₹{saleForm.totalAmount.toFixed(2)}</Text>
                   </View>
                   
-                  <View style={styles.commissionPreview}>
+                    <View style={styles.commissionPreview}>
                     <Text style={styles.commissionLabel}>Your Total Commission:</Text>
                     <Text style={styles.commissionAmount}>₹{totalCommission.toFixed(2)}</Text>
-                  </View>
+                    </View>
                   
                   <TouchableOpacity
                     style={styles.submitButton}

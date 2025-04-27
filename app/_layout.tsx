@@ -19,39 +19,39 @@ export default function RootLayout() {
       
       {/* Context providers for data sharing across the app */}
       <AuthProvider>
-        <UserProvider>
-          <ShopProvider>
+      <UserProvider>
+        <ShopProvider>
             <InventoryProvider>
               <SalesProvider>
                 <CommissionProvider>
-                  {/* Root stack navigator */}
-                  <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(redirects)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(salesman)" options={{ headerShown: false }} />
-                    <Stack.Screen 
-                      name="shop/[id]" 
-                      options={{ 
-                        headerShown: true,
-                        headerTitle: 'Shop Details',
-                        headerBackTitle: 'Back'
-                      }} 
-                    />
-                    <Stack.Screen 
-                      name="index" 
-                      options={{ 
-                        // Auth check & redirect screen, no header needed
-                        headerShown: false 
-                      }} 
-                    />
-                  </Stack>
+                {/* Root stack navigator */}
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(redirects)" options={{ headerShown: false }} />
+                  <Stack.Screen name="(salesman)" options={{ headerShown: false }} />
+                  <Stack.Screen 
+                    name="shop/[id]" 
+                    options={{ 
+                      headerShown: true,
+                      headerTitle: 'Shop Details',
+                      headerBackTitle: 'Back'
+                    }} 
+                  />
+                  <Stack.Screen 
+                    name="index" 
+                    options={{ 
+                      // Auth check & redirect screen, no header needed
+                      headerShown: false 
+                    }} 
+                  />
+                </Stack>
                 </CommissionProvider>
               </SalesProvider>
             </InventoryProvider>
-          </ShopProvider>
-        </UserProvider>
+        </ShopProvider>
+      </UserProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
