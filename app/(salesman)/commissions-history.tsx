@@ -24,9 +24,17 @@ const FILTER_PAID = 'paid';
 const FILTER_UNPAID = 'unpaid';
 
 export default function CommissionsHistoryScreen() {
-  const { commissions, fetchCommissionsBySalesman, markCommissionAsPaid, loading } = useCommission();
+  const { 
+    commissions, 
+    fetchCommissionsBySalesman, 
+    markCommissionAsPaid, 
+    loading,
+    salesWithCommission,
+    commissionSummary,
+    activeCommissionRule
+  } = useCommission();
   const { user } = useAuth();
-  const [filteredCommissions, setFilteredCommissions] = useState<Commission[]>([]);
+  const [filteredSales, setFilteredSales] = useState<any[]>([]);
   const [activeFilter, setActiveFilter] = useState(FILTER_ALL);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -34,55 +42,90 @@ export default function CommissionsHistoryScreen() {
     loadData();
   }, []);
 
-  useEffect(() => {
-    console.log("Filter effect running. Commissions:", commissions?.length || 0);
-    if (!commissions) {
-      console.log("No commissions data available");
-      setFilteredCommissions([]);
-      return;
-    }
-    
-    // Apply payment status filter
-    let filtered = [...commissions];
-    
-    if (activeFilter === FILTER_PAID) {
-      filtered = commissions.filter(commission => commission.isPaid);
-      console.log(`Applied '${FILTER_PAID}' filter:`, filtered.length, 'items');
-    } else if (activeFilter === FILTER_UNPAID) {
-      filtered = commissions.filter(commission => !commission.isPaid);
-      console.log(`Applied '${FILTER_UNPAID}' filter:`, filtered.length, 'items');
-    } else {
-      console.log("Showing all commissions");
-    }
-    
-    setFilteredCommissions(filtered);
-  }, [commissions, activeFilter]);
-
+  // Load commissions data
   const loadData = async () => {
     if (!user?.id) {
-      console.log("Cannot load commissions: User ID is missing");
+      console.log('Cannot load commissions: User ID is missing');
       return;
     }
-    console.log("Fetching commissions for salesman:", user.id);
     
     try {
+      console.log('Fetching commissions for salesman ID:', user.id);
       await fetchCommissionsBySalesman(user.id);
-      console.log("Commissions fetched successfully. Count:", commissions?.length || 0);
+      console.log('Commission data fetched successfully');
     } catch (error: any) {
-      if (error?.response?.status === 404) {
-        console.log('No commissions found (404 response) for user:', user.id);
-        // Clear any existing data when we get a 404
-        setFilteredCommissions([]);
-      } else {
-        console.error('Failed to load commissions:', error?.message || error);
-      }
+      console.error('Failed to load commissions:', error?.message || error);
     }
   };
+
+  // Filter and sort sales when data changes
+  useEffect(() => {
+    if (salesWithCommission && salesWithCommission.length > 0) {
+      console.log('Processing sales with commission for display:', salesWithCommission.length);
+      
+      // Filter by status if needed
+      let filtered = [...salesWithCommission];
+      
+      if (activeFilter === FILTER_PAID) {
+        filtered = filtered.filter(sale => sale.status === 'approved');
+      } else if (activeFilter === FILTER_UNPAID) {
+        filtered = filtered.filter(sale => sale.status === 'pending');
+      }
+      
+      // Sort by date, newest first
+      filtered.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      
+      console.log(`Displaying ${filtered.length} sales with commission (${activeFilter} filter)`);
+      setFilteredSales(filtered);
+    } else {
+      setFilteredSales([]);
+    }
+  }, [salesWithCommission, activeFilter]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
+  };
+
+  // Calculate commission based on rule and sale
+  const calculateCommission = (sale: any) => {
+    if (!activeCommissionRule) return 0;
+    
+    const ruleValue = safeNumberConversion(activeCommissionRule.value);
+    const ruleType = activeCommissionRule.type;
+    const salePrice = safeNumberConversion(sale.salePrice);
+    const basePrice = safeNumberConversion(sale.product?.basePrice || 0);
+    const quantity = safeNumberConversion(sale.quantity);
+    
+    let commissionAmount = 0;
+    
+    switch (ruleType) {
+      case 'PERCENTAGE_OF_SALES':
+        commissionAmount = (salePrice * quantity) * (ruleValue / 100);
+        break;
+      case 'FIXED_AMOUNT':
+        commissionAmount = ruleValue * quantity;
+        break;
+      case 'PERCENTAGE_ON_DIFFERENCE':
+        const priceDifference = salePrice - basePrice;
+        commissionAmount = (priceDifference * quantity) * (ruleValue / 100);
+        break;
+      default:
+        commissionAmount = 0;
+    }
+    
+    return commissionAmount > 0 ? commissionAmount : 0;
+  };
+
+  // Helper function for safe number conversion
+  const safeNumberConversion = (value: string | number): number => {
+    if (typeof value === 'string') {
+      return parseFloat(value) || 0;
+    }
+    return value || 0;
   };
 
   const handleMarkAsPaid = async (commissionId: string) => {
@@ -115,14 +158,16 @@ export default function CommissionsHistoryScreen() {
     </TouchableOpacity>
   );
 
-  const renderCommissionItem = ({ item }: { item: Commission }) => {
+  const renderCommissionItem = ({ item }: { item: any }) => {
+    const isPaid = item.status === 'approved';
+    const commissionAmount = calculateCommission(item);
     const formattedDate = format(new Date(item.createdAt), 'dd MMM yyyy, HH:mm');
     
     return (
       <View style={styles.commissionItem}>
         <View style={styles.commissionHeader}>
           <View style={styles.commissionDetails}>
-            <Text style={styles.commissionId}>Commission ID: {item.id.slice(0, 8)}</Text>
+            <Text style={styles.commissionId}>Sale ID: {item.id.slice(0, 8)}</Text>
             <Text style={styles.commissionDate}>
               <MaterialCommunityIcons name="calendar" size={14} color="#64748B" /> {formattedDate}
             </Text>
@@ -130,33 +175,41 @@ export default function CommissionsHistoryScreen() {
           <View 
             style={[
               styles.paymentStatus, 
-              { backgroundColor: item.isPaid ? '#ECFDF5' : '#FEF9C3' }
+              { backgroundColor: isPaid ? '#ECFDF5' : '#FEF9C3' }
             ]}
           >
             <MaterialCommunityIcons 
-              name={item.isPaid ? 'check-circle' : 'clock-outline'} 
+              name={isPaid ? 'check-circle' : 'clock-outline'} 
               size={16} 
-              color={item.isPaid ? '#10B981' : '#F59E0B'} 
+              color={isPaid ? '#10B981' : '#F59E0B'} 
             />
             <Text 
               style={[
                 styles.statusText, 
-                { color: item.isPaid ? '#10B981' : '#F59E0B' }
+                { color: isPaid ? '#10B981' : '#F59E0B' }
               ]}
             >
-              {item.isPaid ? 'Paid' : 'Unpaid'}
+              {isPaid ? 'Paid' : 'Pending'}
             </Text>
           </View>
+        </View>
+        
+        {/* Product details */}
+        <View style={styles.productDetails}>
+          <Text style={styles.productName}>{item.product?.productName || 'Unknown Product'}</Text>
+          <Text style={styles.saleDetails}>
+            {item.quantity} × ₹{safeNumberConversion(item.salePrice).toFixed(2)}
+          </Text>
         </View>
         
         <View style={styles.commissionBody}>
           <View style={styles.amountContainer}>
             <Text style={styles.amountLabel}>Commission Amount:</Text>
-            <Text style={styles.amountValue}>{formatCurrency(item.amount)}</Text>
+            <Text style={styles.amountValue}>{formatCurrency(commissionAmount)}</Text>
           </View>
         </View>
         
-        {!item.isPaid && (
+        {!isPaid && (
           <View style={styles.actionsContainer}>
             <TouchableOpacity
               style={styles.actionButton}
@@ -210,6 +263,32 @@ export default function CommissionsHistoryScreen() {
         }}
       />
       
+      <View style={styles.summaryContainer}>
+        {commissionSummary && (
+          <>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Total Commission</Text>
+              <Text style={styles.summaryValue}>
+                {formatCurrency(safeNumberConversion(commissionSummary.totalCommission))}
+              </Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Approved</Text>
+              <Text style={[styles.summaryValue, { color: '#10B981' }]}>
+                {formatCurrency(safeNumberConversion(commissionSummary.approvedSalesCommission))}
+              </Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Pending</Text>
+              <Text style={[styles.summaryValue, { color: '#F59E0B' }]}>
+                {formatCurrency(safeNumberConversion(commissionSummary.pendingSalesCommission))}
+              </Text>
+            </View>
+          </>
+        )}
+      </View>
+      
       <View style={styles.filterContainer}>
         {renderFilterTab('All', FILTER_ALL)}
         {renderFilterTab('Paid', FILTER_PAID)}
@@ -217,7 +296,7 @@ export default function CommissionsHistoryScreen() {
       </View>
       
       <FlatList
-        data={filteredCommissions}
+        data={filteredSales}
         renderItem={renderCommissionItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.commissionsList}
@@ -393,5 +472,52 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  productDetails: {
+    marginBottom: 8,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  saleDetails: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  summaryContainer: {
+    backgroundColor: '#FFF',
+    padding: 16,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  summaryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 8,
   },
 }); 

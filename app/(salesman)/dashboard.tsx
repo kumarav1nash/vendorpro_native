@@ -23,7 +23,7 @@ export default function DashboardScreen() {
   const { shop, getShopBySalesmanId } = useShop();
   const { sales, fetchAllSales, createSale } = useSales();
   const { inventories, fetchInventoryByShopId } = useInventory();
-  const { commissions, fetchCommissionsBySalesman } = useCommission();
+  const { commissions, fetchCommissionsBySalesman, commissionSummary } = useCommission();
   const { profile, fetchProfileByUserId } = useUserProfile();
 
   const [loading, setLoading] = useState(true);
@@ -49,29 +49,94 @@ export default function DashboardScreen() {
     };
   });
 
-
-
+  // Track data loading with a ref to prevent unnecessary loads
+  const dataLoadedRef = React.useRef(false);
+  
   // Load data
   useEffect(() => {
     if (user?.id) {
-      loadData();
+      // Reset the ref when user changes
+      if (dataLoadedRef.current && !shop?.id) {
+        dataLoadedRef.current = false;
+      }
+      
+      if (!dataLoadedRef.current) {
+        loadData();
+        dataLoadedRef.current = true;
+      }
     } else {
       setLoading(false);
     }
+    
+    // Refresh data every 60 seconds
+    const refreshInterval = setInterval(() => {
+      if (user?.id) {
+        console.log('Refreshing dashboard data...');
+        loadData();
+      }
+    }, 60000);
+    
+    return () => clearInterval(refreshInterval);
   }, [user?.id, shop?.id]);
 
-    // Filter products based on search
-    const filteredProducts = inventories.filter(product => {
-      if (!searchTerm) return true;
-      return product.productName.toLowerCase().includes(searchTerm.toLowerCase());
-    });
+  // Filter products based on search
+  const filteredProducts = inventories.filter(product => {
+    if (!searchTerm) return true;
+    return product.productName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
-  // Calculate metrics when data changes
-  useEffect(() => {
-    if (userSales.length > 0 || userCommissions.length > 0) {
-      calculateMetrics();
+  // Helper function to safely convert potential string values to numbers
+  const safeNumberConversion = (value: string | number): number => {
+    if (typeof value === 'string') {
+      return parseFloat(value) || 0;
     }
-  }, [userSales, userCommissions]);
+    return value || 0;
+  };
+
+  // Calculate metrics when commissionSummary or userSales change
+  useEffect(() => {
+    console.log("Updating dashboard metrics");
+    
+    // Initialize with default values
+    const updatedMetrics = {
+      totalSales: 0,
+      pendingSales: 0,
+      totalCommission: 0,
+      pendingCommission: 0
+    };
+    
+    // If commission summary is available, use it directly
+    if (commissionSummary) {
+      console.log("Using commission summary for metrics:", commissionSummary);
+      updatedMetrics.totalCommission = safeNumberConversion(commissionSummary.approvedSalesCommission);
+      updatedMetrics.pendingCommission = safeNumberConversion(commissionSummary.pendingSalesCommission);
+    }
+    
+    // Calculate sales metrics from user sales data
+    if (userSales && userSales.length > 0) {
+      console.log("Calculating sales metrics from", userSales.length, "sales");
+      
+      // Calculate total for approved sales
+      const totalSalesAmount = userSales
+        .filter(sale => sale.status === 'approved')
+        .reduce((total, sale) => {
+          const salePrice = safeNumberConversion(sale.salePrice);
+          const quantity = safeNumberConversion(sale.quantity);
+          return total + (salePrice * quantity);
+        }, 0);
+      
+      // Count pending sales
+      const pendingSalesCount = userSales
+        .filter(sale => sale.status === 'pending')
+        .length;
+        
+      updatedMetrics.totalSales = isNaN(totalSalesAmount) ? 0 : totalSalesAmount;
+      updatedMetrics.pendingSales = isNaN(pendingSalesCount) ? 0 : pendingSalesCount;
+    }
+    
+    console.log("Setting new metrics:", updatedMetrics);
+    setMetrics(updatedMetrics);
+  }, [userSales, commissionSummary]);
 
   const loadData = async () => {
     if (!user?.id) {
@@ -102,71 +167,48 @@ export default function DashboardScreen() {
       }
       
       // Load all data in parallel
-      const fetchPromises = [];
-      
-      // Fetch sales
-      const salesPromise = fetchAllSales({ salesmanId: user.id })
-        .catch((salesError: any) => {
-          if (salesError?.response?.status === 404) {
-            console.log('No sales found');
-          } else {
-            console.error('Error fetching sales:', salesError?.message || salesError);
-          }
-          return [];
-        });
-      fetchPromises.push(salesPromise);
-      
-      // Fetch inventory
-      const inventoryPromise = fetchInventoryByShopId(currentShop.id)
-        .catch((inventoryError: any) => {
-          if (inventoryError?.response?.status === 404) {
-            console.log('No inventory found for shop:', currentShop.id);
-          } else {
-            console.error('Error fetching inventory:', inventoryError?.message || inventoryError);
-          }
-          return [];
-        });
-      fetchPromises.push(inventoryPromise);
-      
-      // Fetch commissions
-      const commissionsPromise = fetchCommissionsBySalesman(user.id)
-        .catch((commissionsError: any) => {
-          if (commissionsError?.response?.status === 404) {
-            console.log('No commissions found for salesman:', user.id);
-          } else {
-            console.error('Error fetching commissions:', commissionsError?.message || commissionsError);
-          }
-          return [];
-        });
-      fetchPromises.push(commissionsPromise);
-      
-      // Fetch user profile
-      if (user.id) {
-        const profilePromise = fetchProfileByUserId(user.id)
-          .catch((profileError: any) => {
-            if (profileError?.response?.status === 404) {
-              console.log('User profile not found for:', user.id);
-            } else {
-              console.error('Error fetching user profile:', profileError?.message || profileError);
-            }
-            return null;
+      try {
+        // Fetch sales with specific salesmanId parameter
+        await fetchAllSales({ salesmanId: user.id });
+        
+        // Fetch inventory for the shop
+        await fetchInventoryByShopId(currentShop.id);
+        
+        // Fetch commissions with specific salesmanId
+        // This will now return SalesCommissionResponse with totalCommission, sales, and commissionRule
+        await fetchCommissionsBySalesman(user.id);
+        
+        // Load user profile
+        if (user.id) {
+          await fetchProfileByUserId(user.id).catch(err => {
+            console.log('Profile fetch error (non-critical):', err?.message || err);
           });
-        fetchPromises.push(profilePromise);
-      }
-      
-      // Wait for all promises to complete
-      await Promise.all(fetchPromises);
-      
-      // Set filtered data from context after all fetches complete
-      if (sales) {
-        const filteredSales = sales.filter(sale => sale.salesmanId === user.id);
-        setUserSales(filteredSales);
-        console.log(`Filtered ${filteredSales.length} sales for user`);
-      }
-      
-      if (commissions) {
-        setUserCommissions(commissions);
-        console.log(`Set ${commissions.length} commissions for user`);
+        }
+        
+        // Process the fetched data
+        if (sales && Array.isArray(sales)) {
+          // Ensure we're getting the latest data from context
+          const filteredSales = sales.filter(sale => sale.salesmanId === user.id);
+          setUserSales(filteredSales);
+          console.log(`Filtered ${filteredSales.length} sales for user`);
+        } else {
+          console.log('No sales data available');
+          setUserSales([]);
+        }
+        
+        // We don't need to set userCommissions manually anymore since we're using commissionSummary directly
+        // But keeping it for backward compatibility
+        if (commissions && Array.isArray(commissions)) {
+          setUserCommissions(commissions);
+          console.log(`Set ${commissions.length} derived commissions for user`);
+        } else {
+          console.log('No commission data available');
+          setUserCommissions([]);
+        }
+        
+        console.log("Dashboard data loaded successfully");
+      } catch (error: any) {
+        console.error('Error loading dashboard data:', error?.message || error);
       }
     } catch (error: any) {
       console.error('Failed to load dashboard data:', error?.message || error);
@@ -174,41 +216,10 @@ export default function DashboardScreen() {
       setLoading(false);
     }
   };
-  
-  const calculateMetrics = useCallback(() => {
-    if (!userSales.length && !userCommissions.length) return;
-    
-    // Calculate total for approved sales
-    const totalSalesAmount = userSales
-      .filter(sale => sale.status === 'approved')
-      .reduce((total, sale) => total + (sale.salePrice * sale.quantity), 0);
-    
-    // Count pending sales
-    const pendingSalesCount = userSales
-      .filter(sale => sale.status === 'pending')
-      .length;
-    
-    // Calculate paid commissions
-    const totalPaidCommission = userCommissions
-      .filter(comm => comm.isPaid === true)
-      .reduce((total, comm) => total + comm.amount, 0);
-    
-    // Calculate pending commissions
-    const totalPendingCommission = userCommissions
-      .filter(comm => !comm.isPaid)
-      .reduce((total, comm) => total + comm.amount, 0);
-    
-    setMetrics({
-      totalSales: totalSalesAmount,
-      pendingSales: pendingSalesCount,
-      totalCommission: totalPaidCommission,
-      pendingCommission: totalPendingCommission
-    });
-  }, [userSales, userCommissions]);
 
   const handleProductSelect = (product: Inventory) => {
     setSelectedProduct(product);
-    setCustomPrice(product.sellingPrice.toString());
+    setCustomPrice(safeNumberConversion(product.sellingPrice).toString());
     setQuantity('1');
     setModalVisible(true);
   };
@@ -252,17 +263,42 @@ export default function DashboardScreen() {
     
     setLoading(true);
     try {
-      await createSale({
+      // Create the sale with explicit parameters
+      const saleData = {
         productId: selectedProduct.id,
         salesmanId: user.id,
         shopId: currentShop.id,
         quantity: qtyNum,
         salePrice: priceNum,
-      });
+      };
       
+      await createSale(saleData);
+      
+      // Close the modal
       setModalVisible(false);
-      loadData();
+      
+      // Refresh data in the correct order
+      
+      // 1. Refresh sales data
+      await fetchAllSales({ salesmanId: user.id });
+      
+      // 2. Refresh commission data (this will include the new commission summary)
+      await fetchCommissionsBySalesman(user.id);
+      
+      // 3. Refresh inventory to reflect stock changes
+      if (currentShop.id) {
+        await fetchInventoryByShopId(currentShop.id);
+      }
+      
+      // 4. Update the local sales state
+      if (sales && Array.isArray(sales)) {
+        const freshSales = sales.filter(sale => sale.salesmanId === user.id);
+        setUserSales(freshSales);
+      }
+      
       Alert.alert('Success', 'Sale created successfully');
+      
+      console.log('Sale created and data refreshed successfully');
     } catch (error) {
       console.error('Failed to create sale:', error);
       Alert.alert('Error', 'Failed to create sale. Please try again.');
@@ -323,21 +359,21 @@ export default function DashboardScreen() {
         <View style={styles.metricsContainer}>
           <View style={styles.metricsRow}>
             <View style={[styles.metricCard, styles.primaryMetricCard]}>
-              <Text style={styles.metricValue}>₹{metrics.totalSales}</Text>
+              <Text style={styles.metricValue}>₹{metrics.totalSales.toFixed(2)}</Text>
               <Text style={styles.metricLabel}>Total Sales</Text>
-          </View>
+            </View>
             <View style={[styles.metricCard, styles.warningMetricCard]}>
               <Text style={styles.metricValue}>{metrics.pendingSales}</Text>
               <Text style={styles.metricLabel}>Pending Sales</Text>
-          </View>
+            </View>
           </View>
           <View style={styles.metricsRow}>
             <View style={[styles.metricCard, styles.successMetricCard]}>
-              <Text style={styles.metricValue}>₹{metrics.totalCommission}</Text>
+              <Text style={styles.metricValue}>₹{metrics.totalCommission.toFixed(2)}</Text>
               <Text style={styles.metricLabel}>Earned Commission</Text>
             </View>
             <View style={[styles.metricCard, styles.infoMetricCard]}>
-              <Text style={styles.metricValue}>₹{metrics.pendingCommission}</Text>
+              <Text style={styles.metricValue}>₹{metrics.pendingCommission.toFixed(2)}</Text>
               <Text style={styles.metricLabel}>Pending Commission</Text>
             </View>
           </View>
@@ -424,7 +460,9 @@ export default function DashboardScreen() {
                     <Text style={styles.productName} numberOfLines={1}>
                       {product.productName}
                       </Text>
-                    <Text style={styles.productPrice}>₹{product.sellingPrice}</Text>
+                    <Text style={styles.productPrice}>
+                      ₹{safeNumberConversion(product.sellingPrice).toFixed(2)}
+                    </Text>
                     <View style={styles.stockContainer}>
                       <Text
                         style={[
@@ -497,7 +535,7 @@ export default function DashboardScreen() {
                     <View style={styles.selectedProductInfo}>
                     <Text style={styles.selectedProductName}>{selectedProduct.productName}</Text>
                     <Text style={styles.selectedProductPrice}>
-                      Base Price: ₹{selectedProduct.basePrice}
+                      Base Price: ₹{safeNumberConversion(selectedProduct.basePrice).toFixed(2)}
                     </Text>
                     <Text style={styles.selectedProductStock}>
                       Available: {selectedProduct.stockQuantity} units
@@ -636,30 +674,41 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)'
   },
   primaryMetricCard: {
     backgroundColor: '#EFF6FF',
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6'
   },
   warningMetricCard: {
     backgroundColor: '#FEF9C3',
+    borderLeftWidth: 4,
+    borderLeftColor: '#EAB308'
   },
   successMetricCard: {
     backgroundColor: '#ECFDF5',
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981'
   },
   infoMetricCard: {
     backgroundColor: '#F0F9FF',
+    borderLeftWidth: 4,
+    borderLeftColor: '#0EA5E9'
   },
   metricValue: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#0F172A',
     marginBottom: 4,
   },
   metricLabel: {
     fontSize: 14,
+    fontWeight: '500',
     color: '#64748B',
   },
   actionContainer: {

@@ -5,7 +5,8 @@ import {
   CreateCommissionDto,
   CreateCommissionRuleDto,
   AssignCommissionRuleDto,
-  CommissionDateRangeResult
+  CommissionDateRangeResult,
+  SalesCommissionResponse
 } from '../types/commission';
 import {
   createCommission,
@@ -23,6 +24,10 @@ import {
 interface CommissionContextType {
   commission: Commission | null;
   commissions: Commission[];
+  commissionResponse: SalesCommissionResponse | null;
+  salesWithCommission: SalesCommissionResponse['sales'] | [];
+  commissionSummary: SalesCommissionResponse['totalCommission'] | null;
+  activeCommissionRule: CommissionRule | null;
   rules: CommissionRule[];
   dateRangeResult: CommissionDateRangeResult | null;
   loading: boolean;
@@ -52,6 +57,10 @@ export const useCommission = () => {
 export const CommissionProvider = ({ children }: { children: ReactNode }) => {
   const [commission, setCommission] = useState<Commission | null>(null);
   const [commissions, setCommissions] = useState<Commission[]>([]);
+  const [commissionResponse, setCommissionResponse] = useState<SalesCommissionResponse | null>(null);
+  const [salesWithCommission, setSalesWithCommission] = useState<SalesCommissionResponse['sales']>([]);
+  const [commissionSummary, setCommissionSummary] = useState<SalesCommissionResponse['totalCommission'] | null>(null);
+  const [activeCommissionRule, setActiveCommissionRule] = useState<CommissionRule | null>(null);
   const [rules, setRules] = useState<CommissionRule[]>([]);
   const [dateRangeResult, setDateRangeResult] = useState<CommissionDateRangeResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -138,8 +147,37 @@ export const CommissionProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getCommissionsBySalesman(salesmanId);
-      setCommissions(data);
+      const response = await getCommissionsBySalesman(salesmanId);
+      
+      // Handle the new response structure
+      setCommissionResponse(response);
+      
+      if (response) {
+        // Set sales with commission
+        setSalesWithCommission(response.sales || []);
+        
+        // Set commission summary data
+        setCommissionSummary(response.totalCommission);
+        
+        // Set active commission rule
+        setActiveCommissionRule(response.commissionRule);
+        
+        // Also update the commissions array for backward compatibility
+        // This will be derived from the sales data
+        const derivedCommissions: Commission[] = (response.sales || []).map(sale => ({
+          id: `${sale.id}-commission`,
+          saleId: sale.id,
+          salesmanId: salesmanId,
+          shopId: '',  // We don't have this in the response
+          amount: response.commissionRule?.value || 0,
+          isPaid: sale.status === 'approved',
+          commissionRuleId: response.commissionRule?.id || '',
+          createdAt: sale.createdAt,
+          updatedAt: sale.updatedAt
+        }));
+        
+        setCommissions(derivedCommissions);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch commissions by salesman');
     } finally {
@@ -189,6 +227,10 @@ export const CommissionProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo(() => ({
     commission,
     commissions,
+    commissionResponse,
+    salesWithCommission,
+    commissionSummary,
+    activeCommissionRule,
     rules,
     dateRangeResult,
     loading,
@@ -203,7 +245,8 @@ export const CommissionProvider = ({ children }: { children: ReactNode }) => {
     fetchCommissionsByShop,
     markCommissionAsPaid: markCommissionAsPaidContext,
     fetchCommissionsByDateRange,
-  }), [commission, commissions, rules, dateRangeResult, loading, error]);
+  }), [commission, commissions, commissionResponse, salesWithCommission, commissionSummary, 
+      activeCommissionRule, rules, dateRangeResult, loading, error]);
 
   return (
     <CommissionContext.Provider value={value}>

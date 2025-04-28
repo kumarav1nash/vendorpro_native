@@ -5,7 +5,8 @@ import {
   CreateCommissionDto,
   CreateCommissionRuleDto,
   AssignCommissionRuleDto,
-  CommissionDateRangeResult
+  CommissionDateRangeResult,
+  SalesCommissionResponse
 } from '../types/commission';
 
 export async function createCommission(data: CreateCommissionDto): Promise<Commission> {
@@ -38,11 +39,11 @@ export async function assignCommissionRule(data: AssignCommissionRuleDto): Promi
   return res.data;
 }
 
-export async function getCommissionsBySalesman(salesmanId: string): Promise<Commission[]> {
+export async function getCommissionsBySalesman(salesmanId: string): Promise<SalesCommissionResponse> {
   try {
     console.log(`Fetching commissions for salesman ID: ${salesmanId}`);
-    const res = await apiClient.get<Commission[]>(`commissions/salesman/${salesmanId}`);
-    console.log(`Commissions fetch successful, count: ${res.data.length}`);
+    const res = await apiClient.get<SalesCommissionResponse>(`commissions/salesman/${salesmanId}`);
+    console.log(`Commission data fetched: ${res.data.sales?.length || 0} sales with commission rules`);
     return res.data;
   } catch (error) {
     console.error(`Error fetching commissions for salesman ${salesmanId}:`, error);

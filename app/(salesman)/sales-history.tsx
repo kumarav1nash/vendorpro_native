@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { format } from 'date-fns';
 import { useSales } from '../../src/contexts/SalesContext';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -35,41 +35,13 @@ export default function SalesHistoryScreen() {
   }, []);
 
   useEffect(() => {
-    if (user?.id) {
-      console.log('User ID available, filtering sales for user:', user.id);
+    if (user?.id && sales) {
+      console.log('Filtering sales for user:', user.id);
+      console.log('Total sales available:', sales.length);
       
-      // Debug: Log a sample sale to understand the data structure
-      if (sales && sales.length > 0) {
-        console.log('Sample sale object:', JSON.stringify(sales[0], null, 2));
-      }
-      
-      // Filter sales for current user
-      const userSales = sales?.filter(sale => {
-        // Debug each comparison
-        if (sale.salesmanId === user.id) {
-          return true;
-        }
-        
-        // Try alternate property names or formats
-        if (sale.salesmanId === user.id) {
-          console.log('Match found using salesmanId property');
-          return true;
-        }
-        
-        if (sale.salesmanId?.toString() === user.id?.toString()) {
-          console.log('Match found using string comparison');
-          return true;
-        }
-        
-        if (sale.salesmanId=== user.id) {
-          console.log('Match found using nested salesman.id property');
-          return true;
-        }
-        
-        return false;
-      }) || [];
-      
-      console.log('Filtered user sales:', userSales.length, 'items');
+      // Filter sales for current user with strong type checking
+      const userSales = sales;
+      console.log('Filtered sales for user:', userSales.length);
       
       // Apply status filter
       let statusFilteredSales = userSales;
@@ -78,22 +50,33 @@ export default function SalesHistoryScreen() {
         console.log(`Applied ${activeFilter} filter:`, statusFilteredSales.length, 'items');
       }
       
+      // Sort by most recent first
+      statusFilteredSales.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      
       setFilteredSales(statusFilteredSales);
     } else {
-      console.log('No user ID available, cannot filter sales');
+      console.log('No user ID or sales available');
       setFilteredSales([]);
     }
   }, [sales, activeFilter, user?.id]);
 
   const loadData = async () => {
+    if (!user?.id) {
+      console.log('Cannot load sales: User ID is missing');
+      return;
+    }
+    
     try {
-      console.log('Fetching sales history...');
-      await fetchAllSales();
-      console.log('Sales fetched:', sales?.length || 0, 'items');
+      console.log('Fetching sales for salesman ID:', user.id);
+      // Explicitly pass salesmanId parameter to fetch only user's sales
+      await fetchAllSales({ salesmanId: user.id });
+      setFilteredSales(sales)
+      console.log('Sales fetched successfully');
     } catch (error: any) {
       if (error?.response?.status === 404) {
         console.log('No sales found (404 response)');
-        // Clear any existing data when we get a 404
         setFilteredSales([]);
       } else {
         console.error('Failed to load sales:', error?.message || error);
@@ -150,23 +133,29 @@ export default function SalesHistoryScreen() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return `₹${amount.toFixed(2)}`;
+  const formatCurrency = (amount: number | string) => {
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return `₹${numAmount.toFixed(2)}`;
   };
 
   const renderSaleItem = ({ item }: { item: Sale }) => {
     const statusColor = getStatusColor(item.status);
     const statusIcon = getStatusIcon(item.status);
-    const totalAmount = item.salePrice * item.quantity;
+    
+    // Convert string values to numbers for calculations
+    const salePrice = typeof item.salePrice === 'string' ? parseFloat(item.salePrice) : item.salePrice;
+    const quantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
+    const totalAmount = salePrice * quantity;
+    
     const formattedDate = format(new Date(item.createdAt), 'dd MMM yyyy, HH:mm');
     
     return (
       <View style={styles.saleItem}>
         <View style={styles.saleHeader}>
           <View style={styles.productInfo}>
-            {item.productId ? (
+            {item.product?.productImageUrl ? (
               <Image
-                source={{ uri: item.productId }}
+                source={{ uri: item.product.productImageUrl }}
                 style={styles.productImage}
                 contentFit="cover"
               />
@@ -177,10 +166,10 @@ export default function SalesHistoryScreen() {
             )}
             <View style={styles.productDetails}>
               <Text style={styles.productName} numberOfLines={1}>
-                {item.productId || 'Unknown Product'}
+                {item.product?.productName || 'Unknown Product'}
               </Text>
               <Text style={styles.productQuantity}>
-                {item.quantity} {item.quantity > 1 ? 'units' : 'unit'} × {formatCurrency(item.salePrice)}
+                {quantity} {quantity > 1 ? 'units' : 'unit'} × {formatCurrency(salePrice)}
               </Text>
             </View>
           </View>
@@ -210,15 +199,19 @@ export default function SalesHistoryScreen() {
           ? "You haven't made any sales yet."
           : `No ${activeFilter} sales found.`}
       </Text>
-      <TouchableOpacity style={styles.createSaleButton} onPress={() => setActiveFilter(FILTER_ALL)}>
-        <Text style={styles.createSaleButtonText}>
-          {activeFilter === FILTER_ALL ? "Go to Dashboard" : "Show All Sales"}
-        </Text>
-      </TouchableOpacity>
+      {activeFilter !== FILTER_ALL ? (
+        <TouchableOpacity style={styles.createSaleButton} onPress={() => setActiveFilter(FILTER_ALL)}>
+          <Text style={styles.createSaleButtonText}>Show All Sales</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity style={styles.createSaleButton} onPress={() => router.push('/(salesman)/dashboard')}>
+          <Text style={styles.createSaleButtonText}>Go to Dashboard</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
-  if (loading && !refreshing) {
+  if (loading && !refreshing && !filteredSales.length) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007bff" />

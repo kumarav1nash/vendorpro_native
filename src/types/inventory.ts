@@ -1,15 +1,27 @@
 export interface Inventory {
   id: string;
   productName: string;
-  basePrice: number;
-  sellingPrice: number;
+  basePrice: string | number;
+  sellingPrice: string | number;
   stockQuantity: number;
-  productImageUrl: string;
+  productImageUrl?: string;
   shopId: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface CreateInventoryDto extends Omit<Inventory, 'id' | 'createdAt' | 'updatedAt'> {}
+export interface CreateInventoryDto {
+  productName: string;
+  basePrice: string | number;
+  sellingPrice: string | number;
+  stockQuantity: number;
+  productImageUrl?: string;
+}
 
-export interface UpdateInventoryDto extends Partial<CreateInventoryDto> {} 
+export interface UpdateInventoryDto {
+  productName?: string;
+  basePrice?: string | number;
+  sellingPrice?: string | number;
+  stockQuantity?: number;
+  productImageUrl?: string;
+} 
