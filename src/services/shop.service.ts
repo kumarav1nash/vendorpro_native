@@ -32,7 +32,7 @@ export const shopService = {
   },
 
   getShopBySalesmanId: async (salesmanId: string): Promise<Shop> => {
-    const response = await apiClient.get<Shop>(`shops/salesman/${salesmanId}`);
+    const response = await apiClient.get<Shop>(`shops/assigned-to-salesman/${salesmanId}`);
     return response.data;
   },
 

@@ -22,7 +22,7 @@ export default function RootLayout() {
       <AuthProvider>
       <UserProvider>
         <UserProfileProvider>
-          <ShopProvider>
+        <ShopProvider>
             <InventoryProvider>
               <SalesProvider>
                 <CommissionProvider>
@@ -52,7 +52,7 @@ export default function RootLayout() {
                 </CommissionProvider>
               </SalesProvider>
             </InventoryProvider>
-          </ShopProvider>
+        </ShopProvider>
         </UserProfileProvider>
       </UserProvider>
       </AuthProvider>

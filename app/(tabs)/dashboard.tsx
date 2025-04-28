@@ -134,7 +134,7 @@ export default function DashboardScreen() {
   const greetingName = profile
     ? `${profile.firstName} ${profile.lastName}`
     : user?.email || 'Shop Owner';
-
+  
   return (
     <ScrollView
       style={styles.container}

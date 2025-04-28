@@ -86,7 +86,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
-    });
+  });
   };
   
   // Load sales data
@@ -117,22 +117,22 @@ export default function SalesTab({ shopId }: SalesTabProps) {
     let filtered = [...salesWithNestedObjects];
     
     console.log(`Working with ${filtered.length} sales after removing shopId filter`);
-    
-    // Apply status filter
+      
+      // Apply status filter
     if (activeTab === 'pending') {
       filtered = filtered.filter(sale => sale.status === 'pending');
     } else if (activeTab === 'completed') {
       filtered = filtered.filter(sale => sale.status === 'approved');
     } else if (activeTab === 'rejected') {
       filtered = filtered.filter(sale => sale.status === 'rejected');
-    }
+      }
     
     console.log(`After status filter: ${filtered.length} sales`);
-    
+      
     // Apply search filter if present
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(sale => {
+        filtered = filtered.filter(sale => {
         // Search by id, product name, or salesman email
         return (
           sale.id?.toLowerCase().includes(query) ||
@@ -142,25 +142,25 @@ export default function SalesTab({ shopId }: SalesTabProps) {
       });
       
       console.log(`After search filter: ${filtered.length} sales`);
-    }
-    
+      }
+      
     // Sort the filtered sales
-    filtered.sort((a, b) => {
+      filtered.sort((a, b) => {
       if (sortBy === 'date') {
         const dateA = new Date(a.createdAt || 0).getTime();
         const dateB = new Date(b.createdAt || 0).getTime();
         return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
-      } else {
+        } else {
         // Convert string salePrice to number for comparison
         const priceA = typeof a.salePrice === 'string' ? parseFloat(a.salePrice) : (a.salePrice || 0);
         const priceB = typeof b.salePrice === 'string' ? parseFloat(b.salePrice) : (b.salePrice || 0);
-        return sortDirection === 'asc' 
+          return sortDirection === 'asc' 
           ? priceA - priceB
           : priceB - priceA;
-      }
-    });
-    
-    setFilteredSales(filtered);
+        }
+      });
+      
+      setFilteredSales(filtered);
     console.log(`Final: Displaying ${filtered.length} sales after filtering and sorting`);
   }, [sales, activeTab, sortBy, sortDirection, searchQuery, shopId, inventories]);
   
@@ -168,7 +168,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
   const loadSalesData = async () => {
     try {
       console.log(`Loading sales data for shop: ${shopId}`);
-      setIsLoading(true);
+    setIsLoading(true);
       
       await fetchAllSales({ shopId });
       console.log("Sales fetch completed");
@@ -177,7 +177,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
       console.error('Error loading sales:', err);
       Alert.alert('Error', 'Failed to load sales data');
     } finally {
-      setIsLoading(false);
+    setIsLoading(false);
     }
   };
   
@@ -251,7 +251,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
       if (showDetailsModal) {
         setShowDetailsModal(false);
         setSelectedSale(null);
-      }
+    }
       
       // Refresh data
       await loadSalesData();
@@ -310,7 +310,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
       </TouchableOpacity>
     );
   };
-
+  
   // Helper function to get status style
   const getStatusStyle = (status: string | undefined) => {
     if (!status) return {};
@@ -341,41 +341,41 @@ export default function SalesTab({ shopId }: SalesTabProps) {
   
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <MaterialCommunityIcons name="magnify" size={20} color="#666" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search sales..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-      
+        <View style={styles.searchContainer}>
+          <MaterialCommunityIcons name="magnify" size={20} color="#666" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search sales..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+        
       <View style={styles.tabsContainer}>
-        <TouchableOpacity 
+          <TouchableOpacity 
           style={[styles.tab, activeTab === 'all' && styles.activeTab]}
           onPress={() => setActiveTab('all')}
-        >
+          >
           <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>All</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
+          </TouchableOpacity>
+          <TouchableOpacity 
           style={[styles.tab, activeTab === 'pending' && styles.activeTab]}
           onPress={() => setActiveTab('pending')}
-        >
+          >
           <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>Pending</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
+          </TouchableOpacity>
+          <TouchableOpacity 
           style={[styles.tab, activeTab === 'completed' && styles.activeTab]}
           onPress={() => setActiveTab('completed')}
-        >
+          >
           <Text style={[styles.tabText, activeTab === 'completed' && styles.activeTabText]}>Completed</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
+          </TouchableOpacity>
+          <TouchableOpacity 
           style={[styles.tab, activeTab === 'rejected' && styles.activeTab]}
           onPress={() => setActiveTab('rejected')}
-        >
+          >
           <Text style={[styles.tabText, activeTab === 'rejected' && styles.activeTabText]}>Rejected</Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
       </View>
       
       <View style={styles.sortContainer}>
@@ -445,7 +445,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
           showsVerticalScrollIndicator={false}
         />
       )}
-      
+
       {/* Sale details modal */}
       <Modal
         visible={showDetailsModal}
@@ -535,16 +535,16 @@ export default function SalesTab({ shopId }: SalesTabProps) {
                     >
                       <MaterialCommunityIcons name="check" size={18} color="#fff" />
                       <Text style={styles.actionButtonText}>Approve</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity
+                </TouchableOpacity>
+                
+                <TouchableOpacity
                       style={[styles.actionButton, styles.rejectButton]}
                       onPress={() => handleRejectSale(selectedSale.id)}
                       disabled={isLoading}
-                    >
+                >
                       <MaterialCommunityIcons name="close" size={18} color="#fff" />
                       <Text style={styles.actionButtonText}>Reject</Text>
-                    </TouchableOpacity>
+                </TouchableOpacity>
                   </View>
                 )}
               </View>

@@ -41,7 +41,7 @@ interface CreateUserProfileDto {
     language: string;
     notifications: boolean;
     theme: string;
-  };
+};
 }
 
 export default function ProfileScreen() {
@@ -84,7 +84,7 @@ export default function ProfileScreen() {
     notifications: true,
     theme: 'light',
   });
-  
+
   // Initialize local preferences from profile when it loads
   useEffect(() => {
     if (profile && profile.preferences) {
@@ -296,7 +296,7 @@ export default function ProfileScreen() {
       setIsLoading(false);
     }
   };
-  
+
   // Cancel editing
   const cancelEditing = () => {
     setIsEditing(false);
@@ -603,12 +603,12 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
           <MaterialCommunityIcons name="account-circle" size={80} color="#007AFF" />
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => setIsEditing(true)}
-          >
-            <MaterialCommunityIcons name="pencil" size={20} color="#fff" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.editButton}
+              onPress={() => setIsEditing(true)}
+            >
+              <MaterialCommunityIcons name="pencil" size={20} color="#fff" />
+            </TouchableOpacity>
         </View>
         <Text style={styles.headerUsername}>
           {profile?.firstName || 'User'}
@@ -621,7 +621,7 @@ export default function ProfileScreen() {
       </View>
       <View style={styles.content}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
+        <Text style={styles.sectionTitle}>Personal Information</Text>
           {isEditing ? (
             <View style={styles.editButtonsRow}>
               <TouchableOpacity 
@@ -698,7 +698,7 @@ export default function ProfileScreen() {
           <Text style={styles.fieldLabel}>Phone Number</Text>
           <Text style={styles.fieldValue}>{user?.phoneNumber || 'Not set'}</Text>
         </View>
-        
+
         <Text style={styles.sectionTitle}>Preferences</Text>
         <View style={styles.preferenceContainer}>
           <Text style={styles.preferenceLabel}>Language</Text>
@@ -737,7 +737,7 @@ export default function ProfileScreen() {
             trackColor={{ false: '#767577', true: '#007AFF' }}
           />
         </View>
-        
+
         <TouchableOpacity
           style={[styles.actionButton, styles.setupButton]}
           onPress={() => {
@@ -767,7 +767,7 @@ export default function ProfileScreen() {
           <MaterialCommunityIcons name="store-settings" size={20} color="#007AFF" />
           <Text style={styles.setupButtonText}>Shop Setup</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={() => {

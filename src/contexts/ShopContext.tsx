@@ -67,6 +67,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     try {
       const data = await shopService.getShopBySalesmanId(salesmanId);
+      setShop(data);
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch shop by salesman id');
@@ -177,7 +178,6 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setShops,
     isLoading,
     error,
-    useShop,
     fetchAllShops,
     fetchMyShops,
     getShopBySalesmanId,

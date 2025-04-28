@@ -49,20 +49,22 @@ export default function DashboardScreen() {
     };
   });
 
-  // Filter products based on search
-  const filteredProducts = inventories.filter(product => {
-    if (!searchTerm) return true;
-    return product.productName.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+
 
   // Load data
   useEffect(() => {
-    if (user?.id && shop?.id) {
-    loadData();
+    if (user?.id) {
+      loadData();
     } else {
       setLoading(false);
     }
   }, [user?.id, shop?.id]);
+
+    // Filter products based on search
+    const filteredProducts = inventories.filter(product => {
+      if (!searchTerm) return true;
+      return product.productName.toLowerCase().includes(searchTerm.toLowerCase());
+    });
 
   // Calculate metrics when data changes
   useEffect(() => {
@@ -81,8 +83,10 @@ export default function DashboardScreen() {
     setLoading(true);
     try {
       // First, get the shop for this salesman
+      let currentShop = null;
       try {
-        await getShopBySalesmanId(user.id);
+        currentShop = await getShopBySalesmanId(user.id);
+        console.log('Shop fetched successfully:', currentShop?.id);
       } catch (shopError: any) {
         if (shopError?.response?.status === 404) {
           console.log('No shop found for salesman:', user.id);
@@ -91,55 +95,67 @@ export default function DashboardScreen() {
         }
       }
       
-      if (!shop?.id) {
+      if (!currentShop?.id) {
         console.log("Cannot load shop-specific data: Shop ID is missing");
         setLoading(false);
         return;
       }
       
       // Load all data in parallel
-      try {
-        await fetchAllSales();
-      } catch (salesError: any) {
-        if (salesError?.response?.status === 404) {
-          console.log('No sales found');
-        } else {
-          console.error('Error fetching sales:', salesError?.message || salesError);
-        }
-      }
+      const fetchPromises = [];
       
-      try {
-        await fetchInventoryByShopId(shop.id);
-      } catch (inventoryError: any) {
-        if (inventoryError?.response?.status === 404) {
-          console.log('No inventory found for shop:', shop.id);
-        } else {
-          console.error('Error fetching inventory:', inventoryError?.message || inventoryError);
-        }
-      }
-      
-      try {
-        await fetchCommissionsBySalesman(user.id);
-      } catch (commissionsError: any) {
-        if (commissionsError?.response?.status === 404) {
-          console.log('No commissions found for salesman:', user.id);
-        } else {
-          console.error('Error fetching commissions:', commissionsError?.message || commissionsError);
-        }
-      }
-      
-      // Load user profile with graceful error handling
-      if (user.id) {
-        try {
-          await fetchProfileByUserId(user.id);
-        } catch (profileError: any) {
-          if (profileError?.response?.status === 404) {
-            console.log('User profile not found for:', user.id);
+      // Fetch sales
+      const salesPromise = fetchAllSales({ salesmanId: user.id })
+        .catch((salesError: any) => {
+          if (salesError?.response?.status === 404) {
+            console.log('No sales found');
           } else {
-            console.error('Error fetching user profile:', profileError?.message || profileError);
+            console.error('Error fetching sales:', salesError?.message || salesError);
           }
-        }
+          return [];
+        });
+      fetchPromises.push(salesPromise);
+      
+      // Fetch inventory
+      const inventoryPromise = fetchInventoryByShopId(currentShop.id)
+        .catch((inventoryError: any) => {
+          if (inventoryError?.response?.status === 404) {
+            console.log('No inventory found for shop:', currentShop.id);
+          } else {
+            console.error('Error fetching inventory:', inventoryError?.message || inventoryError);
+          }
+          return [];
+        });
+      fetchPromises.push(inventoryPromise);
+      
+      // Fetch commissions
+      const commissionsPromise = fetchCommissionsBySalesman(user.id)
+        .catch((commissionsError: any) => {
+          if (commissionsError?.response?.status === 404) {
+            console.log('No commissions found for salesman:', user.id);
+          } else {
+            console.error('Error fetching commissions:', commissionsError?.message || commissionsError);
+          }
+          return [];
+        });
+      fetchPromises.push(commissionsPromise);
+      
+      // Fetch user profile
+      if (user.id) {
+        const profilePromise = fetchProfileByUserId(user.id)
+          .catch((profileError: any) => {
+            if (profileError?.response?.status === 404) {
+              console.log('User profile not found for:', user.id);
+            } else {
+              console.error('Error fetching user profile:', profileError?.message || profileError);
+            }
+            return null;
+          });
+        fetchPromises.push(profilePromise);
       }
+      
+      // Wait for all promises to complete
+      await Promise.all(fetchPromises);
       
       // Set filtered data from context after all fetches complete
       if (sales) {
@@ -198,7 +214,23 @@ export default function DashboardScreen() {
   };
   
   const handleCreateSale = async () => {
-    if (!selectedProduct || !user?.id || !shop?.id) return;
+    if (!selectedProduct || !user?.id) return;
+    
+    // Make sure we have the shop data
+    let currentShop = shop;
+    if (!currentShop?.id) {
+      try {
+        currentShop = await getShopBySalesmanId(user.id);
+      } catch (error) {
+        Alert.alert('Error', 'Could not retrieve shop information. Please try again.');
+        return;
+      }
+    }
+    
+    if (!currentShop?.id) {
+      Alert.alert('Error', 'Shop information is missing. Please try again later.');
+      return;
+    }
     
     const qtyNum = parseInt(quantity);
     const priceNum = parseFloat(customPrice);
@@ -223,7 +255,7 @@ export default function DashboardScreen() {
       await createSale({
         productId: selectedProduct.id,
         salesmanId: user.id,
-        shopId: shop.id,
+        shopId: currentShop.id,
         quantity: qtyNum,
         salePrice: priceNum,
       });
@@ -231,7 +263,7 @@ export default function DashboardScreen() {
       setModalVisible(false);
       loadData();
       Alert.alert('Success', 'Sale created successfully');
-            } catch (error) {
+    } catch (error) {
       console.error('Failed to create sale:', error);
       Alert.alert('Error', 'Failed to create sale. Please try again.');
     } finally {
@@ -291,7 +323,7 @@ export default function DashboardScreen() {
         <View style={styles.metricsContainer}>
           <View style={styles.metricsRow}>
             <View style={[styles.metricCard, styles.primaryMetricCard]}>
-              <Text style={styles.metricValue}>₹{metrics.totalSales.toFixed(2)}</Text>
+              <Text style={styles.metricValue}>₹{metrics.totalSales}</Text>
               <Text style={styles.metricLabel}>Total Sales</Text>
           </View>
             <View style={[styles.metricCard, styles.warningMetricCard]}>
@@ -301,11 +333,11 @@ export default function DashboardScreen() {
           </View>
           <View style={styles.metricsRow}>
             <View style={[styles.metricCard, styles.successMetricCard]}>
-              <Text style={styles.metricValue}>₹{metrics.totalCommission.toFixed(2)}</Text>
+              <Text style={styles.metricValue}>₹{metrics.totalCommission}</Text>
               <Text style={styles.metricLabel}>Earned Commission</Text>
             </View>
             <View style={[styles.metricCard, styles.infoMetricCard]}>
-              <Text style={styles.metricValue}>₹{metrics.pendingCommission.toFixed(2)}</Text>
+              <Text style={styles.metricValue}>₹{metrics.pendingCommission}</Text>
               <Text style={styles.metricLabel}>Pending Commission</Text>
             </View>
           </View>
@@ -392,7 +424,7 @@ export default function DashboardScreen() {
                     <Text style={styles.productName} numberOfLines={1}>
                       {product.productName}
                       </Text>
-                    <Text style={styles.productPrice}>₹{product.sellingPrice.toFixed(2)}</Text>
+                    <Text style={styles.productPrice}>₹{product.sellingPrice}</Text>
                     <View style={styles.stockContainer}>
                       <Text
                         style={[
@@ -465,7 +497,7 @@ export default function DashboardScreen() {
                     <View style={styles.selectedProductInfo}>
                     <Text style={styles.selectedProductName}>{selectedProduct.productName}</Text>
                     <Text style={styles.selectedProductPrice}>
-                      Base Price: ₹{selectedProduct.basePrice.toFixed(2)}
+                      Base Price: ₹{selectedProduct.basePrice}
                     </Text>
                     <Text style={styles.selectedProductStock}>
                       Available: {selectedProduct.stockQuantity} units

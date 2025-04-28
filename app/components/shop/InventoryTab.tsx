@@ -414,15 +414,15 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   });
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  
+
   // Constants
   const LOW_STOCK_THRESHOLD = 5;
-  
+
   // Load inventory data when component mounts or shopId changes
   useEffect(() => {
     loadInventory();
   }, [shopId]);
-  
+
   // Filter and sort inventory when data changes
   useEffect(() => {
     if (!inventories) {
@@ -432,7 +432,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
     
     console.log(`Filtering and sorting ${inventories.length} inventory items`);
     console.log('Sample inventory item:', inventories.length > 0 ? JSON.stringify(inventories[0]) : 'No inventory');
-    
+      
     // IMPORTANT: Temporarily disable shopId filtering to show all items
     // This will help us debug if items are being loaded correctly
     // let filtered = inventories.filter(item => item.shopId === shopId);
@@ -444,13 +444,13 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(item => 
         item.productName.toLowerCase().includes(query)
-      );
-    }
-    
+        );
+      }
+      
     if (showLowStock) {
       filtered = filtered.filter(item => item.stockQuantity <= LOW_STOCK_THRESHOLD);
-    }
-    
+      }
+      
     // Sort inventory items
     filtered.sort((a, b) => {
       if (sortBy === 'name') {
@@ -567,7 +567,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   // Submit form
   const handleSubmit = async () => {
     if (!validateForm()) return;
-    
+
     if (editMode && editId) {
       // Update existing product
       const updateData: UpdateInventoryDto = {
@@ -580,7 +580,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       
       try {
         await updateInventory(editId, updateData);
-        Alert.alert('Success', 'Product updated successfully');
+      Alert.alert('Success', 'Product updated successfully');
       } catch (error) {
         console.error('Error updating product:', error);
         Alert.alert('Error', 'Failed to update product');
@@ -598,7 +598,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       
       try {
         await createInventory(shopId, newProduct);
-        Alert.alert('Success', 'Product added successfully');
+      Alert.alert('Success', 'Product added successfully');
       } catch (error) {
         console.error('Error adding product:', error);
         Alert.alert('Error', 'Failed to add product');
@@ -626,8 +626,8 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           onPress: async () => {
             try {
               await deleteInventory(id);
-              Alert.alert('Success', 'Product deleted successfully');
-              loadInventory();
+            Alert.alert('Success', 'Product deleted successfully');
+            loadInventory();
             } catch (error) {
               console.error('Error deleting product:', error);
               Alert.alert('Error', 'Failed to delete product');
@@ -748,7 +748,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         </View>
         
         <View style={styles.actionsContainer}>
-          <TouchableOpacity
+        <TouchableOpacity
             style={[styles.actionButton, styles.editButton]}
             onPress={() => handleEdit(item)}
           >
@@ -757,10 +757,10 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDelete(item.id)}
-          >
+          onPress={() => handleDelete(item.id)}
+        >
             <MaterialCommunityIcons name="delete" size={20} color="#fff" />
-          </TouchableOpacity>
+        </TouchableOpacity>
         </View>
       </View>
     );
@@ -769,7 +769,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   return (
     <View style={styles.container}>
       <View style={styles.headerActions}>
-        <View style={styles.searchContainer}>
+      <View style={styles.searchContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
@@ -786,7 +786,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           }}
         >
           <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-        </TouchableOpacity>
+            </TouchableOpacity>
       </View>
       
       <View style={styles.filtersContainer}>
@@ -835,19 +835,19 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
             </Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity
+          <TouchableOpacity
           style={[styles.filterButton, showLowStock && styles.activeFilter]}
           onPress={() => setShowLowStock(!showLowStock)}
-        >
-          <MaterialCommunityIcons
-            name="alert-circle"
-            size={16}
+          >
+            <MaterialCommunityIcons 
+              name="alert-circle" 
+              size={16} 
             color={showLowStock ? '#fff' : '#333'}
-          />
+            />
           <Text style={[styles.filterButtonText, showLowStock && styles.activeFilterText]}>
-            Low Stock
-          </Text>
-        </TouchableOpacity>
+              Low Stock
+            </Text>
+          </TouchableOpacity>
       </View>
       
       {__DEV__ && renderDebugControls()}
@@ -869,7 +869,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           {error && (
             <Text style={styles.errorText}>Error: {error}</Text>
           )}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.retryButton}
             onPress={loadInventory}
           >
@@ -896,7 +896,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           resetForm();
         }}
       >
-        <View style={styles.modalContainer}>
+          <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -925,21 +925,21 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                   <View style={styles.imagePickerPlaceholder}>
                     <MaterialCommunityIcons name="camera" size={40} color="#999" />
                     <Text style={styles.imagePickerText}>Add Product Image</Text>
-                  </View>
+              </View>
                 )}
               </TouchableOpacity>
               
               {/* Form fields */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Product Name *</Text>
-                <TextInput
+                  <TextInput
                   style={styles.textInput}
                   placeholder="Enter product name"
                   value={formData.productName}
                   onChangeText={(value) => handleInputChange('productName', value)}
-                />
-              </View>
-              
+                  />
+                </View>
+                
               <View style={styles.rowInputs}>
                 <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                   <Text style={styles.inputLabel}>Base Price (₹) *</Text>
@@ -950,8 +950,8 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                     value={formData.basePrice.toString()}
                     onChangeText={(value) => handleInputChange('basePrice', value)}
                   />
-                </View>
-                
+              </View>
+              
                 <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                   <Text style={styles.inputLabel}>Selling Price (₹) *</Text>
                   <TextInput
@@ -975,17 +975,17 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                 />
               </View>
             </ScrollView>
-            
+              
             <View style={styles.modalFooter}>
-              <TouchableOpacity
+                      <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setShowAddModal(false);
                   resetForm();
                 }}
-              >
+                      >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+                      </TouchableOpacity>
               
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
@@ -1001,4 +1001,4 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       </Modal>
     </View>
   );
-} 
+}
