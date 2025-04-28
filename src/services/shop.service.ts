@@ -31,6 +31,11 @@ export const shopService = {
     return response.data;
   },
 
+  getShopBySalesmanId: async (salesmanId: string): Promise<Shop> => {
+    const response = await apiClient.get<Shop>(`shops/salesman/${salesmanId}`);
+    return response.data;
+  },
+
   updateShop: async (shopId: string, data: Partial<CreateShopDto>): Promise<Shop> => {
     const response = await apiClient.patch<Shop>(`shops/${shopId}`, data);
     return response.data;

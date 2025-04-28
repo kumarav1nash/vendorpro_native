@@ -10,6 +10,7 @@ interface ShopContextType {
   error: string | null;
   fetchAllShops: () => Promise<void>;
   fetchMyShops: () => Promise<void>;
+  getShopBySalesmanId: (salesmanId: string) => Promise<Shop>;
   createShop: (data: CreateShopDto) => Promise<Shop>;
   updateShop: (shopId: string, data: Partial<CreateShopDto>) => Promise<Shop>;
   assignSalesman: (shopId: string, data: AssignSalesmanDto) => Promise<any>;
@@ -56,6 +57,20 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setShops(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch my shops');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getShopBySalesmanId = async (salesmanId: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await shopService.getShopBySalesmanId(salesmanId);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch shop by salesman id');
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -165,6 +180,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useShop,
     fetchAllShops,
     fetchMyShops,
+    getShopBySalesmanId,
     createShop,
     updateShop,
     assignSalesman,

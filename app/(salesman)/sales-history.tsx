@@ -1,506 +1,322 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
-  TextInput,
+  RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAuth } from '../../src/contexts/AuthContext';
+import { Stack } from 'expo-router';
+import { format } from 'date-fns';
 import { useSales } from '../../src/contexts/SalesContext';
-import { useInventory } from '../../src/contexts/InventoryContext';
-import { router } from 'expo-router';
-import { Sale } from '@/src/types/sales';
-export default function SalesHistoryScreen() {
-  const { user: salesman } = useAuth();
-  const { sales, fetchAllSales } = useSales();
-  const { inventories, fetchInventoryByShopId } = useInventory();
+import { useAuth } from '../../src/contexts/AuthContext';
+import { Sale } from '../../src/types/sales';
 
-  const [isLoading, setIsLoading] = useState(true);
+// Filter options
+const FILTER_ALL = 'all';
+const FILTER_PENDING = 'pending';
+const FILTER_APPROVED = 'approved';
+const FILTER_REJECTED = 'rejected';
+
+export default function SalesHistoryScreen() {
+  const { sales, fetchAllSales, loading } = useSales();
+  const { user } = useAuth();
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('date');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [activeFilter, setActiveFilter] = useState(FILTER_ALL);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, [salesman]);
+  }, []);
 
   useEffect(() => {
-    if (sales.length > 0 && salesman) {
-      let filtered = sales.filter(sale => sale.salesmanId === salesman.id);
-      if (statusFilter !== 'all') {
-        filtered = filtered.filter(sale => sale.status === statusFilter);
+    if (user?.id) {
+      console.log('User ID available, filtering sales for user:', user.id);
+      
+      // Debug: Log a sample sale to understand the data structure
+      if (sales && sales.length > 0) {
+        console.log('Sample sale object:', JSON.stringify(sales[0], null, 2));
       }
-      if (searchQuery.trim() !== '') {
-        const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          sale => {
-            const product = inventories.find(p => p.id === sale.productId);
-            return (
-              (product?.productName?.toLowerCase().includes(query) ?? false) ||
-              sale.id.toLowerCase().includes(query)
-            );
-          }
-        );
-      }
-      const sorted = [...filtered].sort((a, b) => {
-        if (sortBy === 'date') {
-          return sortOrder === 'asc'
-            ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        } else {
-          return sortOrder === 'asc'
-            ? a.salePrice * a.quantity - b.salePrice * b.quantity
-            : b.salePrice * b.quantity - a.salePrice * a.quantity;
+      
+      // Filter sales for current user
+      const userSales = sales?.filter(sale => {
+        // Debug each comparison
+        if (sale.salesmanId === user.id) {
+          return true;
         }
-      });
-      setFilteredSales(sorted);
+        
+        // Try alternate property names or formats
+        if (sale.salesmanId === user.id) {
+          console.log('Match found using salesmanId property');
+          return true;
+        }
+        
+        if (sale.salesmanId?.toString() === user.id?.toString()) {
+          console.log('Match found using string comparison');
+          return true;
+        }
+        
+        if (sale.salesmanId=== user.id) {
+          console.log('Match found using nested salesman.id property');
+          return true;
+        }
+        
+        return false;
+      }) || [];
+      
+      console.log('Filtered user sales:', userSales.length, 'items');
+      
+      // Apply status filter
+      let statusFilteredSales = userSales;
+      if (activeFilter !== FILTER_ALL) {
+        statusFilteredSales = userSales.filter(sale => sale.status === activeFilter);
+        console.log(`Applied ${activeFilter} filter:`, statusFilteredSales.length, 'items');
+      }
+      
+      setFilteredSales(statusFilteredSales);
+    } else {
+      console.log('No user ID available, cannot filter sales');
+      setFilteredSales([]);
     }
-  }, [sales, salesman, searchQuery, statusFilter, sortBy, sortOrder, inventories]);
+  }, [sales, activeFilter, user?.id]);
 
   const loadData = async () => {
-    setIsLoading(true);
     try {
-      if (salesman?.id) {
-        await fetchAllSales({ salesmanId: salesman.id });
+      console.log('Fetching sales history...');
+      await fetchAllSales();
+      console.log('Sales fetched:', sales?.length || 0, 'items');
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        console.log('No sales found (404 response)');
+        // Clear any existing data when we get a 404
+        setFilteredSales([]);
+      } else {
+        console.error('Failed to load sales:', error?.message || error);
       }
-      // Optionally fetch inventories for product names
-    } catch (error) {
-      console.error('Error loading data:', error);
-      Alert.alert('Error', 'Failed to load sales history');
-    } finally {
-      setIsLoading(false);
     }
   };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  const renderFilterTab = (label: string, filter: string) => (
+    <TouchableOpacity
+      style={[
+        styles.filterTab,
+        activeFilter === filter && styles.activeFilterTab
+      ]}
+      onPress={() => setActiveFilter(filter)}
+    >
+      <Text
+        style={[
+          styles.filterTabText,
+          activeFilter === filter && styles.activeFilterTabText
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'approved':
-        return '#4CAF50';
-      case 'pending':
-        return '#FF9800';
+        return '#10B981';
       case 'rejected':
-        return '#F44336';
+        return '#EF4444';
+      case 'pending':
       default:
-        return '#999';
+        return '#F59E0B';
     }
   };
 
-  const getTotalSales = () => {
-    if (!salesman) return 0;
-    return filteredSales.reduce((sum, sale) => {
-      if (sale.status !== 'rejected') {
-        return sum + sale.salePrice * sale.quantity;
-      }
-      return sum;
-    }, 0);
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'check-circle';
+      case 'rejected':
+        return 'close-circle';
+      case 'pending':
+      default:
+        return 'clock-outline';
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return `₹${amount.toFixed(2)}`;
   };
 
   const renderSaleItem = ({ item }: { item: Sale }) => {
-    const product = inventories.find(p => p.id === item.productId);
+    const statusColor = getStatusColor(item.status);
+    const statusIcon = getStatusIcon(item.status);
+    const totalAmount = item.salePrice * item.quantity;
+    const formattedDate = format(new Date(item.createdAt), 'dd MMM yyyy, HH:mm');
+    
     return (
       <View style={styles.saleItem}>
         <View style={styles.saleHeader}>
-          <Text style={styles.productName}>{product ? product.productName : 'Unknown Product'}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}> 
-            <Text style={styles.statusText}>{item.status}</Text>
+          <View style={styles.productInfo}>
+            {item.productId ? (
+              <Image
+                source={{ uri: item.productId }}
+                style={styles.productImage}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={styles.productImagePlaceholder}>
+                <MaterialCommunityIcons name="package-variant" size={24} color="#9CA3AF" />
+              </View>
+            )}
+            <View style={styles.productDetails}>
+              <Text style={styles.productName} numberOfLines={1}>
+                {item.productId || 'Unknown Product'}
+              </Text>
+              <Text style={styles.productQuantity}>
+                {item.quantity} {item.quantity > 1 ? 'units' : 'unit'} × {formatCurrency(item.salePrice)}
+              </Text>
+            </View>
           </View>
-        </View>
-        <View style={styles.saleDetails}>
-          <View style={styles.saleInfo}>
-            <Text style={styles.saleInfoText}>Customer: {item.id}</Text>
-            <Text style={styles.saleInfoText}>Quantity: {item.quantity}</Text>
-            <Text style={styles.saleInfoText}>
-              Date: {new Date(item.createdAt).toLocaleDateString()}
+          <View style={[styles.saleStatus, { backgroundColor: `${statusColor}15` }]}>
+            <MaterialCommunityIcons name={statusIcon} size={16} color={statusColor} />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
             </Text>
           </View>
-          <View style={styles.saleAmount}>
-            <Text style={styles.amountText}>₹{(item.salePrice * item.quantity).toFixed(2)}</Text>
-          </View>
+        </View>
+        <View style={styles.saleFooter}>
+          <Text style={styles.saleDate}>
+            <MaterialCommunityIcons name="calendar" size={14} color="#64748B" /> {formattedDate}
+          </Text>
+          <Text style={styles.saleTotal}>{formatCurrency(totalAmount)}</Text>
         </View>
       </View>
     );
   };
 
-  const renderHeader = () => {
-    return (
-      <View style={styles.headerContainer}>
-        <View style={styles.statsContainer}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{filteredSales.length}</Text>
-            <Text style={styles.statLabel}>Total Entries</Text>
-          </View>
-          
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>₹{getTotalSales().toFixed(2)}</Text>
-            <Text style={styles.statLabel}>Total Sales</Text>
-          </View>
-        </View>
-        
-        <View style={styles.filtersContainer}>
-          <View style={styles.searchContainer}>
-            <MaterialCommunityIcons name="magnify" size={24} color="#999" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search sales..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearSearch}>
-                <MaterialCommunityIcons name="close-circle" size={20} color="#999" />
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          <View style={styles.filterRow}>
-            <View style={styles.filterGroup}>
-              <Text style={styles.filterLabel}>Status</Text>
-              <View style={styles.pillContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.pill,
-                    statusFilter === 'all' && styles.pillActive,
-                  ]}
-                  onPress={() => setStatusFilter('all')}
-                >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      statusFilter === 'all' && styles.pillTextActive,
-                    ]}
-                  >
-                    All
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.pill,
-                    statusFilter === 'pending' && styles.pillActive,
-                  ]}
-                  onPress={() => setStatusFilter('pending')}
-                >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      statusFilter === 'pending' && styles.pillTextActive,
-                    ]}
-                  >
-                    Pending
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.pill,
-                    statusFilter === 'approved' && styles.pillActive,
-                  ]}
-                  onPress={() => setStatusFilter('approved')}
-                >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      statusFilter === 'approved' && styles.pillTextActive,
-                    ]}
-                  >
-                    Approved
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.pill,
-                    statusFilter === 'rejected' && styles.pillActive,
-                  ]}
-                  onPress={() => setStatusFilter('rejected')}
-                >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      statusFilter === 'rejected' && styles.pillTextActive,
-                    ]}
-                  >
-                    Rejected
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-          
-          <View style={styles.filterRow}>
-            <View style={styles.filterGroup}>
-              <Text style={styles.filterLabel}>Sort By</Text>
-              <View style={styles.pillContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.pill,
-                    sortBy === 'date' && styles.pillActive,
-                  ]}
-                  onPress={() => {
-                    if (sortBy === 'date') {
-                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                    } else {
-                      setSortBy('date');
-                      setSortOrder('desc');
-                    }
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      sortBy === 'date' && styles.pillTextActive,
-                    ]}
-                  >
-                    Date
-                    {sortBy === 'date' && (
-                      <MaterialCommunityIcons
-                        name={sortOrder === 'asc' ? 'arrow-up' : 'arrow-down'}
-                        size={14}
-                        color={sortBy === 'date' ? '#fff' : '#666'}
-                      />
-                    )}
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.pill,
-                    sortBy === 'amount' && styles.pillActive,
-                  ]}
-                  onPress={() => {
-                    if (sortBy === 'amount') {
-                      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-                    } else {
-                      setSortBy('amount');
-                      setSortOrder('desc');
-                    }
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.pillText,
-                      sortBy === 'amount' && styles.pillTextActive,
-                    ]}
-                  >
-                    Amount
-                    {sortBy === 'amount' && (
-                      <MaterialCommunityIcons
-                        name={sortOrder === 'asc' ? 'arrow-up' : 'arrow-down'}
-                        size={14}
-                        color={sortBy === 'amount' ? '#fff' : '#666'}
-                      />
-                    )}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const renderEmpty = () => {
-    return (
-      <View style={styles.emptyContainer}>
-        <MaterialCommunityIcons name="receipt" size={60} color="#ccc" />
-        <Text style={styles.emptyText}>
-          {searchQuery.length > 0 || statusFilter !== 'all'
-            ? 'No sales match your filters'
-            : 'No sales records found'}
+  const renderEmptyList = () => (
+    <View style={styles.emptyState}>
+      <MaterialCommunityIcons name="receipt" size={60} color="#CBD5E1" />
+      <Text style={styles.emptyStateTitle}>No sales found</Text>
+      <Text style={styles.emptyStateDescription}>
+        {activeFilter === FILTER_ALL
+          ? "You haven't made any sales yet."
+          : `No ${activeFilter} sales found.`}
+      </Text>
+      <TouchableOpacity style={styles.createSaleButton} onPress={() => setActiveFilter(FILTER_ALL)}>
+        <Text style={styles.createSaleButtonText}>
+          {activeFilter === FILTER_ALL ? "Go to Dashboard" : "Show All Sales"}
         </Text>
-        {(searchQuery.length > 0 || statusFilter !== 'all') && (
-          <TouchableOpacity
-            style={styles.resetButton}
-            onPress={() => {
-              setSearchQuery('');
-              setStatusFilter('all');
-            }}
-          >
-            <Text style={styles.resetButtonText}>Reset Filters</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  };
+      </TouchableOpacity>
+    </View>
+  );
 
-  if (isLoading) {
+  if (loading && !refreshing) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
         <Text style={styles.loadingText}>Loading sales history...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Sales History</Text>
-        <View style={styles.placeholder} />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Stack.Screen
+        options={{
+          title: 'Sales History',
+        }}
+      />
+      
+      <View style={styles.filterContainer}>
+        {renderFilterTab('All', FILTER_ALL)}
+        {renderFilterTab('Pending', FILTER_PENDING)}
+        {renderFilterTab('Approved', FILTER_APPROVED)}
+        {renderFilterTab('Rejected', FILTER_REJECTED)}
       </View>
       
       <FlatList
         data={filteredSales}
         renderItem={renderSaleItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmpty}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.salesList}
+        ListEmptyComponent={renderEmptyList}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007bff']}
+            tintColor="#007bff"
+          />
+        }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  backButton: {
-    padding: 8,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  placeholder: {
-    width: 40,
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: '#64748B',
   },
-  listContainer: {
-    paddingBottom: 20,
-  },
-  headerContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginBottom: 16,
-  },
-  statsContainer: {
+  filterContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  statBox: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
-    marginHorizontal: 4,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  filtersContainer: {
-    marginTop: 8,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginBottom: 16,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    fontSize: 16,
-  },
-  clearSearch: {
-    padding: 4,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  filterGroup: {
-    flex: 1,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  pillContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  pill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  pillActive: {
-    backgroundColor: '#007AFF',
-  },
-  pillText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  pillTextActive: {
-    color: '#fff',
-  },
-  saleItem: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 16,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  activeFilterTab: {
+    backgroundColor: '#EFF6FF',
+  },
+  filterTabText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  activeFilterTabText: {
+    color: '#007bff',
+    fontWeight: '600',
+  },
+  salesList: {
+    padding: 16,
+    paddingBottom: 24,
+  },
+  saleItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
   },
@@ -508,62 +324,96 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  productInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  productImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+  },
+  productImagePlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  productDetails: {
+    marginLeft: 12,
+    flex: 1,
   },
   productName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 4,
   },
-  statusBadge: {
+  productQuantity: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  saleStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 16,
   },
   statusText: {
     fontSize: 12,
-    color: '#fff',
     fontWeight: '600',
+    marginLeft: 4,
   },
-  saleDetails: {
+  saleFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
-  saleInfo: {
-    flex: 1,
+  saleDate: {
+    fontSize: 12,
+    color: '#64748B',
   },
-  saleInfoText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  saleAmount: {
-    alignItems: 'flex-end',
-  },
-  amountText: {
+  saleTotal: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#0F172A',
   },
-  emptyContainer: {
+  emptyState: {
     alignItems: 'center',
-    padding: 40,
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0F172A',
     marginTop: 16,
+    marginBottom: 8,
   },
-  resetButton: {
-    marginTop: 16,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-  },
-  resetButtonText: {
+  emptyStateDescription: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  createSaleButton: {
+    backgroundColor: '#007bff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  createSaleButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

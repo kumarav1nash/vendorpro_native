@@ -34,7 +34,7 @@ export default function SalesmanLoginScreen() {
     try {
       await login({ phoneNumber: mobile, password });
       await SecureStore.setItemAsync('salesmanAuthenticated', 'true');
-      router.replace('/(salesman)/dashboard');
+      router.replace('/');
     } catch (err) {
       setError('Invalid credentials or login failed.');
     } finally {

@@ -78,6 +78,25 @@ export default function ProfileScreen() {
     { label: 'Other', value: 'other' },
   ];
   
+  // Add state for locally stored preferences
+  const [localPreferences, setLocalPreferences] = useState({
+    language: 'en',
+    notifications: true,
+    theme: 'light',
+  });
+  
+  // Initialize local preferences from profile when it loads
+  useEffect(() => {
+    if (profile && profile.preferences) {
+      console.log("Initializing local preferences from profile");
+      setLocalPreferences({
+        language: profile.preferences.language || 'en',
+        notifications: profile.preferences.notifications !== false, // default to true if undefined
+        theme: profile.preferences.theme || 'light',
+      });
+    }
+  }, [profile]);
+  
   // Add debug logs for both profile and localProfile state changes
   useEffect(() => {
     console.log("Profile context updated:", profile ? "profile exists" : "profile is null");
@@ -150,7 +169,7 @@ export default function ProfileScreen() {
     console.log("Fallback profile created");
   };
 
-  // When entering edit mode, initialize the editValues
+  // Update the startEditing function to include preferences
   const startEditing = () => {
     console.log("startEditing called, localProfile:", localProfile ? "exists" : "null");
     
@@ -160,13 +179,7 @@ export default function ProfileScreen() {
       
       if (user) {
         createFallbackProfile();
-        // Alert the user to wait a moment 
-        Alert.alert(
-          "Creating Profile",
-          "Please wait a moment while we initialize your profile, then try editing again.",
-          [{ text: "OK" }]
-        );
-        return;
+        return; // Don't start editing yet
       } else {
         console.error("Cannot edit: No user data available");
         Alert.alert("Error", "User data not available. Please log out and log in again.");
@@ -205,26 +218,32 @@ export default function ProfileScreen() {
     }));
   };
   
-  // When saving, copy the edit values to localProfile
+  // Update the saveChanges function to include preferences
   const saveChanges = async () => {
     if (!localProfile) return;
     
     try {
       setIsLoading(true);
       
-      // Create an updated profile with our edited values
+      // Create an updated profile with our edited values and local preferences
       const updatedProfile = {
         ...localProfile,
         firstName: editValues.firstName,
         lastName: editValues.lastName,
         dateOfBirth: editValues.dateOfBirth,
-        gender: editValues.gender,
+        gender: editValues.gender as 'male' | 'female' | 'other',
         address: editValues.address,
         city: editValues.city,
         state: editValues.state,
         country: editValues.country,
         postalCode: editValues.postalCode,
         bio: editValues.bio,
+        preferences: {
+          ...localProfile.preferences,
+          language: localPreferences.language,
+          notifications: localPreferences.notifications,
+          theme: localPreferences.theme,
+        }
       };
       
       console.log("Saving profile with updated values:", JSON.stringify(updatedProfile, null, 2));
@@ -241,7 +260,7 @@ export default function ProfileScreen() {
           firstName: updatedProfile.firstName || '',
           lastName: updatedProfile.lastName || '',
           dateOfBirth: updatedProfile.dateOfBirth || '',
-          gender: updatedProfile.gender as 'male' | 'female' | 'other',
+          gender: updatedProfile.gender,
           address: updatedProfile.address || '',
           city: updatedProfile.city || '',
           state: updatedProfile.state || '',
@@ -250,9 +269,9 @@ export default function ProfileScreen() {
           bio: updatedProfile.bio || '',
           profilePicture: updatedProfile.profilePicture || '',
           preferences: {
-            language: updatedProfile.preferences?.language || 'en',
-            notifications: updatedProfile.preferences?.notifications || true,
-            theme: updatedProfile.preferences?.theme || 'light',
+            language: localPreferences.language,
+            notifications: localPreferences.notifications,
+            theme: localPreferences.theme,
           },
         };
         
@@ -380,15 +399,13 @@ export default function ProfileScreen() {
     loadProfileData();
   }, [user, userLoading, authLoading]);
 
-  const handlePreferencesChange = (key: keyof UserProfilePreferences, value: string | boolean) => {
-    if (!localProfile) return;
-    setLocalProfile({
-      ...localProfile,
-      preferences: {
-        ...localProfile.preferences,
-        [key]: value,
-      },
-    });
+  // Updated handlePreferencesChange to update local preferences state
+  const handlePreferencesChange = (key: keyof typeof localPreferences, value: string | boolean) => {
+    console.log(`Updating preference ${key} to ${value}`);
+    setLocalPreferences(prev => ({
+      ...prev,
+      [key]: value
+    }));
   };
 
   // Fix the handleGenderSelect function to use updateEditField instead of handleFieldChange
@@ -577,7 +594,10 @@ export default function ProfileScreen() {
     );
   };
 
-  // Update the render methods to use our new date picker
+  // Check if edit button should be disabled - add this as a separate variable
+  const isEditButtonDisabled = isLoading || !localProfile || userLoading || authLoading;
+
+  // Fix the Edit button styling conditionals
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -619,24 +639,22 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <TouchableOpacity 
-              style={styles.saveEditButton}
+              style={[
+                styles.saveEditButton,
+                isEditButtonDisabled ? styles.disabledButton : null
+              ]}
               onPress={() => {
                 console.log("Edit button pressed");
-                // Check if we have a profile first
-                if (!localProfile && user) {
-                  createFallbackProfile();
-                  setTimeout(() => {
-                    console.log("Starting edit with delay after fallback creation");
-                    startEditing();
-                  }, 300); // Give state time to update
-                } else {
-                  startEditing();
-                }
+                startEditing();
               }}
+              disabled={isEditButtonDisabled}
               accessibilityLabel="Edit profile"
               accessibilityHint="Activates edit mode for your profile information"
             >
-              <Text style={styles.saveEditButtonText}>Edit</Text>
+              <Text style={[
+                styles.saveEditButtonText,
+                isEditButtonDisabled ? styles.disabledButtonText : null
+              ]}>Edit</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -688,27 +706,25 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={[
                 styles.languageButton,
-                localProfile?.preferences?.language === 'en' && styles.languageButtonActive,
+                localPreferences.language === 'en' && styles.languageButtonActive,
               ]}
-              disabled={!isEditing}
               onPress={() => handlePreferencesChange('language', 'en')}
             >
               <Text style={[
                 styles.languageButtonText,
-                localProfile?.preferences?.language === 'en' && styles.languageButtonTextActive,
+                localPreferences.language === 'en' && styles.languageButtonTextActive,
               ]}>English</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.languageButton,
-                localProfile?.preferences?.language === 'hi' && styles.languageButtonActive,
+                localPreferences.language === 'hi' && styles.languageButtonActive,
               ]}
-              disabled={!isEditing}
               onPress={() => handlePreferencesChange('language', 'hi')}
             >
               <Text style={[
                 styles.languageButtonText,
-                localProfile?.preferences?.language === 'hi' && styles.languageButtonTextActive,
+                localPreferences.language === 'hi' && styles.languageButtonTextActive,
               ]}>हिंदी</Text>
             </TouchableOpacity>
           </View>
@@ -716,10 +732,9 @@ export default function ProfileScreen() {
         <View style={styles.preferenceContainer}>
           <Text style={styles.preferenceLabel}>Notifications</Text>
           <Switch
-            value={!!localProfile?.preferences?.notifications}
+            value={localPreferences.notifications}
             onValueChange={(value) => handlePreferencesChange('notifications', value)}
             trackColor={{ false: '#767577', true: '#007AFF' }}
-            disabled={!isEditing}
           />
         </View>
         
@@ -1143,5 +1158,12 @@ const styles = StyleSheet.create({
   debugButtonText: {
     color: '#333',
     fontWeight: '500',
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+    opacity: 0.7,
+  },
+  disabledButtonText: {
+    color: '#999999',
   },
 }); 

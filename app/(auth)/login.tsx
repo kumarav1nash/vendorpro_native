@@ -69,7 +69,7 @@ export default function LoginScreen() {
     }
     try {
       await verifyOtp({ phoneNumber: mobile, otp });
-      router.replace('/(tabs)/dashboard');
+      router.replace('/');
     } catch (err) {
       setError(authError || 'Invalid OTP. Please try again.');
     }
