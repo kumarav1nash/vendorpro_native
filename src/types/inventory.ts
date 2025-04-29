@@ -1,8 +1,8 @@
 export interface Inventory {
   id: string;
   productName: string;
-  basePrice: string | number;
-  sellingPrice: string | number;
+  basePrice: number;
+  sellingPrice: number;
   stockQuantity: number;
   productImageUrl?: string;
   shopId: string;
@@ -12,16 +12,16 @@ export interface Inventory {
 
 export interface CreateInventoryDto {
   productName: string;
-  basePrice: string | number;
-  sellingPrice: string | number;
+  basePrice:  number;
+  sellingPrice: number;
   stockQuantity: number;
   productImageUrl?: string;
 }
 
 export interface UpdateInventoryDto {
   productName?: string;
-  basePrice?: string | number;
-  sellingPrice?: string | number;
+  basePrice?: number;
+  sellingPrice?: number;
   stockQuantity?: number;
   productImageUrl?: string;
 } 

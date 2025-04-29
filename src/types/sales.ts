@@ -9,7 +9,7 @@ export interface Sale {
   productId: string;
   product: Inventory;
   quantity: number;
-  soldAt: string;
+  soldAt: number;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   updatedAt: string;

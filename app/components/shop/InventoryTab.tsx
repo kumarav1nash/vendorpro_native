@@ -18,9 +18,11 @@ import { useInventory } from '../../../src/contexts/InventoryContext';
 import { Inventory, CreateInventoryDto, UpdateInventoryDto } from '../../../src/types/inventory';
 import { useUser } from '../../../src/contexts/UserContext';
 import { useShop } from '../../../src/contexts/ShopContext';
+import { Shop } from '@/src/types/shop';
 
 type InventoryTabProps = {
   shopId: string;
+  shop: Shop;
 };
 
 // Styles definition
@@ -690,14 +692,16 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       // Add new product
       const newProduct: CreateInventoryDto = {
         productName: formData.productName,
-        basePrice: formData.basePrice,
-        sellingPrice: formData.sellingPrice,
-        stockQuantity: formData.stockQuantity,
+        basePrice: Number(formData.basePrice) || 0,
+        sellingPrice: Number(formData.sellingPrice) || 0  ,
+        stockQuantity: Number(formData.stockQuantity) || 0,
         productImageUrl: formData.productImageUrl || '',
       };
       
       try {
-        await createInventory(shopId, newProduct);
+        // remove productImageUrl if it is empty or undefined from newProduct 
+        const { productImageUrl, ...newProductWithoutImage } = newProduct;
+        await createInventory(shopId, productImageUrl ? newProduct : newProductWithoutImage);
       Alert.alert('Success', 'Product added successfully');
       } catch (error) {
         console.error('Error adding product:', error);
@@ -745,7 +749,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       productName: product.productName,
       basePrice: typeof product.basePrice === 'string' ? parseFloat(product.basePrice) : product.basePrice,
       sellingPrice: typeof product.sellingPrice === 'string' ? parseFloat(product.sellingPrice) : product.sellingPrice,
-      stockQuantity: product.stockQuantity,
+      stockQuantity: typeof product.stockQuantity === 'string' ? parseInt(product.stockQuantity) : product.stockQuantity,
       productImageUrl: product.productImageUrl || '',
     });
     setEditMode(true);

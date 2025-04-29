@@ -20,12 +20,13 @@ import { useShop } from '../../../src/contexts/ShopContext';
 import { useSales } from '../../../src/contexts/SalesContext';
 import { useCommission } from '../../../src/contexts/CommissionContext';
 import { User, UserRole, UserProfile } from '../../../src/types/user';
-import { CreateSalesmanDto } from '../../../src/types/shop';
+import { CreateSalesmanDto, Shop } from '../../../src/types/shop';
 import { Sale } from '../../../src/types/sales';
 import { Commission, CommissionRule, CommissionSummary, SalesCommissionResponse } from '../../../src/types/commission';
 
 type SalesmenTabProps = {
   shopId: string;
+  shop: Shop;
 };
 
 // Extend the User type to include profile info
@@ -313,7 +314,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     // Calculate totals
     const totalSales = salesmanSales.length;
     const totalAmount = salesmanSales.reduce((sum, sale) => 
-      sum + (parseInt(sale.soldAt) * sale.quantity), 0);
+      sum + (sale.soldAt * sale.quantity), 0);
     
     // Get commission from actual commissions
     const totalCommission = salesmanCommissionSummary.reduce((sum, commission) => 

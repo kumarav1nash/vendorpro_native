@@ -69,11 +69,11 @@ export default function ShopDetailScreen() {
     
     switch (activeTab) {
       case 'inventory':
-        return <InventoryTab shopId={shop.id} />;
+        return <InventoryTab shopId={shop.id} shop={shop} />;
       case 'sales':
-        return <SalesTab shopId={shop.id} />;
+        return <SalesTab shopId={shop.id} shop={shop} />;
       case 'salesmen':
-        return <SalesmenTab shopId={shop.id} />;
+        return <SalesmenTab shopId={shop.id} shop={shop} />;
       default:
         return null;
     }
