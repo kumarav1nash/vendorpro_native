@@ -18,9 +18,11 @@ import { useInventory } from '../../../src/contexts/InventoryContext';
 import { Inventory, CreateInventoryDto, UpdateInventoryDto } from '../../../src/types/inventory';
 import { useUser } from '../../../src/contexts/UserContext';
 import { useShop } from '../../../src/contexts/ShopContext';
+import { Shop } from '@/src/types/shop';
 
 type InventoryTabProps = {
   shopId: string;
+  shop: Shop;
 };
 
 // Styles definition
@@ -52,7 +54,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 40,
+    height: 50,
     fontSize: 16,
   },
   addButton: {
@@ -380,6 +382,51 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  metricsContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  metricCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    width: '48%',
+  },
+  metricIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  metricTextContainer: {
+    flex: 1,
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
 });
 
 export default function InventoryTab({ shopId }: InventoryTabProps) {
@@ -413,6 +460,15 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   });
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  
+  // KPI metrics state
+  const [metrics, setMetrics] = useState({
+    totalProducts: 0,
+    lowStockProducts: 0,
+    outOfStockProducts: 0,
+    totalValue: 0,
+    averagePrice: 0
+  });
 
   // Constants
   const LOW_STOCK_THRESHOLD = 5;
@@ -421,6 +477,54 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   useEffect(() => {
     loadInventory();
   }, [shopId]);
+  
+  // Calculate metrics
+  useEffect(() => {
+    if (inventories && inventories.length > 0) {
+      // Filter products for this shop
+      
+      // Count products
+      const totalProducts = inventories.length;
+      
+      // Count low stock products
+      const lowStockProducts = inventories.filter(
+        item => item.stockQuantity <= LOW_STOCK_THRESHOLD && item.stockQuantity > 0
+      ).length;
+      
+      // Count out of stock products
+      const outOfStockProducts = inventories.filter(
+        item => item.stockQuantity === 0
+      ).length;
+      
+      // Calculate total inventory value and average price
+      let totalValue = 0;
+      inventories.forEach(item => {
+        const price = typeof item.sellingPrice === 'string' 
+          ? parseFloat(item.sellingPrice) 
+          : item.sellingPrice;
+        
+        totalValue += price * item.stockQuantity;
+      });
+      
+      const averagePrice = totalProducts > 0 
+        ? inventories.reduce((sum, item) => {
+            const price = typeof item.sellingPrice === 'string' 
+              ? parseFloat(item.sellingPrice) 
+              : item.sellingPrice;
+            return sum + price;
+          }, 0) / totalProducts
+        : 0;
+      
+      // Update metrics
+      setMetrics({
+        totalProducts,
+        lowStockProducts,
+        outOfStockProducts,
+        totalValue,
+        averagePrice
+      });
+    }
+  }, [inventories, shopId]);
 
   // Filter and sort inventory when data changes
   useEffect(() => {
@@ -588,14 +692,16 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       // Add new product
       const newProduct: CreateInventoryDto = {
         productName: formData.productName,
-        basePrice: formData.basePrice,
-        sellingPrice: formData.sellingPrice,
-        stockQuantity: formData.stockQuantity,
+        basePrice: Number(formData.basePrice) || 0,
+        sellingPrice: Number(formData.sellingPrice) || 0  ,
+        stockQuantity: Number(formData.stockQuantity) || 0,
         productImageUrl: formData.productImageUrl || '',
       };
       
       try {
-        await createInventory(shopId, newProduct);
+        // remove productImageUrl if it is empty or undefined from newProduct 
+        const { productImageUrl, ...newProductWithoutImage } = newProduct;
+        await createInventory(shopId, productImageUrl ? newProduct : newProductWithoutImage);
       Alert.alert('Success', 'Product added successfully');
       } catch (error) {
         console.error('Error adding product:', error);
@@ -643,7 +749,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       productName: product.productName,
       basePrice: typeof product.basePrice === 'string' ? parseFloat(product.basePrice) : product.basePrice,
       sellingPrice: typeof product.sellingPrice === 'string' ? parseFloat(product.sellingPrice) : product.sellingPrice,
-      stockQuantity: product.stockQuantity,
+      stockQuantity: typeof product.stockQuantity === 'string' ? parseInt(product.stockQuantity) : product.stockQuantity,
       productImageUrl: product.productImageUrl || '',
     });
     setEditMode(true);
@@ -762,8 +868,62 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
     );
   };
 
+  // Render KPI Cards
+  const renderMetricsCards = () => {
+    return (
+      <View style={styles.metricsContainer}>
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <View style={styles.metricIconContainer}>
+              <MaterialCommunityIcons name="package-variant" size={24} color="#007AFF" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{metrics.totalProducts}</Text>
+              <Text style={styles.metricLabel}>Total Products</Text>
+            </View>
+          </View>
+          
+          <View style={styles.metricCard}>
+            <View style={styles.metricIconContainer}>
+              <MaterialCommunityIcons name="cash" size={24} color="#4CAF50" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>₹{metrics.totalValue.toFixed(0)}</Text>
+              <Text style={styles.metricLabel}>Inventory Value</Text>
+            </View>
+          </View>
+        </View>
+        
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconContainer, { backgroundColor: '#FFF9C4' }]}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#FFC107" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{metrics.lowStockProducts}</Text>
+              <Text style={styles.metricLabel}>Low Stock Items</Text>
+            </View>
+          </View>
+          
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconContainer, { backgroundColor: '#FFEBEE' }]}>
+              <MaterialCommunityIcons name="package-variant-closed" size={24} color="#F44336" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{metrics.outOfStockProducts}</Text>
+              <Text style={styles.metricLabel}>Out of Stock</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
+      {/* KPI Metrics Section */}
+      {!isLoading && renderMetricsCards()}
+      
       <View style={styles.headerActions}>
       <View style={styles.searchContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#666" style={styles.searchIcon} />
@@ -783,67 +943,6 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         >
           <MaterialCommunityIcons name="plus" size={24} color="#fff" />
             </TouchableOpacity>
-      </View>
-      
-      <View style={styles.filtersContainer}>
-        <Text style={styles.filterLabel}>Sort:</Text>
-        <View style={styles.sortButtons}>
-          <TouchableOpacity
-            style={[styles.sortButton, sortBy === 'name' && styles.activeSort]}
-            onPress={() => {
-              if (sortBy === 'name') {
-                setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-              } else {
-                setSortBy('name');
-              }
-            }}
-          >
-            <Text style={[styles.sortButtonText, sortBy === 'name' && styles.activeSortText]}>
-              Name {sortBy === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sortButton, sortBy === 'price' && styles.activeSort]}
-            onPress={() => {
-              if (sortBy === 'price') {
-                setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-              } else {
-                setSortBy('price');
-              }
-            }}
-          >
-            <Text style={[styles.sortButtonText, sortBy === 'price' && styles.activeSortText]}>
-              Price {sortBy === 'price' && (sortDirection === 'asc' ? '↑' : '↓')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sortButton, sortBy === 'stock' && styles.activeSort]}
-            onPress={() => {
-              if (sortBy === 'stock') {
-                setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-              } else {
-                setSortBy('stock');
-              }
-            }}
-          >
-            <Text style={[styles.sortButtonText, sortBy === 'stock' && styles.activeSortText]}>
-              Stock {sortBy === 'stock' && (sortDirection === 'asc' ? '↑' : '↓')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-          <TouchableOpacity
-          style={[styles.filterButton, showLowStock && styles.activeFilter]}
-          onPress={() => setShowLowStock(!showLowStock)}
-          >
-            <MaterialCommunityIcons 
-              name="alert-circle" 
-              size={16} 
-            color={showLowStock ? '#fff' : '#333'}
-            />
-          <Text style={[styles.filterButtonText, showLowStock && styles.activeFilterText]}>
-              Low Stock
-            </Text>
-          </TouchableOpacity>
       </View>
       
       {__DEV__ && renderDebugControls()}

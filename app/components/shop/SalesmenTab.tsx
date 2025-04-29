@@ -12,6 +12,7 @@ import {
   ScrollView,
   Switch,
   TouchableWithoutFeedback,
+  Image,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useUser } from '../../../src/contexts/UserContext';
@@ -19,12 +20,13 @@ import { useShop } from '../../../src/contexts/ShopContext';
 import { useSales } from '../../../src/contexts/SalesContext';
 import { useCommission } from '../../../src/contexts/CommissionContext';
 import { User, UserRole, UserProfile } from '../../../src/types/user';
-import { CreateSalesmanDto } from '../../../src/types/shop';
+import { CreateSalesmanDto, Shop } from '../../../src/types/shop';
 import { Sale } from '../../../src/types/sales';
-import { Commission, CommissionRule } from '../../../src/types/commission';
+import { Commission, CommissionRule, CommissionSummary, SalesCommissionResponse } from '../../../src/types/commission';
 
 type SalesmenTabProps = {
   shopId: string;
+  shop: Shop;
 };
 
 // Extend the User type to include profile info
@@ -46,7 +48,7 @@ type PerformanceMetrics = {
 };
 
 export default function SalesmenTab({ shopId }: SalesmenTabProps) {
-  const { fetchUsersByRole, updateUser, users } = useUser();
+  const { fetchUsersByRole, updateUser, user } = useUser();
   const { createSalesman, getShopSalesmen, removeSalesman } = useShop();
   const { fetchAllSales, sales } = useSales();
   const { 
@@ -61,6 +63,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredSalesmen, setFilteredSalesmen] = useState<UserWithProfile[]>([]);
   const [salesmanCommissions, setSalesmanCommissions] = useState<Commission[]>([]);
+  const [salesmanCommissionSummary, setSalesmanCommissionSummary] = useState<CommissionSummary[]>([]);
   
   // Form state
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -89,6 +92,15 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   
   // Dropdown state
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  
+  // KPI metrics state
+  const [metrics, setMetrics] = useState({
+    totalSalesmen: 0,
+    activeSalesmen: 0,
+    totalCommission: 0,
+    topPerformer: '',
+    topPerformerSales: 0
+  });
   
   useEffect(() => {
     loadSalesmen();
@@ -298,16 +310,15 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     
     // Calculate performance metrics
     const salesmanSales = sales.filter(sale => sale.salesmanId === salesman.id) as ExtendedSale[];
-    const salesmanCommissions = commissions.filter(comm => comm.salesmanId === salesman.id);
     
     // Calculate totals
     const totalSales = salesmanSales.length;
     const totalAmount = salesmanSales.reduce((sum, sale) => 
-      sum + (parseInt(sale.soldAt) * sale.quantity), 0);
+      sum + (sale.soldAt * sale.quantity), 0);
     
     // Get commission from actual commissions
-    const totalCommission = salesmanCommissions.reduce((sum, commission) => 
-      sum + parseInt(commission.amount), 0);
+    const totalCommission = salesmanCommissionSummary.reduce((sum, commission) => 
+      sum + commission.totalCommission, 0);
     
     // Count approved sales as "completed"
     const completedSales = salesmanSales.filter(sale => sale.status === 'approved').length;
@@ -412,6 +423,124 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     </View>
   );
   
+  // Calculate metrics when data changes
+  useEffect(() => {
+    if (shopSalesmen.length > 0 && sales) {
+      // Calculate basic metrics
+      const totalSalesmen = shopSalesmen.length;
+      const activeSalesmen = shopSalesmen.filter(s => s.isActive).length;
+      
+      // Calculate total commission and find top performer
+      let totalCommission = 0;
+      let topPerformerSales = 0;
+      let topPerformer = '';
+      
+      // Create a map of salesman ID to their sales count
+      const salesBySalesman = new Map<string, number>();
+      const amountBySalesman = new Map<string, number>();
+      
+      // Process sales data
+      sales.forEach(sale => {
+        // Skip if not approved
+        if (sale.status !== 'approved') return;
+        
+        const salesmanId = sale.salesmanId || '';
+        if (!salesmanId) return;
+        
+        // Count sales by salesman
+        const currentCount = salesBySalesman.get(salesmanId) || 0;
+        salesBySalesman.set(salesmanId, currentCount + 1);
+        
+        // Sum amount by salesman
+        const saleAmount = typeof sale.soldAt === 'string' 
+          ? parseFloat(sale.soldAt) 
+          : (sale.soldAt || 0);
+        
+        const currentAmount = amountBySalesman.get(salesmanId) || 0;
+        amountBySalesman.set(salesmanId, currentAmount + saleAmount);
+      });
+      
+      // Find top performer
+      shopSalesmen.forEach(salesman => {
+        const salesCount = salesBySalesman.get(salesman.id) || 0;
+        if (salesCount > topPerformerSales) {
+          topPerformerSales = salesCount;
+          topPerformer = salesman.profile?.firstName || salesman.email || salesman.phoneNumber || 'Unknown';
+        }
+      });
+      
+      // Calculate total commission 
+      salesmanCommissionSummary?.forEach(commission => {
+          const amount = typeof commission.totalCommission === 'string'
+            ? parseFloat(commission.totalCommission)
+            : commission.totalCommission;
+          
+          totalCommission += amount;
+        
+      });
+      
+      // Update metrics
+      setMetrics({
+        totalSalesmen,
+        activeSalesmen,
+        totalCommission,
+        topPerformer,
+        topPerformerSales
+      });
+    }
+  }, [shopSalesmen, sales, commissions]);
+  
+  // Render KPI metrics
+  const renderMetricsCards = () => {
+    return (
+      <View style={styles.metricsContainer}>
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <View style={styles.metricIconContainer}>
+              <MaterialCommunityIcons name="account-group" size={24} color="#007AFF" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{metrics.totalSalesmen}</Text>
+              <Text style={styles.metricLabel}>Total Salesmen</Text>
+            </View>
+          </View>
+          
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconContainer, { backgroundColor: '#E8F5E9' }]}>
+              <MaterialCommunityIcons name="account-check" size={24} color="#4CAF50" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{metrics.activeSalesmen}</Text>
+              <Text style={styles.metricLabel}>Active Salesmen</Text>
+            </View>
+          </View>
+        </View>
+        
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconContainer, { backgroundColor: '#FFF8E1' }]}>
+              <MaterialCommunityIcons name="trophy" size={24} color="#FFC107" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue} numberOfLines={1}>{metrics.topPerformer || 'N/A'}</Text>
+              <Text style={styles.metricLabel}>Top Performer ({metrics.topPerformerSales} sales)</Text>
+            </View>
+          </View>
+          
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconContainer, { backgroundColor: '#E3F2FD' }]}>
+              <MaterialCommunityIcons name="currency-inr" size={24} color="#2196F3" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>₹{metrics.totalCommission.toFixed(2)}</Text>
+              <Text style={styles.metricLabel}>Total Commission</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  };
+  
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -423,6 +552,9 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   
   return (
     <View style={styles.container}>
+      {/* KPI Metrics Section */}
+      {!isLoading && renderMetricsCards()}
+      
       <View style={styles.header}>
         <View style={styles.searchContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#666" style={styles.searchIcon} />
@@ -795,7 +927,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 36,
+    height: 50,
     fontSize: 14,
   },
   clearSearch: {
@@ -1218,5 +1350,50 @@ const styles = StyleSheet.create({
   dropdownItemDetail: {
     fontSize: 12,
     color: '#666',
-  }
+  },
+  metricsContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  metricCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    width: '48%',
+  },
+  metricIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  metricTextContainer: {
+    flex: 1,
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
 }); 

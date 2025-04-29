@@ -226,6 +226,9 @@ export default function DashboardScreen() {
     setTotalAmount(total.toFixed(2));
   };
 
+  // Track if total amount has been manually edited
+  const [totalAmountManuallyEdited, setTotalAmountManuallyEdited] = useState(false);
+
   // Handle quantity change
   const handleQuantityChange = (newQuantity: string) => {
     // Ensure quantity is a positive number
@@ -234,18 +237,37 @@ export default function DashboardScreen() {
     
     setQuantity(newQuantity);
     
-    // If we have a total amount, recalculate the unit price
-    if (totalAmount) {
-      updateUnitPrice(totalAmount, newQuantity);
+    if (!totalAmountManuallyEdited && selectedProduct) {
+      // If total hasn't been manually edited, calculate based on product price and new quantity
+      const basePrice = safeNumberConversion(selectedProduct.sellingPrice);
+      const newTotal = (basePrice * qty).toFixed(2);
+      setTotalAmount(newTotal);
+      updateUnitPrice(newTotal, newQuantity);
     } else if (customPrice) {
       // Otherwise, recalculate the total from unit price
       updateTotalAmount(customPrice, newQuantity);
     }
   };
 
+  // Quick quantity update
+  const quickUpdateQuantity = (increment: number) => {
+    const currentQty = parseInt(quantity) || 0;
+    const newQty = Math.max(1, currentQty + increment);
+    
+    // Don't exceed stock quantity
+    if (selectedProduct && newQty > selectedProduct.stockQuantity) {
+      Alert.alert('Maximum stock reached', `Only ${selectedProduct.stockQuantity} units available.`);
+      return;
+    }
+    
+    setQuantity(newQty.toString());
+    handleQuantityChange(newQty.toString());
+  };
+
   // Handle total amount change
   const handleTotalAmountChange = (newTotal: string) => {
     setTotalAmount(newTotal);
+    setTotalAmountManuallyEdited(true);
     updateUnitPrice(newTotal, quantity);
   };
 
@@ -261,6 +283,7 @@ export default function DashboardScreen() {
     setQuantity('1');
     setCustomPrice('');
     setTotalAmount('');
+    setTotalAmountManuallyEdited(false);
   };
 
   const handleCreateSale = async () => {
@@ -283,15 +306,15 @@ export default function DashboardScreen() {
     }
     
     const qtyNum = parseInt(quantity);
-    const priceNum = parseFloat(customPrice);
+    const totalAmountNum = parseFloat(totalAmount);
     
     if (isNaN(qtyNum) || qtyNum <= 0) {
       Alert.alert('Invalid quantity', 'Please enter a valid quantity');
       return;
     }
     
-    if (isNaN(priceNum) || priceNum <= 0) {
-      Alert.alert('Invalid price', 'Please enter a valid price');
+    if (isNaN(totalAmountNum) || totalAmountNum <= 0) {
+      Alert.alert('Invalid total amount', 'Please enter a valid total selling amount');
       return;
     }
     
@@ -308,7 +331,7 @@ export default function DashboardScreen() {
         salesmanId: user.id,
         shopId: currentShop.id,
         quantity: qtyNum,
-        soldAt: priceNum.toString(),
+        soldAt: Number(totalAmount),
       };
       
       await createSale(saleData);
@@ -654,6 +677,28 @@ export default function DashboardScreen() {
                         <MaterialCommunityIcons name="plus" size={20} color="#007bff" />
                       </TouchableOpacity>
                       </View>
+                      
+                      {/* Quick quantity buttons */}
+                      <View style={styles.quickQuantityContainer}>
+                        <TouchableOpacity
+                          style={styles.quickQuantityButton}
+                          onPress={() => quickUpdateQuantity(2)}
+                        >
+                          <Text style={styles.quickQuantityButtonText}>+2</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.quickQuantityButton}
+                          onPress={() => quickUpdateQuantity(5)}
+                        >
+                          <Text style={styles.quickQuantityButtonText}>+5</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.quickQuantityButton}
+                          onPress={() => quickUpdateQuantity(10)}
+                        >
+                          <Text style={styles.quickQuantityButtonText}>+10</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     
                   <View style={styles.formGroup}>
@@ -670,12 +715,11 @@ export default function DashboardScreen() {
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>Unit Price (₹)</Text>
                   <TextInput
-                    style={styles.formInput}
+                    style={[styles.formInput, styles.readonlyInput]}
                     value={customPrice}
-                    onChangeText={handleUnitPriceChange}
                     keyboardType="decimal-pad"
                     placeholder="Per unit price"
-                    editable={true}
+                    editable={false}
                   />
                 </View>
                 
@@ -1081,5 +1125,28 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  quickQuantityContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+  },
+  quickQuantityButton: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+  },
+  quickQuantityButtonText: {
+    color: '#007bff',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  readonlyInput: {
+    backgroundColor: '#F0F0F0',
+    color: '#666',
   },
 }); 
