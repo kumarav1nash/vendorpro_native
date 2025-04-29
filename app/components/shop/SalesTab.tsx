@@ -22,18 +22,6 @@ import { getUserById } from '@/src/services/user.service';
 import { User } from '@/src/types/user';
 import { Shop } from '@/src/types/shop';
 
-// Define a separate type for API response to avoid TypeScript errors
-interface SaleWithNestedObjects {
-  id: string;
-  quantity: number;
-  salePrice: string | number; // Accept both string and number
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  salesman?: User;
-  shop?: Shop;
-  product?: Inventory;
-}
 
 type SalesTabProps = {
   shopId: string;
@@ -54,13 +42,23 @@ export default function SalesTab({ shopId }: SalesTabProps) {
   
   // Local state
   const [isLoading, setIsLoading] = useState(true);
-  const [filteredSales, setFilteredSales] = useState<SaleWithNestedObjects[]>([]);
+  const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSale, setSelectedSale] = useState<SaleWithNestedObjects | null>(null);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  
+  // KPI metrics state
+  const [metrics, setMetrics] = useState({
+    totalSales: 0,
+    pendingSales: 0,
+    approvedSales: 0,
+    rejectedSales: 0,
+    totalRevenue: 0,
+    averageSaleAmount: 0
+  });
   
   // Format currency - handles undefined and string values safely
   const formatCurrency = (amount: string | number | undefined) => {
@@ -94,6 +92,52 @@ export default function SalesTab({ shopId }: SalesTabProps) {
     loadSalesData();
   }, [shopId]);
   
+  // Calculate metrics when sales data changes
+  useEffect(() => {
+    if (sales && sales.length > 0) {
+      // Convert to our expected structure
+      
+      // Filter for this shop
+      const shopSales = sales.map(sale => sale as unknown as Sale);
+      
+      // Calculate metrics
+      const totalSales = shopSales.length;
+      const pendingSales = shopSales.filter(sale => sale.status === 'pending').length;
+      const approvedSales = shopSales.filter(sale => sale.status === 'approved').length;
+      const rejectedSales = shopSales.filter(sale => sale.status === 'rejected').length;
+      
+      // Calculate total revenue (only from approved sales)
+      let totalRevenue = 0;
+      let approvedSalesAmount = 0;
+      
+      shopSales
+        .filter(sale => sale.status === 'approved')
+        .forEach(sale => {
+          const saleAmount = typeof sale.soldAt === 'string' 
+            ? parseFloat(sale.soldAt) 
+            : (sale.soldAt || 0);
+          
+          totalRevenue += saleAmount;
+          approvedSalesAmount++;
+        });
+      
+      // Calculate average sale amount
+      const averageSaleAmount = approvedSalesAmount > 0 
+        ? totalRevenue / approvedSalesAmount 
+        : 0;
+      
+      // Update metrics state
+      setMetrics({
+        totalSales,
+        pendingSales,
+        approvedSales,
+        rejectedSales,
+        totalRevenue,
+        averageSaleAmount
+      });
+    }
+  }, [sales, shopId]);
+  
   // Filter and sort sales when data changes
   useEffect(() => {
     if (!sales) {
@@ -105,16 +149,15 @@ export default function SalesTab({ shopId }: SalesTabProps) {
     console.log('Sample sale item:', sales.length > 0 ? JSON.stringify(sales[0]) : 'No sales');
     
     // Convert the sales array to match our expected structure
-    const salesWithNestedObjects = sales.map(sale => sale as unknown as SaleWithNestedObjects);
-    
+
     // For debugging - check the structure of the first item
-    if (salesWithNestedObjects.length > 0) {
-      console.log('First sale structure:', JSON.stringify(salesWithNestedObjects[0]));
+    if (sales.length > 0) {
+      console.log('First sale structure:', JSON.stringify(sales[0]));
     }
     
     // IMPORTANT: Temporarily show all sales instead of filtering by shopId
     // This will help us debug if any sales are loading at all
-    let filtered = [...salesWithNestedObjects];
+    let filtered = [...sales];
     
     console.log(`Working with ${filtered.length} sales after removing shopId filter`);
       
@@ -152,8 +195,8 @@ export default function SalesTab({ shopId }: SalesTabProps) {
         return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
         } else {
         // Convert string salePrice to number for comparison
-        const priceA = typeof a.salePrice === 'string' ? parseFloat(a.salePrice) : (a.salePrice || 0);
-        const priceB = typeof b.salePrice === 'string' ? parseFloat(b.salePrice) : (b.salePrice || 0);
+        const priceA = typeof a.soldAt === 'string' ? parseFloat(a.soldAt) : (a.soldAt || 0);
+        const priceB = typeof b.soldAt === 'string' ? parseFloat(b.soldAt) : (b.soldAt || 0);
           return sortDirection === 'asc' 
           ? priceA - priceB
           : priceB - priceA;
@@ -201,9 +244,9 @@ export default function SalesTab({ shopId }: SalesTabProps) {
             
             // Log specific properties to check structure
             if (sales && sales.length > 0) {
-              const sampleSale = sales[0] as unknown as SaleWithNestedObjects;
+              const sampleSale = sales[0] as unknown as Sale;
               console.log("Product name:", sampleSale.product?.productName);
-              console.log("Sale price:", sampleSale.salePrice);
+              console.log("Sale price:", sampleSale.soldAt);
               console.log("Status:", sampleSale.status);
             }
             
@@ -264,7 +307,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
   };
   
   // Render individual sale item
-  const renderSaleItem = ({ item }: { item: SaleWithNestedObjects }) => {
+  const renderSaleItem = ({ item }: { item: Sale }) => {
     // Add safety check
     if (!item) {
       console.log('Undefined sale item encountered');
@@ -296,7 +339,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
             <Text style={styles.quantity}>Qty: {item.quantity || 0}</Text>
           </View>
           <View style={styles.priceInfo}>
-            <Text style={styles.amount}>{formatCurrency(item.salePrice)}</Text>
+            <Text style={styles.amount}>{formatCurrency(item.soldAt)}</Text>
             <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
           </View>
         </View>
@@ -333,14 +376,69 @@ export default function SalesTab({ shopId }: SalesTabProps) {
   };
   
   // Calculate unit price safely
-  const calculateUnitPrice = (sale: SaleWithNestedObjects) => {
+  const calculateUnitPrice = (sale: Sale) => {
     if (!sale || !sale.quantity || sale.quantity <= 0) return 0;
-    const salePrice = typeof sale.salePrice === 'string' ? parseFloat(sale.salePrice) : (sale.salePrice || 0);
+    const salePrice = typeof sale.soldAt === 'string' ? parseFloat(sale.soldAt) : (sale.soldAt || 0);
     return salePrice / sale.quantity;
+  };
+  
+  // Render KPI metrics section
+  const renderMetricsCards = () => {
+    return (
+      <View style={styles.metricsContainer}>
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <View style={styles.metricIconContainer}>
+              <MaterialCommunityIcons name="cart-outline" size={24} color="#007AFF" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{metrics.totalSales}</Text>
+              <Text style={styles.metricLabel}>Total Sales</Text>
+            </View>
+          </View>
+          
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconContainer, { backgroundColor: '#E8F5E9' }]}>
+              <MaterialCommunityIcons name="cash-multiple" size={24} color="#4CAF50" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{formatCurrency(metrics.totalRevenue)}</Text>
+              <Text style={styles.metricLabel}>Total Revenue</Text>
+            </View>
+          </View>
+        </View>
+        
+        <View style={styles.metricsRow}>
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconContainer, { backgroundColor: '#FFF8E1' }]}>
+              <MaterialCommunityIcons name="clock-outline" size={22} color="#FFC107" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{metrics.pendingSales}</Text>
+              <Text style={styles.metricLabel}>Pending</Text>
+            </View>
+          </View>
+          
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconContainer, { backgroundColor: '#E8F5E9' }]}>
+              <MaterialCommunityIcons name="check-circle-outline" size={22} color="#4CAF50" />
+            </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{metrics.approvedSales}</Text>
+              <Text style={styles.metricLabel}>Approved</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    );
   };
   
   return (
     <View style={styles.container}>
+      {/* KPI Metrics Section */}
+      {!isLoading && renderMetricsCards()}
+    
+      <View style={styles.headerActions}>
         <View style={styles.searchContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
@@ -351,6 +449,17 @@ export default function SalesTab({ shopId }: SalesTabProps) {
           />
         </View>
         
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => {
+            // This will be handled in a future implementation
+            Alert.alert('Create Sale', 'Create sale functionality coming soon!');
+          }}
+        >
+          <MaterialCommunityIcons name="plus" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+      
       <View style={styles.tabsContainer}>
           <TouchableOpacity 
           style={[styles.tab, activeTab === 'all' && styles.activeTab]}
@@ -515,7 +624,7 @@ export default function SalesTab({ shopId }: SalesTabProps) {
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Total Amount:</Text>
                   <Text style={[styles.detailValue, styles.totalAmount]}>
-                    {formatCurrency(selectedSale.salePrice)}
+                    {formatCurrency(selectedSale.soldAt)}
                   </Text>
                 </View>
                 
@@ -561,21 +670,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f0f0f0',
     borderRadius: 8,
     paddingHorizontal: 12,
-    marginBottom: 12,
+    height: 40,
+    marginBottom: 0,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    height: 36,
+    height: 50,
     fontSize: 14,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0066cc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -855,5 +984,50 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
+  },
+  metricsContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  metricCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    width: '48%',
+  },
+  metricIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  metricTextContainer: {
+    flex: 1,
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  metricLabel: {
+    fontSize: 12,
+    color: '#666',
   },
 }); 
