@@ -69,7 +69,7 @@ export default function LoginScreen() {
     }
     try {
       await verifyOtp({ phoneNumber: mobile, otp });
-      router.replace('/(tabs)/dashboard');
+      router.replace('/');
     } catch (err) {
       setError(authError || 'Invalid OTP. Please try again.');
     }
@@ -95,14 +95,14 @@ export default function LoginScreen() {
             <View style={styles.countryCodeBox}>
               <Text style={styles.countryCodeText}>+91</Text>
             </View>
-            <TextInput
+          <TextInput
               style={[styles.input, { flex: 1 }]}
-              placeholder="10-digit mobile number"
-              value={mobile}
-              onChangeText={setMobile}
-              keyboardType="numeric"
-              maxLength={10}
-            />
+            placeholder="10-digit mobile number"
+            value={mobile}
+            onChangeText={setMobile}
+            keyboardType="numeric"
+            maxLength={10}
+          />
           </View>
           <TouchableOpacity
             style={styles.button}

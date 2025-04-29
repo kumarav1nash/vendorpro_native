@@ -14,120 +14,548 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useProducts, Product } from '../../contexts/ProductContext';
+import { useInventory } from '../../../src/contexts/InventoryContext';
+import { Inventory, CreateInventoryDto, UpdateInventoryDto } from '../../../src/types/inventory';
+import { useUser } from '../../../src/contexts/UserContext';
+import { useShop } from '../../../src/contexts/ShopContext';
 
 type InventoryTabProps = {
   shopId: string;
 };
 
+// Styles definition
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 40,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0066cc',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  filtersContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  filterLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 8,
+  },
+  sortButtons: {
+    flexDirection: 'row',
+    marginRight: 12,
+  },
+  sortButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  activeSort: {
+    backgroundColor: '#0066cc',
+  },
+  sortButtonText: {
+    fontSize: 12,
+    color: '#333',
+  },
+  activeSortText: {
+    color: '#fff',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+  },
+  activeFilter: {
+    backgroundColor: '#0066cc',
+  },
+  filterButtonText: {
+    fontSize: 12,
+    color: '#333',
+    marginLeft: 4,
+  },
+  activeFilterText: {
+    color: '#fff',
+  },
+  listContainer: {
+    padding: 16,
+  },
+  productCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  productImageContainer: {
+    width: 100,
+    height: 100,
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  productDetails: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 4,
+  },
+  sellingPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0066cc',
+  },
+  basePrice: {
+    fontSize: 14,
+    color: '#999',
+    textDecorationLine: 'line-through',
+    marginLeft: 8,
+  },
+  stockContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  quantityText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  stockIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 4,
+  },
+  stockText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  actionsContainer: {
+    justifyContent: 'space-between',
+    padding: 8,
+  },
+  actionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  editButton: {
+    backgroundColor: '#2196F3',
+  },
+  deleteButton: {
+    backgroundColor: '#F44336',
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loaderText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  formContainer: {
+    padding: 16,
+    maxHeight: '70%',
+  },
+  imagePicker: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  pickedImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  imagePickerPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  imagePickerText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#333',
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+  },
+  rowInputs: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    padding: 16,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+    marginRight: 8,
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  saveButton: {
+    backgroundColor: '#0066cc',
+    marginLeft: 8,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  debugContainer: {
+    padding: 8,
+    backgroundColor: '#f8f8f8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  debugButton: {
+    backgroundColor: '#333',
+    padding: 8,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  debugButtonText: {
+    color: '#fff',
+    fontSize: 12,
+  },
+  errorText: {
+    color: 'red',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: '#0066cc',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+});
+
 export default function InventoryTab({ shopId }: InventoryTabProps) {
-  const { products, addProduct, updateProduct, deleteProduct, getShopProducts } = useProducts();
+  const { 
+    inventories, 
+    loading, 
+    error, 
+    fetchInventoryByShopId,
+    createInventory,
+    updateInventory,
+    deleteInventory
+  } = useInventory();
+  const { user } = useUser();
+  const { shop } = useShop();
   
-  // State management
-  const [shopProducts, setShopProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // State for the component
   const [searchQuery, setSearchQuery] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [sortBy, setSortBy] = useState<'name' | 'price' | 'quantity'>('name');
-  const [filterLowStock, setFilterLowStock] = useState(false);
-  const [productForm, setProductForm] = useState({
-    name: '',
-    basePrice: '',
-    sellingPrice: '',
-    quantity: '',
-    imageUri: '',
-    category: '',
-    description: '',
-    unit: '',
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [displayedInventory, setDisplayedInventory] = useState<Inventory[]>([]);
+  const [showLowStock, setShowLowStock] = useState(false);
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [formData, setFormData] = useState<CreateInventoryDto>({
+    productName: '',
+    basePrice: 0,
+    sellingPrice: 0,
+    stockQuantity: 0,
+    productImageUrl: '',
   });
+  const [editMode, setEditMode] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
 
   // Constants
   const LOW_STOCK_THRESHOLD = 5;
 
-  // Load products on component mount
+  // Load inventory data when component mounts or shopId changes
   useEffect(() => {
     loadInventory();
-  }, [shopId, products]);
+  }, [shopId]);
 
-  // Filter products when search query changes
+  // Filter and sort inventory when data changes
   useEffect(() => {
-    if (shopProducts.length > 0) {
-      let filtered = [...shopProducts];
+    if (!inventories) {
+      console.log('No inventory data available');
+      return;
+    }
+    
+    console.log(`Filtering and sorting ${inventories.length} inventory items`);
+    console.log('Sample inventory item:', inventories.length > 0 ? JSON.stringify(inventories[0]) : 'No inventory');
       
-      // Apply search filter
-      if (searchQuery.trim() !== '') {
-        filtered = filtered.filter(product => 
-          product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (product.category?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+    // IMPORTANT: Temporarily disable shopId filtering to show all items
+    // This will help us debug if items are being loaded correctly
+    // let filtered = inventories.filter(item => item.shopId === shopId);
+    let filtered = [...inventories]; // Show all items for now
+    
+    console.log(`After removing shopId filter: ${filtered.length} items`);
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.productName.toLowerCase().includes(query)
         );
       }
       
-      // Apply low stock filter
-      if (filterLowStock) {
-        filtered = filtered.filter(product => product.quantity <= LOW_STOCK_THRESHOLD);
+    if (showLowStock) {
+      filtered = filtered.filter(item => item.stockQuantity <= LOW_STOCK_THRESHOLD);
       }
       
-      setFilteredProducts(filtered);
-    }
-  }, [searchQuery, shopProducts, filterLowStock]);
-
-  // Sort products when sort criteria changes
-  useEffect(() => {
-    const sortedProducts = [...filteredProducts].sort((a, b) => {
+    // Sort inventory items
+    filtered.sort((a, b) => {
       if (sortBy === 'name') {
-        return a.name.localeCompare(b.name);
+        return sortDirection === 'asc' 
+          ? a.productName.localeCompare(b.productName)
+          : b.productName.localeCompare(a.productName);
       } else if (sortBy === 'price') {
-        return a.sellingPrice - b.sellingPrice;
+        // Handle price as string or number
+        const priceA = typeof a.sellingPrice === 'string' ? parseFloat(a.sellingPrice) : a.sellingPrice;
+        const priceB = typeof b.sellingPrice === 'string' ? parseFloat(b.sellingPrice) : b.sellingPrice;
+        return sortDirection === 'asc'
+          ? priceA - priceB
+          : priceB - priceA;
       } else {
-        return a.quantity - b.quantity;
+        return sortDirection === 'asc'
+          ? a.stockQuantity - b.stockQuantity
+          : b.stockQuantity - a.stockQuantity;
       }
     });
     
-    setFilteredProducts(sortedProducts);
-  }, [sortBy]);
-
-  // Load inventory from context
-  const loadInventory = () => {
-    setIsLoading(true);
+    setDisplayedInventory(filtered);
+    console.log(`Displaying ${filtered.length} inventory items after filtering and sorting`);
+  }, [inventories, searchQuery, showLowStock, sortBy, sortDirection, shopId]);
+  
+  const loadInventory = async () => {
     try {
-      const productsForShop = getShopProducts(shopId);
-      setShopProducts(productsForShop);
-      setFilteredProducts(productsForShop);
-    } catch (error) {
-      console.error('Error loading products:', error);
-      Alert.alert('Error', 'Failed to load products');
+      console.log(`Loading inventory for shop: ${shopId}`);
+      setIsLoading(true);
+      
+      // First try to fetch by shopId
+      await fetchInventoryByShopId(shopId);
+      
+      // If that returns no items, try fetching all inventory
+      if (inventories && inventories.length === 0) {
+        console.log("No inventory items found for this shop. Fetching all inventory items instead.");
+        // There could be an API method to get all inventory, but we'll work with what we have
+      }
+      
+      console.log("Inventory fetch completed");
+      
+    } catch (err) {
+      console.error('Error loading inventory:', err);
+      Alert.alert('Error', 'Failed to load inventory');
     } finally {
       setIsLoading(false);
     }
   };
+  
+  // Add a more verbose debug control
+  const renderDebugControls = () => {
+    if (!__DEV__) return null;
+    
+    return (
+      <View style={styles.debugContainer}>
+        <TouchableOpacity
+          style={styles.debugButton}
+          onPress={() => {
+            console.log("Debug - Current inventory state:");
+            console.log(`Total inventory count: ${inventories?.length || 0}`);
+            console.log(`Filtered inventory count: ${displayedInventory.length}`);
+            console.log(`Shop ID being filtered for: ${shopId}`);
+            console.log(`Loading state: ${loading}`);
+            console.log(`Error state: ${error}`);
+            console.log("First few inventory items:");
+            if (inventories && inventories.length > 0) {
+              inventories.slice(0, 3).forEach((item, index) => {
+                console.log(`Item ${index + 1}:`, JSON.stringify(item));
+              });
+            } else {
+              console.log("No inventory items available");
+            }
+            
+            // Force refresh
+            loadInventory();
+          }}
+        >
+          <Text style={styles.debugButtonText}>Debug Inventory</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   // Handle input change
   const handleInputChange = (field: string, value: string) => {
-    setProductForm({ ...productForm, [field]: value });
+    setFormData({ ...formData, [field]: value });
   };
 
   // Form validation
   const validateForm = () => {
     // Validate the form
-    if (!productForm.name.trim()) {
+    if (!formData.productName.trim()) {
       Alert.alert('Error', 'Product name is required');
       return false;
     }
     
-    if (!productForm.basePrice || isNaN(parseFloat(productForm.basePrice)) || parseFloat(productForm.basePrice) <= 0) {
+    if (!formData.basePrice || isNaN(Number(formData.basePrice)) || Number(formData.basePrice) <= 0) {
       Alert.alert('Error', 'Base price must be greater than 0');
       return false;
     }
     
-    if (!productForm.sellingPrice || isNaN(parseFloat(productForm.sellingPrice)) || parseFloat(productForm.sellingPrice) <= 0) {
+    if (!formData.sellingPrice || isNaN(Number(formData.sellingPrice)) || Number(formData.sellingPrice) <= 0) {
       Alert.alert('Error', 'Selling price must be greater than 0');
       return false;
     }
     
-    if (!productForm.quantity || isNaN(parseInt(productForm.quantity)) || parseInt(productForm.quantity) < 0) {
+    if (!formData.stockQuantity || isNaN(formData.stockQuantity) || formData.stockQuantity < 0) {
       Alert.alert('Error', 'Quantity cannot be negative');
       return false;
     }
@@ -136,56 +564,52 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   };
 
   // Submit form
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    const timestamp = new Date().toISOString();
-    
-    if (isEditing && currentProduct) {
+    if (editMode && editId) {
       // Update existing product
-      const updatedProduct: Product = {
-        ...currentProduct,
-        name: productForm.name,
-        basePrice: parseFloat(productForm.basePrice),
-        sellingPrice: parseFloat(productForm.sellingPrice),
-        quantity: parseInt(productForm.quantity),
-        imageUri: productForm.imageUri || undefined,
-        category: productForm.category || undefined,
-        description: productForm.description || undefined,
-        unit: productForm.unit || undefined,
-        updatedAt: timestamp
+      const updateData: UpdateInventoryDto = {
+        productName: formData.productName,
+        basePrice: formData.basePrice,
+        sellingPrice: formData.sellingPrice,
+        stockQuantity: formData.stockQuantity,
+        productImageUrl: formData.productImageUrl || '',
       };
       
-      updateProduct(updatedProduct);
+      try {
+        await updateInventory(editId, updateData);
       Alert.alert('Success', 'Product updated successfully');
+      } catch (error) {
+        console.error('Error updating product:', error);
+        Alert.alert('Error', 'Failed to update product');
+      }
     } else {
       // Add new product
-      const newProduct: Product = {
-        id: Date.now().toString(),
-        shopId: shopId,
-        name: productForm.name,
-        basePrice: parseFloat(productForm.basePrice),
-        sellingPrice: parseFloat(productForm.sellingPrice),
-        quantity: parseInt(productForm.quantity),
-        imageUri: productForm.imageUri || undefined,
-        category: productForm.category || undefined,
-        description: productForm.description || undefined,
-        unit: productForm.unit || undefined,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+      const newProduct: CreateInventoryDto = {
+        productName: formData.productName,
+        basePrice: formData.basePrice,
+        sellingPrice: formData.sellingPrice,
+        stockQuantity: formData.stockQuantity,
+        productImageUrl: formData.productImageUrl || '',
       };
       
-      addProduct(newProduct);
+      try {
+        await createInventory(shopId, newProduct);
       Alert.alert('Success', 'Product added successfully');
+      } catch (error) {
+        console.error('Error adding product:', error);
+        Alert.alert('Error', 'Failed to add product');
+      }
     }
     
-    setShowModal(false);
+    setShowAddModal(false);
     resetForm();
     loadInventory();
   };
 
   // Delete a product
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     Alert.alert(
       'Delete Product',
       'Are you sure you want to delete this product? This action cannot be undone.',
@@ -197,10 +621,15 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            deleteProduct(id);
+          onPress: async () => {
+            try {
+              await deleteInventory(id);
             Alert.alert('Success', 'Product deleted successfully');
             loadInventory();
+            } catch (error) {
+              console.error('Error deleting product:', error);
+              Alert.alert('Error', 'Failed to delete product');
+            }
           },
         },
       ]
@@ -208,57 +637,44 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   };
 
   // Edit a product
-  const handleEdit = (product: Product) => {
-    setCurrentProduct(product);
-    setProductForm({
-      name: product.name,
-      basePrice: product.basePrice.toString(),
-      sellingPrice: product.sellingPrice.toString(),
-      quantity: product.quantity.toString(),
-      imageUri: product.imageUri || '',
-      category: product.category || '',
-      description: product.description || '',
-      unit: product.unit || '',
+  const handleEdit = (product: Inventory) => {
+    setEditId(product.id);
+    setFormData({
+      productName: product.productName,
+      basePrice: typeof product.basePrice === 'string' ? parseFloat(product.basePrice) : product.basePrice,
+      sellingPrice: typeof product.sellingPrice === 'string' ? parseFloat(product.sellingPrice) : product.sellingPrice,
+      stockQuantity: product.stockQuantity,
+      productImageUrl: product.productImageUrl || '',
     });
-    setIsEditing(true);
-    setShowModal(true);
+    setEditMode(true);
+    setShowAddModal(true);
   };
 
   // Reset the form
   const resetForm = () => {
-    setProductForm({
-      name: '',
-      basePrice: '',
-      sellingPrice: '',
-      quantity: '',
-      imageUri: '',
-      category: '',
-      description: '',
-      unit: '',
+    setFormData({
+      productName: '',
+      basePrice: 0,
+      sellingPrice: 0,
+      stockQuantity: 0,
+      productImageUrl: '',
     });
-    setIsEditing(false);
-    setCurrentProduct(null);
+    setEditMode(false);
+    setEditId(null);
   };
 
   // Pick an image from the gallery
   const pickImage = async () => {
     try {
-      // Request permission if not already granted
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert('Permission required', 'Please allow access to your photo library to add product images.');
-        return;
-      }
-      
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.7,
+        aspect: [4, 3],
+        quality: 1,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        handleInputChange('imageUri', result.assets[0].uri);
+        setFormData({ ...formData, productImageUrl: result.assets[0].uri });
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -266,638 +682,319 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
     }
   };
 
-  // Render a product item
-  const renderProductItem = ({ item }: { item: Product }) => {
-    const isLowStock = item.quantity <= LOW_STOCK_THRESHOLD;
+  // Render stock level indicator
+  const renderStockLevel = (quantity: number) => {
+    let color = '#4CAF50'; // Green for good stock
+    let text = 'In Stock';
+    
+    if (quantity <= LOW_STOCK_THRESHOLD && quantity > 0) {
+      color = '#FFC107'; // Yellow for low stock
+      text = 'Low Stock';
+    } else if (quantity === 0) {
+      color = '#F44336'; // Red for out of stock
+      text = 'Out of Stock';
+    }
     
     return (
-      <TouchableOpacity
-        style={styles.productCard}
-        onPress={() => handleEdit(item)}
-      >
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={[styles.stockIndicator, { backgroundColor: color }]} />
+        <Text style={styles.stockText}>{text}</Text>
+      </View>
+    );
+  };
+
+  // Render product item
+  const renderProductItem = ({ item }: { item: Inventory }) => {
+    const isLowStock = item.stockQuantity <= LOW_STOCK_THRESHOLD;
+    
+    // Format prices safely, handling string values
+    const formatPrice = (price: number | string) => {
+      if (typeof price === 'string') {
+        return `₹${parseFloat(price).toFixed(2)}`;
+      }
+      return `₹${price.toFixed(2)}`;
+    };
+    
+    return (
+      <View style={styles.productCard}>
         <View style={styles.productImageContainer}>
-          {item.imageUri ? (
-            <Image source={{ uri: item.imageUri }} style={styles.productImage} />
+          {item.productImageUrl ? (
+            <Image source={{ uri: item.productImageUrl }} style={styles.productImage} />
           ) : (
-            <MaterialCommunityIcons name="package-variant" size={40} color="#ccc" />
+            <View style={styles.imagePlaceholder}>
+              <MaterialCommunityIcons name="image-outline" size={40} color="#cccccc" />
+            </View>
           )}
         </View>
         
         <View style={styles.productDetails}>
-          <Text style={styles.productName}>{item.name}</Text>
-          <Text style={styles.productPrice}>₹{item.sellingPrice.toFixed(2)} <Text style={styles.basePrice}>(Base: ₹{item.basePrice.toFixed(2)})</Text></Text>
-          <View style={styles.quantityContainer}>
-            <Text 
-              style={[
-                styles.quantityText, 
-                isLowStock && styles.lowStockText
-              ]}
-            >
-              Qty: {item.quantity} {item.unit || ''}
-            </Text>
-            {isLowStock && (
-              <View style={styles.lowStockBadge}>
-                <Text style={styles.lowStockBadgeText}>Low Stock</Text>
-              </View>
+          <Text style={styles.productName}>{item.productName}</Text>
+          
+          <View style={styles.priceContainer}>
+            <Text style={styles.sellingPrice}>{formatPrice(item.sellingPrice)}</Text>
+            {item.basePrice !== item.sellingPrice && (
+              <Text style={styles.basePrice}>{formatPrice(item.basePrice)}</Text>
             )}
+          </View>
+          
+          <View style={styles.stockContainer}>
+            <Text style={styles.quantityText}>Qty: {item.stockQuantity}</Text>
+            {renderStockLevel(item.stockQuantity)}
           </View>
         </View>
         
+        <View style={styles.actionsContainer}>
         <TouchableOpacity
-          style={styles.deleteButton}
+            style={[styles.actionButton, styles.editButton]}
+            onPress={() => handleEdit(item)}
+          >
+            <MaterialCommunityIcons name="pencil" size={20} color="#fff" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
           onPress={() => handleDelete(item.id)}
         >
-          <MaterialCommunityIcons name="delete" size={20} color="#FF3B30" />
+            <MaterialCommunityIcons name="delete" size={20} color="#fff" />
         </TouchableOpacity>
-      </TouchableOpacity>
+        </View>
+      </View>
     );
   };
 
-  // Main component render
   return (
     <View style={styles.container}>
+      <View style={styles.headerActions}>
       <View style={styles.searchContainer}>
-        <View style={styles.searchInputContainer}>
-          <MaterialCommunityIcons name="magnify" size={20} color="#666" />
+          <MaterialCommunityIcons name="magnify" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search products..."
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <MaterialCommunityIcons name="close" size={20} color="#666" />
-            </TouchableOpacity>
-          )}
         </View>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => {
+            resetForm();
+            setShowAddModal(true);
+          }}
+        >
+          <MaterialCommunityIcons name="plus" size={24} color="#fff" />
+            </TouchableOpacity>
       </View>
       
-      <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View style={styles.filtersContainer}>
+        <Text style={styles.filterLabel}>Sort:</Text>
+        <View style={styles.sortButtons}>
           <TouchableOpacity
-            style={[
-              styles.filterButton,
-              sortBy === 'name' && styles.filterButtonActive
-            ]}
-            onPress={() => setSortBy('name')}
+            style={[styles.sortButton, sortBy === 'name' && styles.activeSort]}
+            onPress={() => {
+              if (sortBy === 'name') {
+                setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+              } else {
+                setSortBy('name');
+              }
+            }}
           >
-            <Text 
-              style={[
-                styles.filterButtonText,
-                sortBy === 'name' && styles.filterButtonTextActive
-              ]}
-            >
-              Name
+            <Text style={[styles.sortButtonText, sortBy === 'name' && styles.activeSortText]}>
+              Name {sortBy === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
             </Text>
           </TouchableOpacity>
-          
           <TouchableOpacity
-            style={[
-              styles.filterButton,
-              sortBy === 'price' && styles.filterButtonActive
-            ]}
-            onPress={() => setSortBy('price')}
+            style={[styles.sortButton, sortBy === 'price' && styles.activeSort]}
+            onPress={() => {
+              if (sortBy === 'price') {
+                setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+              } else {
+                setSortBy('price');
+              }
+            }}
           >
-            <Text 
-              style={[
-                styles.filterButtonText,
-                sortBy === 'price' && styles.filterButtonTextActive
-              ]}
-            >
-              Price
+            <Text style={[styles.sortButtonText, sortBy === 'price' && styles.activeSortText]}>
+              Price {sortBy === 'price' && (sortDirection === 'asc' ? '↑' : '↓')}
             </Text>
           </TouchableOpacity>
-          
           <TouchableOpacity
-            style={[
-              styles.filterButton,
-              sortBy === 'quantity' && styles.filterButtonActive
-            ]}
-            onPress={() => setSortBy('quantity')}
+            style={[styles.sortButton, sortBy === 'stock' && styles.activeSort]}
+            onPress={() => {
+              if (sortBy === 'stock') {
+                setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+              } else {
+                setSortBy('stock');
+              }
+            }}
           >
-            <Text 
-              style={[
-                styles.filterButtonText,
-                sortBy === 'quantity' && styles.filterButtonTextActive
-              ]}
-            >
-              Quantity
+            <Text style={[styles.sortButtonText, sortBy === 'stock' && styles.activeSortText]}>
+              Stock {sortBy === 'stock' && (sortDirection === 'asc' ? '↑' : '↓')}
             </Text>
           </TouchableOpacity>
-          
+        </View>
           <TouchableOpacity
-            style={[
-              styles.filterButton,
-              filterLowStock && styles.filterButtonActive,
-              styles.lowStockFilter
-            ]}
-            onPress={() => setFilterLowStock(!filterLowStock)}
+          style={[styles.filterButton, showLowStock && styles.activeFilter]}
+          onPress={() => setShowLowStock(!showLowStock)}
           >
             <MaterialCommunityIcons 
               name="alert-circle" 
               size={16} 
-              color={filterLowStock ? "#fff" : "#FF3B30"} 
+            color={showLowStock ? '#fff' : '#333'}
             />
-            <Text 
-              style={[
-                styles.filterButtonText,
-                filterLowStock && styles.filterButtonTextActive,
-                { color: filterLowStock ? "#fff" : "#FF3B30" }
-              ]}
-            >
+          <Text style={[styles.filterButtonText, showLowStock && styles.activeFilterText]}>
               Low Stock
             </Text>
           </TouchableOpacity>
-        </ScrollView>
       </View>
       
+      {__DEV__ && renderDebugControls()}
+      
       {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading products...</Text>
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#0066cc" />
+          <Text style={styles.loaderText}>Loading inventory...</Text>
         </View>
-      ) : filteredProducts.length === 0 ? (
+      ) : displayedInventory.length === 0 ? (
         <View style={styles.emptyContainer}>
           <MaterialCommunityIcons name="package-variant" size={60} color="#ccc" />
-          <Text style={styles.emptyText}>
-            {searchQuery.trim() !== '' || filterLowStock
-              ? 'No products match your filters'
-              : 'No products added yet'}
+          <Text style={styles.emptyText}>No products found</Text>
+          <Text style={styles.emptySubtext}>
+            {searchQuery || showLowStock
+              ? "Try adjusting your search or filters"
+              : "Add some products to your inventory"}
           </Text>
+          {error && (
+            <Text style={styles.errorText}>Error: {error}</Text>
+          )}
           <TouchableOpacity
-            style={styles.emptyButton}
-            onPress={() => {
-              resetForm();
-              setShowModal(true);
-            }}
+            style={styles.retryButton}
+            onPress={loadInventory}
           >
-            <Text style={styles.emptyButtonText}>Add Your First Product</Text>
+            <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={filteredProducts}
-          renderItem={renderProductItem}
+          contentContainerStyle={styles.listContainer}
+          data={displayedInventory}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.productList}
+          renderItem={renderProductItem}
           showsVerticalScrollIndicator={false}
         />
       )}
       
-      {/* Floating Action Button */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => {
-          resetForm();
-          setShowModal(true);
-        }}
-      >
-        <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-        <Text style={styles.fabText}>Add Product</Text>
-      </TouchableOpacity>
-      
-      {/* Add/Edit Product Modal */}
+      {/* Add/Edit modal */}
       <Modal
-        visible={showModal}
+        visible={showAddModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowModal(false)}
+        onRequestClose={() => {
+          setShowAddModal(false);
+          resetForm();
+        }}
       >
-        <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {isEditing ? 'Edit Product' : 'Add New Product'}
+                {editMode ? 'Edit Product' : 'Add New Product'}
               </Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#000" />
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => {
+                  setShowAddModal(false);
+                  resetForm();
+                }}
+              >
+                <MaterialCommunityIcons name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.modalContent}>
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Product Name*</Text>
-                <TextInput
-                  style={styles.input}
-                  value={productForm.name}
-                  onChangeText={(text) => handleInputChange('name', text)}
+            <ScrollView style={styles.formContainer}>
+              {/* Product image picker */}
+              <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+                {formData.productImageUrl ? (
+                  <Image
+                    source={{ uri: formData.productImageUrl }}
+                    style={styles.pickedImage}
+                  />
+                ) : (
+                  <View style={styles.imagePickerPlaceholder}>
+                    <MaterialCommunityIcons name="camera" size={40} color="#999" />
+                    <Text style={styles.imagePickerText}>Add Product Image</Text>
+              </View>
+                )}
+              </TouchableOpacity>
+              
+              {/* Form fields */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Product Name *</Text>
+                  <TextInput
+                  style={styles.textInput}
                   placeholder="Enter product name"
-                />
-              </View>
-              
-              <View style={styles.formRow}>
-                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={styles.label}>Base Price (₹)*</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={productForm.basePrice}
-                    onChangeText={(text) => handleInputChange('basePrice', text)}
-                    keyboardType="numeric"
-                    placeholder="0.00"
+                  value={formData.productName}
+                  onChangeText={(value) => handleInputChange('productName', value)}
                   />
                 </View>
                 
-                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={styles.label}>Selling Price (₹)*</Text>
+              <View style={styles.rowInputs}>
+                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.inputLabel}>Base Price (₹) *</Text>
                   <TextInput
-                    style={styles.input}
-                    value={productForm.sellingPrice}
-                    onChangeText={(text) => handleInputChange('sellingPrice', text)}
-                    keyboardType="numeric"
+                    style={styles.textInput}
                     placeholder="0.00"
-                  />
-                </View>
-              </View>
-              
-              <View style={styles.formRow}>
-                <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={styles.label}>Quantity*</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={productForm.quantity}
-                    onChangeText={(text) => handleInputChange('quantity', text)}
                     keyboardType="numeric"
-                    placeholder="0"
+                    value={formData.basePrice.toString()}
+                    onChangeText={(value) => handleInputChange('basePrice', value)}
                   />
-                </View>
-                
-                <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={styles.label}>Unit</Text>
+              </View>
+              
+                <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.inputLabel}>Selling Price (₹) *</Text>
                   <TextInput
-                    style={styles.input}
-                    value={productForm.unit}
-                    onChangeText={(text) => handleInputChange('unit', text)}
-                    placeholder="e.g. pcs, kg, etc."
+                    style={styles.textInput}
+                    placeholder="0.00"
+                    keyboardType="numeric"
+                    value={formData.sellingPrice.toString()}
+                    onChangeText={(value) => handleInputChange('sellingPrice', value)}
                   />
                 </View>
               </View>
               
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Category</Text>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Stock Quantity *</Text>
                 <TextInput
-                  style={styles.input}
-                  value={productForm.category}
-                  onChangeText={(text) => handleInputChange('category', text)}
-                  placeholder="Product category"
+                  style={styles.textInput}
+                  placeholder="0"
+                  keyboardType="numeric"
+                  value={formData.stockQuantity.toString()}
+                  onChangeText={(value) => handleInputChange('stockQuantity', value)}
                 />
               </View>
+            </ScrollView>
               
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Description</Text>
-                <TextInput
-                  style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-                  value={productForm.description}
-                  onChangeText={(text) => handleInputChange('description', text)}
-                  placeholder="Product description"
-                  multiline
-                />
-              </View>
-              
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Product Image (Optional)</Text>
-                <View style={styles.imagePickerContainer}>
-                  {productForm.imageUri ? (
-                    <View style={styles.imagePreviewContainer}>
-                      <Image 
-                        source={{ uri: productForm.imageUri }} 
-                        style={styles.imagePreview} 
-                      />
+            <View style={styles.modalFooter}>
                       <TouchableOpacity 
-                        style={styles.removeImageButton}
-                        onPress={() => handleInputChange('imageUri', '')}
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowAddModal(false);
+                  resetForm();
+                }}
                       >
-                        <MaterialCommunityIcons name="close-circle" size={24} color="#FF3B30" />
+                <Text style={styles.cancelButtonText}>Cancel</Text>
                       </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.imagePickerButton}
-                      onPress={pickImage}
-                    >
-                      <MaterialCommunityIcons name="camera" size={24} color="#007AFF" />
-                      <Text style={styles.imagePickerText}>Select Image</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <TouchableOpacity
-                  style={styles.imagePickerLink}
-                  onPress={pickImage}
-                >
-                  <Text style={styles.imagePickerLinkText}>
-                    {productForm.imageUri ? 'Change Image' : 'Add Image from Gallery'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
               
               <TouchableOpacity
-                style={styles.submitButton}
+                style={[styles.modalButton, styles.saveButton]}
                 onPress={handleSubmit}
               >
-                <Text style={styles.submitButtonText}>
-                  {isEditing ? 'Update Product' : 'Add Product'}
+                <Text style={styles.saveButtonText}>
+                  {editMode ? 'Update' : 'Add Product'}
                 </Text>
               </TouchableOpacity>
-            </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  searchContainer: {
-    padding: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-  },
-  searchInput: {
-    flex: 1,
-    padding: 10,
-    fontSize: 16,
-  },
-  filterContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  filterButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-    marginRight: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  filterButtonActive: {
-    backgroundColor: '#007AFF',
-  },
-  filterButtonText: {
-    color: '#666',
-    fontWeight: '500',
-  },
-  filterButtonTextActive: {
-    color: '#fff',
-  },
-  lowStockFilter: {
-    backgroundColor: '#FFF5F5',
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
-    fontSize: 16,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  emptyButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  emptyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  productList: {
-    padding: 15,
-  },
-  productCard: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  productImageContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#f8f8f8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-    overflow: 'hidden',
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  productDetails: {
-    flex: 1,
-  },
-  productName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 5,
-  },
-  productPrice: {
-    fontSize: 16,
-    color: '#000',
-    marginBottom: 5,
-  },
-  basePrice: {
-    fontSize: 14,
-    color: '#666',
-  },
-  quantityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  quantityText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  lowStockText: {
-    color: '#FF3B30',
-  },
-  lowStockBadge: {
-    backgroundColor: '#FFF5F5',
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 8,
-  },
-  lowStockBadgeText: {
-    fontSize: 10,
-    color: '#FF3B30',
-    fontWeight: '600',
-  },
-  deleteButton: {
-    padding: 5,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  modalContent: {
-    padding: 20,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formRow: {
-    flexDirection: 'row',
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#f8f8f8',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  submitButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 30,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 30,
-    backgroundColor: '#007AFF',
-    borderRadius: 30,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-  },
-  fabText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
-    marginLeft: 8,
-  },
-  imagePickerContainer: {
-    marginTop: 10,
-  },
-  imagePickerButton: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8f8f8',
-  },
-  imagePickerText: {
-    color: '#007AFF',
-    fontSize: 16,
-    marginTop: 8,
-  },
-  imagePickerLink: {
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  imagePickerLinkText: {
-    color: '#007AFF',
-    fontSize: 14,
-  },
-  imagePreviewContainer: {
-    position: 'relative',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  imagePreview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    resizeMode: 'cover',
-  },
-  removeImageButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'white',
-    borderRadius: 20,
-  },
-}); 

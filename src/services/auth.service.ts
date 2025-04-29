@@ -1,8 +1,6 @@
-import axios from 'axios';
+import * as SecureStore from 'expo-secure-store';
+import apiClient from './api-client';
 import { AuthResponse, LoginDto, OtpResponse, RequestOtpDto, VerifyOtpDto, RefreshTokenDto, RefreshTokenResponse, LogoutDto } from '../types/auth';
-
-const API_BASE_URL = 'http://192.168.1.9:3000';
-//const API_LOCAL_URL = 'http://localhost:3000';
 
 // Helper to ensure phone number has +91 country code
 function normalizePhoneNumber(phoneNumber: string): string {
@@ -12,38 +10,71 @@ function normalizePhoneNumber(phoneNumber: string): string {
 export const authService = {
   requestOtp: async (data: RequestOtpDto): Promise<OtpResponse> => {
     data.phoneNumber = normalizePhoneNumber(data.phoneNumber);
-    const response = await axios.post<OtpResponse>(`${API_BASE_URL}/auth/request-otp`, data);
+    const response = await apiClient.post<OtpResponse>('auth/request-otp', data);
     return response.data;
   },
 
   verifyOtp: async (data: VerifyOtpDto): Promise<AuthResponse> => {
     data.phoneNumber = normalizePhoneNumber(data.phoneNumber);
-    const response = await axios.post<AuthResponse>(`${API_BASE_URL}/auth/verify-otp`, data);
+    const response = await apiClient.post<AuthResponse>('auth/verify-otp', data);
+    
+    // Store tokens in secure storage
+    if (response.data.accessToken) {
+      await SecureStore.setItemAsync('accessToken', response.data.accessToken);
+    }
+    if (response.data.refreshToken) {
+      await SecureStore.setItemAsync('refreshToken', response.data.refreshToken);
+    }
+    
     return response.data;
   },
 
   login: async (data: LoginDto): Promise<AuthResponse> => {
     data.phoneNumber = normalizePhoneNumber(data.phoneNumber);
-    const response = await axios.post<AuthResponse>(`${API_BASE_URL}/auth/login`, data);
+    const response = await apiClient.post<AuthResponse>('auth/login', data);
+    
+    // Store tokens in secure storage
+    if (response.data.accessToken) {
+      await SecureStore.setItemAsync('accessToken', response.data.accessToken);
+    }
+    if (response.data.refreshToken) {
+      await SecureStore.setItemAsync('refreshToken', response.data.refreshToken);
+    }
+    
     return response.data;
   },
 
   refreshToken: async (data: RefreshTokenDto): Promise<RefreshTokenResponse> => {
-    const response = await axios.post<RefreshTokenResponse>(`${API_BASE_URL}/auth/refresh-token`, data);
+    const response = await apiClient.post<RefreshTokenResponse>('auth/refresh-token', data);
+    
+    // Store new tokens
+    if (response.data.accessToken) {
+      await SecureStore.setItemAsync('accessToken', response.data.accessToken);
+    }
+    if (response.data.refreshToken) {
+      await SecureStore.setItemAsync('refreshToken', response.data.refreshToken);
+    }
+    
     return response.data;
   },
 
   logout: async (data: LogoutDto): Promise<void> => {
-    await axios.post(`${API_BASE_URL}/auth/logout`, data);
+    try {
+      await apiClient.post('auth/logout', data);
+    } finally {
+      // Always clear tokens on logout, even if API call fails
+      await SecureStore.deleteItemAsync('accessToken');
+      await SecureStore.deleteItemAsync('refreshToken');
+    }
   },
 
-  // Helper function to set the auth token for subsequent requests
-  setAuthToken: (token: string) => {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  // Get the current stored token
+  getAccessToken: async (): Promise<string | null> => {
+    return SecureStore.getItemAsync('accessToken');
   },
 
-  // Helper function to remove the auth token
-  removeAuthToken: () => {
-    delete axios.defaults.headers.common['Authorization'];
+  // Get the current refresh token
+  getRefreshToken: async (): Promise<string | null> => {
+    return SecureStore.getItemAsync('refreshToken');
   }
 }; 

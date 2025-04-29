@@ -12,33 +12,31 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useShop, Shop } from '../contexts/ShopContext';
-import { useUser } from '../contexts/UserContext';
+import { useShop } from '../../src/contexts/ShopContext';
+import { useUser } from '../../src/contexts/UserContext';
+import { Shop } from '../../src/types/shop';
 
 export default function ShopsScreen() {
   // User context
-  const { currentUser } = useUser();
+  const { user } = useUser();
   
   // State management
-  const { shops, isLoading, addShop, updateShop, deleteShop, setCurrentShop, currentShop, loadShops } = useShop();
+  const { shops, isLoading, createShop, updateShop, fetchMyShops, deleteShop} = useShop();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredShops, setFilteredShops] = useState<Shop[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [shopForm, setShopForm] = useState({
-    name: '',
-    address: '',
-    phone: '',
+    shopName: '',
+    ownerName: '',
     email: '',
-    gstin: '',
-    isActive: true,
-    ownerId: ''
+    gstinNumber: '',
   });
   const [editingShopId, setEditingShopId] = useState<string | null>(null);
 
   // Load and filter shops
   useEffect(() => {
-    loadShops();
+    fetchMyShops();
   }, []);
 
   useEffect(() => {
@@ -46,8 +44,8 @@ export default function ShopsScreen() {
       setFilteredShops(shops);
     } else {
       const filtered = shops.filter(shop => 
-        shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        shop.address?.toLowerCase().includes(searchQuery.toLowerCase())
+        shop.shopName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        shop.ownerName?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredShops(filtered);
     }
@@ -56,13 +54,10 @@ export default function ShopsScreen() {
   // Handle form reset
   const resetForm = () => {
     setShopForm({
-      name: '',
-      address: '',
-      phone: '',
+      shopName: '',
+      ownerName: '',
       email: '',
-      gstin: '',
-      isActive: true,
-      ownerId: ''
+      gstinNumber: '',
     });
     setEditingShopId(null);
   };
@@ -70,59 +65,43 @@ export default function ShopsScreen() {
   // Handle edit shop
   const handleEditShop = async (shop: Shop) => {
     setShopForm({
-      name: shop.name,
-      address: shop.address || '',
-      phone: shop.phone || '',
-      email: shop.email || '',
-      gstin: shop.gstin || '',
-      isActive: shop.isActive || true,
-      ownerId: shop.ownerId || currentUser?.id || '',
+      shopName: shop.shopName,
+      ownerName: shop.ownerName,
+      email: shop.email,
+      gstinNumber: shop.gstinNumber || '',
     });
     setEditingShopId(shop.id);
     setShowEditModal(true);
   };
 
   // Handle form input change
-  const handleChange = (field: string, value: string | boolean) => {
+  const handleChange = (field: string, value: string) => {
     setShopForm(prev => ({ ...prev, [field]: value }));
   };
 
   // Form validation
   const validateForm = () => {
-    if (!shopForm.name.trim()) {
+    if (!shopForm.shopName.trim()) {
       Alert.alert('Error', 'Shop name is required');
       return false;
     }
-
-    if (!shopForm.address.trim()) {
-      Alert.alert('Error', 'Shop address is required');
+    if (!shopForm.ownerName.trim()) {
+      Alert.alert('Error', 'Owner name is required');
       return false;
     }
-
-    if (!shopForm.phone.trim()) {
-      Alert.alert('Error', 'Contact number is required');
+    if (!shopForm.email.trim()) {
+      Alert.alert('Error', 'Email is required');
       return false;
     }
-
     return true;
   };
 
   // Handle add shop submission
   const handleAddSubmit = async () => {
     if (!validateForm()) return;
-
     try {
-      const userId = currentUser?.id || 'owner-1';
-      const userName = currentUser?.name || 'Shop Owner';
-      
-      await addShop({
+      await createShop({
         ...shopForm,
-        ownerId: userId,
-        ownerName: userName,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        isActive: true
       });
       setShowAddModal(false);
       resetForm();
@@ -136,7 +115,6 @@ export default function ShopsScreen() {
   // Handle edit shop submission
   const handleEditSubmit = async () => {
     if (!validateForm() || !editingShopId) return;
-
     try {
       await updateShop(editingShopId, shopForm);
       setShowEditModal(false);
@@ -152,7 +130,7 @@ export default function ShopsScreen() {
   const handleDeleteShop = (shop: Shop) => {
     Alert.alert(
       'Delete Shop',
-      `Are you sure you want to delete ${shop.name}?`,
+      `Are you sure you want to delete ${shop.shopName}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -172,26 +150,17 @@ export default function ShopsScreen() {
     );
   };
 
-  // Handle selecting a shop
-  const handleSelectShop = (shop: Shop) => {
-    setCurrentShop(shop);
-    router.push(`/shop/${shop.id}`);
-  };
-
   // Render shop item
   const renderShopItem = ({ item }: { item: Shop }) => (
     <TouchableOpacity
-      style={[
-        styles.shopCard,
-        currentShop?.id === item.id && styles.selectedShopCard
-      ]}
-      onPress={() => handleSelectShop(item)}
+      style={styles.shopCard}
+      onPress={() => router.push(`/shop/${item.id}`)}
     >
       <View style={styles.shopInfo}>
-        <Text style={styles.shopName}>{item.name}</Text>
-        <Text style={styles.shopAddress}>{item.address}</Text>
-        <Text style={styles.shopContact}>{item.phone}</Text>
-        {item.gstin && <Text style={styles.shopGstin}>GSTIN: {item.gstin}</Text>}
+        <Text style={styles.shopName}>{item.shopName}</Text>
+        <Text style={styles.shopOwner}>Owner: {item.ownerName}</Text>
+        <Text style={styles.shopEmail}>Email: {item.email}</Text>
+        {item.gstinNumber && <Text style={styles.shopGstin}>GSTIN: {item.gstinNumber}</Text>}
       </View>
       <View style={styles.shopActions}>
         <TouchableOpacity
@@ -298,38 +267,27 @@ export default function ShopsScreen() {
                 <Text style={styles.label}>Shop Name*</Text>
                 <TextInput
                   style={styles.input}
-                  value={shopForm.name}
-                  onChangeText={(text) => handleChange('name', text)}
+                  value={shopForm.shopName}
+                  onChangeText={(text) => handleChange('shopName', text)}
                   placeholder="Enter shop name"
                 />
               </View>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Address*</Text>
+                <Text style={styles.label}>Owner Name*</Text>
                 <TextInput
                   style={styles.input}
-                  value={shopForm.address}
-                  onChangeText={(text) => handleChange('address', text)}
-                  placeholder="Enter shop address"
-                  multiline
+                  value={shopForm.ownerName}
+                  onChangeText={(text) => handleChange('ownerName', text)}
+                  placeholder="Enter owner name"
                 />
               </View>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Contact Number*</Text>
-                <TextInput
-                  style={styles.input}
-                  value={shopForm.phone}
-                  onChangeText={(text) => handleChange('phone', text)}
-                  placeholder="Enter contact number"
-                  keyboardType="phone-pad"
-                />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>Email*</Text>
                 <TextInput
                   style={styles.input}
                   value={shopForm.email}
                   onChangeText={(text) => handleChange('email', text)}
-                  placeholder="Enter email (optional)"
+                  placeholder="Enter email"
                   keyboardType="email-address"
                 />
               </View>
@@ -337,8 +295,8 @@ export default function ShopsScreen() {
                 <Text style={styles.label}>GSTIN</Text>
                 <TextInput
                   style={styles.input}
-                  value={shopForm.gstin}
-                  onChangeText={(text) => handleChange('gstin', text)}
+                  value={shopForm.gstinNumber}
+                  onChangeText={(text) => handleChange('gstinNumber', text)}
                   placeholder="Enter GSTIN (optional)"
                 />
               </View>
@@ -373,38 +331,27 @@ export default function ShopsScreen() {
                 <Text style={styles.label}>Shop Name*</Text>
                 <TextInput
                   style={styles.input}
-                  value={shopForm.name}
-                  onChangeText={(text) => handleChange('name', text)}
+                  value={shopForm.shopName}
+                  onChangeText={(text) => handleChange('shopName', text)}
                   placeholder="Enter shop name"
                 />
               </View>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Address*</Text>
+                <Text style={styles.label}>Owner Name*</Text>
                 <TextInput
                   style={styles.input}
-                  value={shopForm.address}
-                  onChangeText={(text) => handleChange('address', text)}
-                  placeholder="Enter shop address"
-                  multiline
+                  value={shopForm.ownerName}
+                  onChangeText={(text) => handleChange('ownerName', text)}
+                  placeholder="Enter owner name"
                 />
               </View>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Contact Number*</Text>
-                <TextInput
-                  style={styles.input}
-                  value={shopForm.phone}
-                  onChangeText={(text) => handleChange('phone', text)}
-                  placeholder="Enter contact number"
-                  keyboardType="phone-pad"
-                />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>Email*</Text>
                 <TextInput
                   style={styles.input}
                   value={shopForm.email}
                   onChangeText={(text) => handleChange('email', text)}
-                  placeholder="Enter email (optional)"
+                  placeholder="Enter email"
                   keyboardType="email-address"
                 />
               </View>
@@ -412,8 +359,8 @@ export default function ShopsScreen() {
                 <Text style={styles.label}>GSTIN</Text>
                 <TextInput
                   style={styles.input}
-                  value={shopForm.gstin}
-                  onChangeText={(text) => handleChange('gstin', text)}
+                  value={shopForm.gstinNumber}
+                  onChangeText={(text) => handleChange('gstinNumber', text)}
                   placeholder="Enter GSTIN (optional)"
                 />
               </View>
@@ -527,10 +474,6 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  selectedShopCard: {
-    borderWidth: 2,
-    borderColor: '#007AFF',
-  },
   shopInfo: {
     flex: 1,
   },
@@ -540,12 +483,12 @@ const styles = StyleSheet.create({
     color: '#000',
     marginBottom: 5,
   },
-  shopAddress: {
+  shopOwner: {
     fontSize: 14,
     color: '#666',
     marginBottom: 3,
   },
-  shopContact: {
+  shopEmail: {
     fontSize: 14,
     color: '#666',
   },

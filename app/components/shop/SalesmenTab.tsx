@@ -11,14 +11,31 @@ import {
   Alert,
   ScrollView,
   Switch,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSalesmen, Salesman } from '../../contexts/SalesmenContext';
-import { useSales } from '../../contexts/SalesContext';
+import { useUser } from '../../../src/contexts/UserContext';
+import { useShop } from '../../../src/contexts/ShopContext';
+import { useSales } from '../../../src/contexts/SalesContext';
+import { useCommission } from '../../../src/contexts/CommissionContext';
+import { User, UserRole, UserProfile } from '../../../src/types/user';
+import { CreateSalesmanDto } from '../../../src/types/shop';
+import { Sale } from '../../../src/types/sales';
+import { Commission, CommissionRule } from '../../../src/types/commission';
 
 type SalesmenTabProps = {
   shopId: string;
 };
+
+// Extend the User type to include profile info
+interface UserWithProfile extends User {
+  profile?: UserProfile;
+}
+
+// Extend the Sale type to include calculated fields
+interface ExtendedSale extends Sale {
+  totalAmount?: number;
+}
 
 type PerformanceMetrics = {
   totalSales: number;
@@ -29,29 +46,38 @@ type PerformanceMetrics = {
 };
 
 export default function SalesmenTab({ shopId }: SalesmenTabProps) {
-  const { salesmen, addSalesman, updateSalesman, deleteSalesman, getShopSalesmen } = useSalesmen();
-  const { sales, getShopSales } = useSales();
+  const { fetchUsersByRole, updateUser, users } = useUser();
+  const { createSalesman, getShopSalesmen, removeSalesman } = useShop();
+  const { fetchAllSales, sales } = useSales();
+  const { 
+    commissions, 
+    rules: commissionRules,
+    fetchCommissionsBySalesman,
+    fetchAllCommissionRules
+  } = useCommission();
   
-  const [shopSalesmen, setShopSalesmen] = useState<Salesman[]>([]);
+  const [shopSalesmen, setShopSalesmen] = useState<UserWithProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredSalesmen, setFilteredSalesmen] = useState<Salesman[]>([]);
+  const [filteredSalesmen, setFilteredSalesmen] = useState<UserWithProfile[]>([]);
+  const [salesmanCommissions, setSalesmanCommissions] = useState<Commission[]>([]);
   
   // Form state
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [currentSalesman, setCurrentSalesman] = useState<Salesman | null>(null);
+  const [currentSalesman, setCurrentSalesman] = useState<UserWithProfile | null>(null);
   const [salesmanForm, setSalesmanForm] = useState({
-    name: '',
-    mobile: '',
-    username: '',
+    firstName: '',
+    lastName: '',
+    phoneNumber: '',
+    email: '',
     password: '',
-    commissionRate: '',
+    commissionRuleId: '',
     isActive: true,
   });
   
   // Performance metrics state
-  const [selectedSalesman, setSelectedSalesman] = useState<Salesman | null>(null);
+  const [selectedSalesman, setSelectedSalesman] = useState<UserWithProfile | null>(null);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [salesmanPerformance, setSalesmanPerformance] = useState<PerformanceMetrics>({
     totalSales: 0,
@@ -61,9 +87,14 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     pendingSales: 0,
   });
   
+  // Dropdown state
+  const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  
   useEffect(() => {
     loadSalesmen();
-  }, [shopId, salesmen]);
+    loadSales();
+    loadCommissionRules();
+  }, [shopId]);
   
   useEffect(() => {
     if (shopSalesmen.length > 0) {
@@ -72,21 +103,52 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       } else {
         const query = searchQuery.toLowerCase();
         const filtered = shopSalesmen.filter(salesman => 
-          salesman.name.toLowerCase().includes(query) ||
-          salesman.mobile.includes(query) ||
-          (salesman.username && salesman.username.toLowerCase().includes(query))
+          (salesman.profile?.firstName && salesman.profile.firstName.toLowerCase().includes(query)) ||
+          (salesman.profile?.lastName && salesman.profile.lastName.toLowerCase().includes(query)) ||
+          salesman.phoneNumber.includes(query) ||
+          (salesman.email && salesman.email.toLowerCase().includes(query))
         );
         setFilteredSalesmen(filtered);
       }
     }
   }, [searchQuery, shopSalesmen]);
   
-  const loadSalesmen = () => {
+  const loadSalesmen = async () => {
     setIsLoading(true);
-    const salesmenForShop = getShopSalesmen(shopId);
-    setShopSalesmen(salesmenForShop);
-    setFilteredSalesmen(salesmenForShop);
-    setIsLoading(false);
+    try {
+      const salesmenData = await getShopSalesmen(shopId) as UserWithProfile[];
+      setShopSalesmen(salesmenData);
+      setFilteredSalesmen(salesmenData);
+    } catch (error) {
+      console.error('Error loading salesmen:', error);
+      Alert.alert('Error', 'Failed to load salesmen');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const loadSales = async () => {
+    try {
+      await fetchAllSales({ shopId });
+    } catch (error) {
+      console.error('Error loading sales:', error);
+    }
+  };
+
+  const loadCommissionRules = async () => {
+    try {
+      await fetchAllCommissionRules();
+    } catch (error) {
+      console.error('Error loading commission rules:', error);
+    }
+  };
+
+  const loadSalesmanCommissions = async (salesmanId: string) => {
+    try {
+      await fetchCommissionsBySalesman(salesmanId);
+    } catch (error) {
+      console.error('Error loading salesman commissions:', error);
+    }
   };
   
   const handleInputChange = (field: string, value: string | number | boolean) => {
@@ -94,7 +156,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   };
   
   const validateForm = () => {
-    const requiredFields = ['name', 'mobile'];
+    const requiredFields = ['firstName', 'lastName', 'phoneNumber'];
     
     for (const field of requiredFields) {
       if (!salesmanForm[field as keyof typeof salesmanForm]) {
@@ -103,76 +165,64 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       }
     }
     
-    // Validate mobile number
-    if (!/^\d{10}$/.test(salesmanForm.mobile)) {
-      Alert.alert('Error', 'Mobile number must be 10 digits');
+    // Validate phone number
+    if (!/^\d{10}$/.test(salesmanForm.phoneNumber)) {
+      Alert.alert('Error', 'Phone number must be 10 digits');
       return false;
-    }
-    
-    // Validate commission rate is a valid percentage
-    if (salesmanForm.commissionRate) {
-      const rate = parseFloat(salesmanForm.commissionRate);
-      if (isNaN(rate) || rate < 0 || rate > 100) {
-        Alert.alert('Error', 'Commission rate must be between 0 and 100');
-        return false;
-      }
     }
     
     return true;
   };
   
-  const handleAddSalesman = () => {
+  const handleAddSalesman = async () => {
     if (!validateForm()) return;
     
-    const newSalesman: Salesman = {
-      id: Date.now().toString(),
-      shopId: shopId,
-      name: salesmanForm.name,
-      mobile: salesmanForm.mobile,
-      username: salesmanForm.username || undefined,
-      password: salesmanForm.password || undefined,
-      commissionRate: salesmanForm.commissionRate ? parseFloat(salesmanForm.commissionRate) : 0,
-      isActive: salesmanForm.isActive,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    const newSalesmanData: CreateSalesmanDto = {
+      firstName: salesmanForm.firstName,
+      lastName: salesmanForm.lastName,
+      phoneNumber: salesmanForm.phoneNumber,
+      email: salesmanForm.email || '',
+      password: salesmanForm.password || '',
+      username: `${salesmanForm.firstName.toLowerCase()}${Math.floor(Math.random() * 100)}`
     };
     
-    addSalesman(newSalesman);
-    
-    setIsModalVisible(false);
-    resetForm();
-    
-    Alert.alert('Success', 'Salesman added successfully');
-    loadSalesmen();
+    try {
+      await createSalesman(shopId, newSalesmanData);
+      setIsModalVisible(false);
+      resetForm();
+      Alert.alert('Success', 'Salesman added successfully');
+      loadSalesmen();
+    } catch (error) {
+      console.error('Error adding salesman:', error);
+      Alert.alert('Error', 'Failed to add salesman');
+    }
   };
   
-  const handleEditSalesman = () => {
+  const handleEditSalesman = async () => {
     if (!validateForm() || !currentSalesman) return;
     
-    const updatedSalesman: Salesman = {
-      ...currentSalesman,
-      name: salesmanForm.name,
-      mobile: salesmanForm.mobile,
-      username: salesmanForm.username || undefined,
-      password: salesmanForm.password ? salesmanForm.password : currentSalesman.password,
-      commissionRate: salesmanForm.commissionRate ? parseFloat(salesmanForm.commissionRate) : 0,
-      isActive: salesmanForm.isActive,
-      updatedAt: new Date().toISOString(),
-    };
-    
-    updateSalesman(updatedSalesman);
-    
-    setIsModalVisible(false);
-    resetForm();
-    
-    Alert.alert('Success', 'Salesman updated successfully');
-    loadSalesmen();
+    try {
+      // Note: This is simplified and may need adjustment based on your API
+      const userData: Partial<User> = {
+        isActive: salesmanForm.isActive
+      };
+      
+      // Update user data
+      await updateUser(currentSalesman.id, userData);
+      
+      setIsModalVisible(false);
+      resetForm();
+      Alert.alert('Success', 'Salesman updated successfully');
+      loadSalesmen();
+    } catch (error) {
+      console.error('Error updating salesman:', error);
+      Alert.alert('Error', 'Failed to update salesman');
+    }
   };
   
   const handleDeleteSalesman = (salesmanId: string) => {
     // Check if salesman has any sales
-    const shopSales = getShopSales(shopId);
-    const salesmanSales = shopSales.filter(sale => sale.salesmanId === salesmanId);
+    const salesmanSales = sales.filter(sale => sale.salesmanId === salesmanId);
     
     if (salesmanSales.length > 0) {
       Alert.alert(
@@ -184,17 +234,22 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     }
     
     Alert.alert(
-      'Delete Salesman',
-      'Are you sure you want to delete this salesman?',
+      'Remove Salesman',
+      'Are you sure you want to remove this salesman from the shop?',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Delete', 
+          text: 'Remove', 
           style: 'destructive',
-          onPress: () => {
-            deleteSalesman(salesmanId);
-            Alert.alert('Success', 'Salesman deleted successfully');
-            loadSalesmen();
+          onPress: async () => {
+            try {
+              await removeSalesman(shopId, salesmanId);
+              Alert.alert('Success', 'Salesman removed successfully');
+              loadSalesmen();
+            } catch (error) {
+              console.error('Error removing salesman:', error);
+              Alert.alert('Error', 'Failed to remove salesman');
+            }
           }
         }
       ]
@@ -207,43 +262,55 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     setIsModalVisible(true);
   };
   
-  const openEditModal = (salesman: Salesman) => {
+  const openEditModal = (salesman: UserWithProfile) => {
     setIsEditMode(true);
     setCurrentSalesman(salesman);
     setSalesmanForm({
-      name: salesman.name,
-      mobile: salesman.mobile,
-      username: salesman.username || '',
+      firstName: salesman.profile?.firstName || '',
+      lastName: salesman.profile?.lastName || '',
+      phoneNumber: salesman.phoneNumber,
+      email: salesman.email || '',
       password: '',
-      commissionRate: salesman.commissionRate ? salesman.commissionRate.toString() : '',
-      isActive: salesman.isActive !== undefined ? salesman.isActive : true,
+      commissionRuleId: '', // This would need to be fetched if stored elsewhere
+      isActive: salesman.isActive,
     });
     setIsModalVisible(true);
   };
   
   const resetForm = () => {
     setSalesmanForm({
-      name: '',
-      mobile: '',
-      username: '',
+      firstName: '',
+      lastName: '',
+      phoneNumber: '',
+      email: '',
       password: '',
-      commissionRate: '',
+      commissionRuleId: '',
       isActive: true,
     });
     setCurrentSalesman(null);
   };
   
-  const viewPerformance = (salesman: Salesman) => {
+  const viewPerformance = async (salesman: UserWithProfile) => {
     setSelectedSalesman(salesman);
     
-    // Calculate performance metrics
-    const shopSales = getShopSales(shopId);
-    const salesmanSales = shopSales.filter(sale => sale.salesmanId === salesman.id);
+    // Load commissions first
+    await loadSalesmanCommissions(salesman.id);
     
+    // Calculate performance metrics
+    const salesmanSales = sales.filter(sale => sale.salesmanId === salesman.id) as ExtendedSale[];
+    const salesmanCommissions = commissions.filter(comm => comm.salesmanId === salesman.id);
+    
+    // Calculate totals
     const totalSales = salesmanSales.length;
-    const totalAmount = salesmanSales.reduce((sum, sale) => sum + sale.totalAmount, 0);
-    const totalCommission = salesmanSales.reduce((sum, sale) => sum + sale.commission, 0);
-    const completedSales = salesmanSales.filter(sale => sale.status === 'completed').length;
+    const totalAmount = salesmanSales.reduce((sum, sale) => 
+      sum + (parseInt(sale.soldAt) * sale.quantity), 0);
+    
+    // Get commission from actual commissions
+    const totalCommission = salesmanCommissions.reduce((sum, commission) => 
+      sum + parseInt(commission.amount), 0);
+    
+    // Count approved sales as "completed"
+    const completedSales = salesmanSales.filter(sale => sale.status === 'approved').length;
     const pendingSales = salesmanSales.filter(sale => sale.status === 'pending').length;
     
     setSalesmanPerformance({
@@ -269,31 +336,34 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
 
   // Generate a username based on name
   const generateUsername = () => {
-    if (!salesmanForm.name.trim()) {
-      Alert.alert('Error', 'Please enter salesman name first');
+    if (!salesmanForm.firstName.trim()) {
+      Alert.alert('Error', 'Please enter salesman first name first');
       return;
     }
     
-    // Create username from name (first name + first letter of last name if exists)
-    const nameParts = salesmanForm.name.trim().toLowerCase().split(' ');
-    let username = nameParts[0];
+    // Create username from name
+    let username = salesmanForm.firstName.trim().toLowerCase();
     
-    if (nameParts.length > 1) {
-      username += nameParts[nameParts.length - 1].charAt(0);
+    if (salesmanForm.lastName.trim()) {
+      username += salesmanForm.lastName.trim().toLowerCase().charAt(0);
     }
     
     // Add random number to make it unique
     username += Math.floor(Math.random() * 100);
     
-    handleInputChange('username', username);
+    handleInputChange('email', `${username}@example.com`);
   };
   
-  const renderSalesmanItem = ({ item }: { item: Salesman }) => (
+  const getFullName = (user: UserWithProfile) => {
+    return `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() || 'Unknown';
+  };
+  
+  const renderSalesmanItem = ({ item }: { item: UserWithProfile }) => (
     <View style={[styles.salesmanItem, !item.isActive && styles.inactiveSalesman]}>
       <View style={styles.salesmanHeader}>
         <View>
-          <Text style={styles.salesmanName}>{item.name}</Text>
-          <Text style={styles.salesmanContact}>{item.mobile}</Text>
+          <Text style={styles.salesmanName}>{getFullName(item)}</Text>
+          <Text style={styles.salesmanContact}>{item.phoneNumber}</Text>
         </View>
         <View style={styles.actionButtons}>
           <TouchableOpacity 
@@ -318,19 +388,12 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       </View>
       
       <View style={styles.salesmanDetails}>
-        {item.username && (
+        {item.email && (
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Username:</Text>
-            <Text style={styles.detailValue}>{item.username}</Text>
+            <Text style={styles.detailLabel}>Email:</Text>
+            <Text style={styles.detailValue}>{item.email}</Text>
           </View>
         )}
-        
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Commission Rate:</Text>
-          <Text style={styles.detailValue}>
-            {item.commissionRate ? `${item.commissionRate}%` : 'Not set'}
-          </Text>
-        </View>
         
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Status:</Text>
@@ -420,94 +483,171 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
             </View>
             
             <ScrollView>
-              <View style={styles.formField}>
-                <Text style={styles.label}>Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Salesman name"
-                  value={salesmanForm.name}
-                  onChangeText={(value) => handleInputChange('name', value)}
-                />
-              </View>
-              
-              <View style={styles.formField}>
-                <Text style={styles.label}>Mobile *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="10-digit mobile number"
-                  value={salesmanForm.mobile}
-                  onChangeText={(value) => handleInputChange('mobile', value)}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                />
-              </View>
-              
-              <View style={styles.formField}>
-                <View style={styles.usernameContainer}>
-                  <Text style={styles.label}>Username</Text>
-                  <TouchableOpacity onPress={generateUsername}>
-                    <Text style={styles.generateText}>Generate</Text>
-                  </TouchableOpacity>
-                </View>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Username (optional)"
-                  value={salesmanForm.username}
-                  onChangeText={(value) => handleInputChange('username', value)}
-                  autoCapitalize="none"
-                />
-              </View>
-              
-              <View style={styles.formField}>
-                <View style={styles.usernameContainer}>
-                  <Text style={styles.label}>
-                    {isEditMode ? 'New Password' : 'Password'}
-                  </Text>
-                  <TouchableOpacity onPress={generatePassword}>
-                    <Text style={styles.generateText}>Generate</Text>
-                  </TouchableOpacity>
-                </View>
-                <TextInput
-                  style={styles.input}
-                  placeholder={isEditMode ? "Leave blank to keep current" : "Enter password (optional)"}
-                  value={salesmanForm.password}
-                  onChangeText={(value) => handleInputChange('password', value)}
-                  secureTextEntry={true}
-                />
-              </View>
-              
-              <View style={styles.formField}>
-                <Text style={styles.label}>Commission Rate (%)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 10 for 10%"
-                  value={salesmanForm.commissionRate}
-                  onChangeText={(value) => handleInputChange('commissionRate', value)}
-                  keyboardType="numeric"
-                />
-              </View>
-              
-              <View style={styles.formField}>
-                <View style={styles.switchContainer}>
-                  <Text style={styles.label}>Active Status</Text>
-                  <Switch
-                    trackColor={{ false: "#ccc", true: "#007AFF" }}
-                    thumbColor="#fff"
-                    ios_backgroundColor="#ccc"
-                    onValueChange={(value) => handleInputChange('isActive', value)}
-                    value={salesmanForm.isActive}
+              <View>
+                <View style={styles.formField}>
+                  <Text style={styles.label}>First Name *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="First name"
+                    value={salesmanForm.firstName}
+                    onChangeText={(value) => handleInputChange('firstName', value)}
+                    onFocus={() => setIsDropdownVisible(false)}
                   />
                 </View>
+                
+                <View style={styles.formField}>
+                  <Text style={styles.label}>Last Name *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Last name"
+                    value={salesmanForm.lastName}
+                    onChangeText={(value) => handleInputChange('lastName', value)}
+                    onFocus={() => setIsDropdownVisible(false)}
+                  />
+                </View>
+                
+                <View style={styles.formField}>
+                  <Text style={styles.label}>Phone Number *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="10-digit phone number"
+                    value={salesmanForm.phoneNumber}
+                    onChangeText={(value) => handleInputChange('phoneNumber', value)}
+                    keyboardType="phone-pad"
+                    maxLength={10}
+                    onFocus={() => setIsDropdownVisible(false)}
+                  />
+                </View>
+                
+                <View style={styles.formField}>
+                  <View style={styles.usernameContainer}>
+                    <Text style={styles.label}>Email</Text>
+                    <TouchableOpacity onPress={generateUsername}>
+                      <Text style={styles.generateText}>Generate</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email (optional)"
+                    value={salesmanForm.email}
+                    onChangeText={(value) => handleInputChange('email', value)}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    onFocus={() => setIsDropdownVisible(false)}
+                  />
+                </View>
+                
+                {!isEditMode && (
+                  <View style={styles.formField}>
+                    <View style={styles.usernameContainer}>
+                      <Text style={styles.label}>Password</Text>
+                      <TouchableOpacity onPress={generatePassword}>
+                        <Text style={styles.generateText}>Generate</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter password (optional)"
+                      value={salesmanForm.password}
+                      onChangeText={(value) => handleInputChange('password', value)}
+                      secureTextEntry={true}
+                      onFocus={() => setIsDropdownVisible(false)}
+                    />
+                  </View>
+                )}
+                
+                <View style={styles.formField}>
+                  <Text style={styles.label}>Commission Rule</Text>
+                  <TouchableOpacity 
+                    style={styles.dropdownButton}
+                    onPress={() => {
+                      setIsDropdownVisible(!isDropdownVisible);
+                    }}
+                  >
+                    <Text style={styles.dropdownButtonText}>
+                      {salesmanForm.commissionRuleId 
+                        ? commissionRules.find(rule => rule.id === salesmanForm.commissionRuleId)?.description || 'Select commission rule'
+                        : 'Select commission rule'
+                      }
+                    </Text>
+                    <MaterialCommunityIcons 
+                      name={isDropdownVisible ? "chevron-up" : "chevron-down"} 
+                      size={20} 
+                      color="#666" 
+                    />
+                  </TouchableOpacity>
+                  
+                  {isDropdownVisible && (
+                    <View style={styles.dropdownList}>
+                      <ScrollView 
+                        style={{ maxHeight: 200 }}
+                        nestedScrollEnabled={true}
+                      >
+                        {commissionRules.length > 0 ? (
+                          commissionRules.map((rule) => (
+                            <TouchableOpacity 
+                              key={rule.id}
+                              style={[
+                                styles.dropdownItem,
+                                salesmanForm.commissionRuleId === rule.id && styles.dropdownItemSelected
+                              ]}
+                              onPress={() => {
+                                handleInputChange('commissionRuleId', rule.id);
+                                setIsDropdownVisible(false);
+                              }}
+                            >
+                              <View>
+                                <Text style={[
+                                  styles.dropdownItemText,
+                                  salesmanForm.commissionRuleId === rule.id && styles.dropdownItemTextSelected
+                                ]}>
+                                  {rule.description}
+                                </Text>
+                                <Text style={styles.dropdownItemDetail}>
+                                  {rule.type === 'PERCENTAGE_OF_SALES' 
+                                    ? `${rule.value}% of sales` 
+                                    : rule.type === 'FIXED_AMOUNT' 
+                                      ? `Fixed ₹${rule.value}` 
+                                      : `${rule.value}% of price difference`}
+                                </Text>
+                              </View>
+                              {salesmanForm.commissionRuleId === rule.id && (
+                                <MaterialCommunityIcons name="check" size={20} color="#007AFF" />
+                              )}
+                            </TouchableOpacity>
+                          ))
+                        ) : (
+                          <Text style={styles.noRulesText}>No commission rules available</Text>
+                        )}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+                
+                {isEditMode && (
+                  <View style={styles.formField}>
+                    <View style={styles.switchContainer}>
+                      <Text style={styles.label}>Active Status</Text>
+                      <Switch
+                        trackColor={{ false: "#ccc", true: "#007AFF" }}
+                        thumbColor="#fff"
+                        ios_backgroundColor="#ccc"
+                        onValueChange={(value) => handleInputChange('isActive', value)}
+                        value={salesmanForm.isActive}
+                      />
+                    </View>
+                  </View>
+                )}
+                
+                <TouchableOpacity
+                  style={styles.submitButton}
+                  onPress={isEditMode ? handleEditSalesman : handleAddSalesman}
+                >
+                  <Text style={styles.submitButtonText}>
+                    {isEditMode ? 'Update Salesman' : 'Add Salesman'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={isEditMode ? handleEditSalesman : handleAddSalesman}
-              >
-                <Text style={styles.submitButtonText}>
-                  {isEditMode ? 'Update Salesman' : 'Add Salesman'}
-                </Text>
-              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
@@ -537,13 +677,8 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
                 <View style={styles.salesmanProfileHeader}>
                   <MaterialCommunityIcons name="account-circle" size={64} color="#007AFF" />
                   <View style={styles.salesmanProfileInfo}>
-                    <Text style={styles.salesmanProfileName}>{selectedSalesman.name}</Text>
-                    <Text style={styles.salesmanProfileDetail}>{selectedSalesman.mobile}</Text>
-                    {selectedSalesman.commissionRate > 0 && (
-                      <Text style={styles.salesmanProfileDetail}>
-                        Commission Rate: {selectedSalesman.commissionRate}%
-                      </Text>
-                    )}
+                    <Text style={styles.salesmanProfileName}>{getFullName(selectedSalesman)}</Text>
+                    <Text style={styles.salesmanProfileDetail}>{selectedSalesman.phoneNumber}</Text>
                   </View>
                 </View>
                 
@@ -578,6 +713,28 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
                     <Text style={styles.performanceLabel}>Completed Sales</Text>
                   </View>
                 </View>
+                
+                {commissions.length > 0 && (
+                  <View style={styles.commissionSection}>
+                    <Text style={styles.sectionTitle}>Commission Details</Text>
+                    <View style={styles.commissionHeader}>
+                      <Text style={styles.commissionHeaderText}>Amount</Text>
+                      <Text style={styles.commissionHeaderText}>Status</Text>
+                      <Text style={styles.commissionHeaderText}>Date</Text>
+                    </View>
+                    {commissions.filter(c => c.salesmanId === selectedSalesman.id).slice(0, 5).map(commission => (
+                      <View key={commission.id} style={styles.commissionRow}>
+                        <Text style={styles.commissionAmount}>₹{commission.amount}</Text>
+                        <View style={[styles.statusBadge, commission.isPaid ? styles.paidBadge : styles.unpaidBadge]}>
+                          <Text style={styles.statusText}>{commission.isPaid ? 'Paid' : 'Unpaid'}</Text>
+                        </View>
+                        <Text style={styles.commissionDate}>
+                          {new Date(commission.createdAt).toLocaleDateString('en-IN')}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
                 
                 {salesmanPerformance.totalSales > 0 ? (
                   <View style={styles.performanceProgress}>
@@ -703,14 +860,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   salesmanDetails: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 6,
-    padding: 12,
+    marginTop: 8,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    alignItems: 'center',
+    paddingVertical: 4,
   },
   detailLabel: {
     fontSize: 14,
@@ -718,24 +874,40 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     fontSize: 14,
-    fontWeight: '500',
     color: '#333',
   },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
   activeBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#E5F5E8',
   },
   inactiveBadge: {
-    backgroundColor: '#999',
+    backgroundColor: '#eee',
+  },
+  paidBadge: {
+    backgroundColor: '#E5F5E8',
+  },
+  unpaidBadge: {
+    backgroundColor: '#FFE8E8',
   },
   statusText: {
     fontSize: 12,
-    color: '#fff',
     fontWeight: '500',
+    color: '#333',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
   },
   emptyState: {
     flex: 1,
@@ -746,7 +918,7 @@ const styles = StyleSheet.create({
   emptyStateText: {
     fontSize: 16,
     color: '#666',
-    marginTop: 16,
+    marginTop: 12,
     marginBottom: 24,
   },
   emptyStateButton: {
@@ -757,7 +929,7 @@ const styles = StyleSheet.create({
   },
   emptyStateButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   modalContainer: {
@@ -767,40 +939,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
+    width: '90%',
+    maxHeight: '90%',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
   },
   closeButton: {
     padding: 4,
   },
   formField: {
-    marginBottom: 16,
-  },
-  usernameContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginHorizontal: 16,
+    marginVertical: 10,
   },
   label: {
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   input: {
     backgroundColor: '#f5f5f5',
@@ -808,10 +978,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  usernameContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
   },
   generateText: {
+    fontSize: 12,
     color: '#007AFF',
-    fontSize: 14,
+    fontWeight: '500',
   },
   switchContainer: {
     flexDirection: 'row',
@@ -822,61 +1002,52 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     borderRadius: 8,
     paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 20,
+    margin: 16,
   },
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
+    textAlign: 'center',
   },
   salesmanProfileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   salesmanProfileInfo: {
     marginLeft: 16,
-    flex: 1,
   },
   salesmanProfileName: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
   },
   salesmanProfileDetail: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 2,
+    marginTop: 2,
   },
   performanceContainer: {
     flexDirection: 'row',
-    marginBottom: 16,
+    padding: 8,
   },
   performanceCard: {
     flex: 1,
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     padding: 16,
-    marginHorizontal: 4,
+    margin: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   performanceValue: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#333',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   performanceLabel: {
     fontSize: 12,
@@ -884,10 +1055,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   performanceProgress: {
-    marginTop: 8,
     padding: 16,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
   },
   progressContainer: {
     flexDirection: 'row',
@@ -906,19 +1074,149 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#f0f0f0',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
+    height: 8,
+    borderRadius: 4,
   },
   noDataText: {
     textAlign: 'center',
+    color: '#666',
+    fontStyle: 'italic',
+    padding: 24,
+  },
+  pickerContainer: {
+    marginTop: 8,
+    maxHeight: 65,
+  },
+  ruleOption: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 12,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  selectedRuleOption: {
+    backgroundColor: '#E1F5FE',
+    borderColor: '#007AFF',
+  },
+  ruleOptionText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  selectedRuleOptionText: {
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  noRulesText: {
     fontSize: 14,
     color: '#666',
-    marginTop: 16,
     fontStyle: 'italic',
+    padding: 8,
   },
+  commissionSection: {
+    marginHorizontal: 16,
+    marginTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  commissionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  commissionHeaderText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#666',
+    textAlign: 'center',
+  },
+  commissionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  commissionAmount: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    textAlign: 'center',
+  },
+  commissionDate: {
+    flex: 1,
+    fontSize: 13,
+    color: '#666',
+    textAlign: 'center',
+  },
+  dropdownButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  dropdownButtonText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  dropdownList: {
+    position: 'absolute',
+    top: 74,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 1000,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#E1F5FE',
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 4,
+  },
+  dropdownItemTextSelected: {
+    color: '#007AFF',
+  },
+  dropdownItemDetail: {
+    fontSize: 12,
+    color: '#666',
+  }
 }); 

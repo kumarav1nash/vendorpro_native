@@ -1,3 +1,5 @@
+import { User } from "./user";
+
 export interface RequestOtpDto {
   phoneNumber: string;
 }
@@ -10,12 +12,6 @@ export interface VerifyOtpDto {
 export interface LoginDto {
   phoneNumber: string;
   password: string;
-}
-
-export interface User {
-  id: string;
-  phoneNumber: string;
-  role: 'SHOP_OWNER' | 'SALESMAN';
 }
 
 export interface AuthResponse {
@@ -34,7 +30,7 @@ export interface RefreshTokenDto {
 }
 
 export interface RefreshTokenResponse {
-  token: string;
+  accessToken: string;
   refreshToken: string;
   user: User;
 }

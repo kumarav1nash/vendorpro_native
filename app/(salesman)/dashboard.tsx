@@ -1,898 +1,1085 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
-  TextInput,
-  Alert,
-  Modal,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert, Platform, RefreshControl } from 'react-native';
+import { Image } from 'expo-image';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Stack, router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { Product } from '../contexts/ProductContext';
-import { Sale } from '../contexts/SalesContext';
-import { Salesman } from '../contexts/SalesmenContext';
-import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useShop } from '../../src/contexts/ShopContext';
+import { useInventory } from '../../src/contexts/InventoryContext';
+import { useSales } from '../../src/contexts/SalesContext';
+import { useCommission } from '../../src/contexts/CommissionContext';
+import { useUser } from '../../src/contexts/UserContext';
+import { Inventory } from '../../src/types/inventory';
+import { Sale } from '../../src/types/sales';
+import { Commission } from '../../src/types/commission';
 
-type SaleForm = {
-  productId: string;
-  productName: string;
-  customerName: string;
-  quantity: number;
-  sellingPrice: number;
-  totalAmount: number;
-};
+export default function DashboardScreen() {
+  const { user,logout } = useAuth();
+  const { shop, getShopBySalesmanId } = useShop();
+  const { sales, fetchAllSales, createSale } = useSales();
+  const { inventories, fetchInventoryByShopId } = useInventory();
+  const { commissions, fetchCommissionsBySalesman, commissionSummary } = useCommission();
+ 
 
-export default function SalesmanDashboardScreen() {
-  // State management
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [salesman, setSalesman] = useState<Salesman | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [sales, setSales] = useState<Sale[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [saleForm, setSaleForm] = useState<SaleForm>({
-    productId: '',
-    productName: '',
-    customerName: '',
-    quantity: 1,
-    sellingPrice: 0,
-    totalAmount: 0,
+  const [selectedProduct, setSelectedProduct] = useState<Inventory | null>(null);
+  const [quantity, setQuantity] = useState('1');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [customPrice, setCustomPrice] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [userCommissions, setUserCommissions] = useState<Commission[]>([]);
+  const [metrics, setMetrics] = useState({
+    totalSales: 0,
+    pendingSales: 0,
+    totalCommission: 0,
+    pendingCommission: 0
   });
-  const [showModal, setShowModal] = useState(false);
-  const [pendingSales, setPendingSales] = useState(0);
-  const [completedSales, setCompletedSales] = useState(0);
-  const [totalCommission, setTotalCommission] = useState(0);
-  const [todaySales, setTodaySales] = useState(0);
 
-  const { logout } = useAuth();
+  // Animations
+  const scrollY = useSharedValue(0);
+  const headerStyle = useAnimatedStyle(() => {
+    return {
+      opacity: 1 - scrollY.value / 100,
+    };
+  });
 
+  // Track data loading with a ref to prevent unnecessary loads
+  const dataLoadedRef = React.useRef(false);
+  
+  // Load data
   useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (selectedProduct) {
-      setSaleForm(prev => ({
-        ...prev,
-        productId: selectedProduct.id,
-        productName: selectedProduct.name,
-        sellingPrice: selectedProduct.sellingPrice,
-        totalAmount: selectedProduct.sellingPrice * prev.quantity
-      }));
-    }
-  }, [selectedProduct]);
-
-  useEffect(() => {
-    // Update total amount when quantity or selling price changes
-    setSaleForm(prev => ({
-      ...prev,
-      totalAmount: prev.sellingPrice * prev.quantity
-    }));
-  }, [saleForm.quantity, saleForm.sellingPrice]);
-
-  useEffect(() => {
-    // Filter products based on search query
-    if (searchQuery.trim() === '') {
-      setFilteredProducts(products);
+    if (user?.id) {
+      // Reset the ref when user changes
+      if (dataLoadedRef.current && !shop?.id) {
+        dataLoadedRef.current = false;
+      }
+      
+      if (!dataLoadedRef.current) {
+        loadData();
+        dataLoadedRef.current = true;
+      }
     } else {
-      const filtered = products.filter(product => 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredProducts(filtered);
+      setLoading(false);
     }
-  }, [searchQuery, products]);
+    
+  }, [user?.id, shop?.id]);
+
+  // Filter products based on search
+  const filteredProducts = inventories.filter(product => {
+    if (!searchTerm) return true;
+    return product.productName.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  // Helper function to safely convert potential string values to numbers
+  const safeNumberConversion = (value: string | number): number => {
+    if (typeof value === 'string') {
+      return parseFloat(value) || 0;
+    }
+    return value || 0;
+  };
+
+  // Calculate metrics when commissionSummary or userSales change
+  useEffect(() => {
+    console.log("Updating dashboard metrics");
+    
+    // Initialize with default values
+ 
+    
+    // If commission summary is available, use it directly
+    if (commissionSummary) {
+      console.log("Using commission summary for metrics:", commissionSummary);
+      setMetrics({
+        ...metrics,
+        totalSales: safeNumberConversion(sales.length),
+        pendingSales:  safeNumberConversion(sales.filter(sale => sale.status === 'pending').length),
+        totalCommission: safeNumberConversion(commissionSummary.approvedSalesCommission),
+        pendingCommission: safeNumberConversion(commissionSummary.pendingSalesCommission)
+      });
+    }
+    
+    
+    
+    console.log("Setting new metrics:", metrics);
+  }, [ sales, commissionSummary]);
 
   const loadData = async () => {
-    setIsLoading(true);
-    try {
-      // Load salesman data first
-      let currentSalesman: Salesman | null = null;
-      const salesmanData = await AsyncStorage.getItem('currentSalesman');
-      if (salesmanData) {
-        currentSalesman = JSON.parse(salesmanData) as Salesman;
-        setSalesman(currentSalesman);
-      }
-
-      // Then load and filter products based on salesman's shop
-      const productsData = await AsyncStorage.getItem('products');
-      if (productsData) {
-        const parsedProducts = JSON.parse(productsData) as Product[];
-        
-        // Filter products to only show those from the salesman's assigned shop
-        if (currentSalesman && currentSalesman.shopId) {
-          const shopProducts = parsedProducts.filter(product => product.shopId === currentSalesman.shopId);
-          setProducts(shopProducts);
-          setFilteredProducts(shopProducts);
-        } else {
-          setProducts([]);
-          setFilteredProducts([]);
-        }
-      }
-
-      // Load sales
-      const salesData = await AsyncStorage.getItem('sales');
-      if (salesData) {
-        const parsedSales = JSON.parse(salesData) as Sale[];
-        setSales(parsedSales);
-
-        // Calculate metrics
-        if (currentSalesman) {
-          // Filter sales for this salesman
-          const salesmanSales = parsedSales.filter(sale => sale.salesmanId === currentSalesman.id);
-          
-          // Pending sales
-          setPendingSales(salesmanSales.filter(sale => sale.status === 'pending').length);
-          
-          // Completed sales
-          setCompletedSales(salesmanSales.filter(sale => sale.status === 'completed').length);
-          
-          // Total commission
-          const totalComm = salesmanSales
-            .filter(sale => sale.status === 'completed')
-            .reduce((sum, sale) => sum + (sale.commission || 0), 0);
-          setTotalCommission(totalComm);
-          
-          // Today's sales
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const todayTimestamp = today.toISOString().split('T')[0]; // Get YYYY-MM-DD part
-          
-          const todaySalesAmount = salesmanSales
-            .filter(sale => {
-              if (!sale.createdAt) return false;
-              try {
-                const saleDate = new Date(sale.createdAt).toISOString().split('T')[0]; // Get YYYY-MM-DD part
-                return saleDate === todayTimestamp && sale.status !== 'rejected';
-              } catch (error) {
-                console.error('Invalid date format for sale:', sale.id);
-                return false;
-              }
-            })
-            .reduce((sum, sale) => sum + sale.totalAmount, 0);
-          setTodaySales(todaySalesAmount);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  };
-
-  const handleOpenSaleForm = () => {
-    // Reset form
-    setSaleForm({
-      productId: '',
-      productName: '',
-      customerName: '',
-      quantity: 1,
-      sellingPrice: 0,
-      totalAmount: 0,
-    });
-    setSelectedProduct(null);
-    setSearchQuery('');
-    setShowModal(true);
-  };
-
-  const handleSelectProduct = (product: Product) => {
-    setSelectedProduct(product);
-    setSearchQuery('');
-  };
-
-  const handleQuantityChange = (text: string) => {
-    const quantity = text.trim() === '' ? 0 : parseInt(text, 10);
-    
-    if (selectedProduct && quantity > selectedProduct.quantity) {
-      Alert.alert('Error', `Only ${selectedProduct.quantity} units available in stock`);
+    if (!user?.id) {
+      console.log("Cannot load data: User ID is missing");
+      setLoading(false);
       return;
     }
     
-    setSaleForm(prev => ({
-      ...prev,
-      quantity
-    }));
-  };
-
-  const handleSellingPriceChange = (text: string) => {
-    const sellingPrice = text.trim() === '' ? 0 : parseFloat(text);
-    setSaleForm(prev => ({
-      ...prev,
-      sellingPrice
-    }));
-  };
-
-  const validateSaleForm = () => {
-    if (!selectedProduct) {
-      Alert.alert('Error', 'Please select a product');
-      return false;
-    }
-    
-    if (!saleForm.customerName.trim()) {
-      Alert.alert('Error', 'Customer name is required');
-      return false;
-    }
-    
-    if (saleForm.quantity <= 0) {
-      Alert.alert('Error', 'Quantity must be greater than 0');
-      return false;
-    }
-    
-    if (saleForm.sellingPrice <= 0) {
-      Alert.alert('Error', 'Selling price must be greater than 0');
-      return false;
-    }
-    
-    return true;
-  };
-
-  const handleSubmitSale = async () => {
-    if (!validateSaleForm() || !salesman || !selectedProduct) return;
-    
+    setLoading(true);
     try {
-      // Create new sale
-      const timestamp = Date.now();
-      const currentDate = new Date().toISOString();
-      const commission = saleForm.totalAmount * (salesman.commissionRate / 100);
+      // First, get the shop for this salesman
+      let currentShop = null;
+      try {
+        currentShop = await getShopBySalesmanId(user.id);
+        console.log('Shop fetched successfully:', currentShop?.id);
+      } catch (shopError: any) {
+        if (shopError?.response?.status === 404) {
+          console.log('No shop found for salesman:', user.id);
+        } else {
+          console.error('Error fetching shop:', shopError?.message || shopError);
+        }
+      }
       
-      const newSale: Sale = {
-        id: `sale-${timestamp}`,
-        shopId: salesman.shopId,
-        customerName: saleForm.customerName,
+      if (!currentShop?.id) {
+        console.log("Cannot load shop-specific data: Shop ID is missing");
+        setLoading(false);
+        return;
+      }
+      
+      // Load all data in parallel
+      try {
+        // Fetch sales with specific salesmanId parameter
+        await fetchAllSales({ salesmanId: user.id });
+        // Fetch inventory for the shop
+        await fetchInventoryByShopId(currentShop.id);
+        
+        // Fetch commissions with specific salesmanId
+        // This will now return SalesCommissionResponse with totalCommission, sales, and commissionRule
+        await fetchCommissionsBySalesman(user.id);
+        
+        // Process the fetched data
+        if (sales && Array.isArray(sales)) {
+          // Ensure we're getting the latest data from context          //set sales count
+          setMetrics({
+            ...metrics,
+            totalSales: safeNumberConversion(sales.length),
+            pendingSales: safeNumberConversion(sales.filter(sale => sale.status === 'pending').length)
+          });
+          console.log(`Filtered ${sales.length} sales for user`);
+        } else {
+          console.log('No sales data available');
+        }
+        
+        // We don't need to set userCommissions manually anymore since we're using commissionSummary directly
+        // But keeping it for backward compatibility
+        if (commissions && Array.isArray(commissions)) {
+          setUserCommissions(commissions);
+          console.log(`Set ${commissions.length} derived commissions for user`);
+        } else {
+          console.log('No commission data available');
+          setUserCommissions([]);
+        }
+        
+        console.log("Dashboard data loaded successfully");
+      } catch (error: any) {
+        console.error('Error loading dashboard data:', error?.message || error);
+      }
+    } catch (error: any) {
+      console.error('Failed to load dashboard data:', error?.message || error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProductSelect = (product: Inventory) => {
+    // First reset any existing state to avoid stale values
+    resetModalState();
+    
+    // Then set the new product and values
+    setSelectedProduct(product);
+    setQuantity('1');
+    
+    // Set default prices based on product
+    const basePrice = safeNumberConversion(product.sellingPrice);
+    setCustomPrice(basePrice.toString());
+    setTotalAmount(basePrice.toString()); // Initially, total = unit price * 1
+    
+    // Show the modal after all state is updated
+    setModalVisible(true);
+  };
+
+  // Calculate unit price when total amount or quantity changes
+  const updateUnitPrice = (newTotal: string, newQuantity: string) => {
+    // Guard against null or undefined inputs
+    if (!newTotal || !newQuantity) return;
+    
+    const total = parseFloat(newTotal) || 0;
+    const qty = parseInt(newQuantity) || 1;
+    
+    if (qty > 0 && total > 0) {
+      const unitPrice = total / qty;
+      setCustomPrice(unitPrice.toFixed(2));
+    } else {
+      setCustomPrice('0');
+    }
+  };
+
+  // Calculate total when unit price or quantity changes
+  const updateTotalAmount = (newPrice: string, newQuantity: string) => {
+    // Guard against null or undefined inputs
+    if (!newPrice || !newQuantity) return;
+    
+    const price = parseFloat(newPrice) || 0;
+    const qty = parseInt(newQuantity) || 1;
+    
+    const total = price * qty;
+    setTotalAmount(total.toFixed(2));
+  };
+
+  // Handle quantity change
+  const handleQuantityChange = (newQuantity: string) => {
+    // Ensure quantity is a positive number
+    const qty = parseInt(newQuantity) || 0;
+    if (qty < 0) return;
+    
+    setQuantity(newQuantity);
+    
+    // If we have a total amount, recalculate the unit price
+    if (totalAmount) {
+      updateUnitPrice(totalAmount, newQuantity);
+    } else if (customPrice) {
+      // Otherwise, recalculate the total from unit price
+      updateTotalAmount(customPrice, newQuantity);
+    }
+  };
+
+  // Handle total amount change
+  const handleTotalAmountChange = (newTotal: string) => {
+    setTotalAmount(newTotal);
+    updateUnitPrice(newTotal, quantity);
+  };
+
+  // Handle unit price change
+  const handleUnitPriceChange = (newPrice: string) => {
+    setCustomPrice(newPrice);
+    updateTotalAmount(newPrice, quantity);
+  };
+
+  // Reset modal state function
+  const resetModalState = () => {
+    setSelectedProduct(null);
+    setQuantity('1');
+    setCustomPrice('');
+    setTotalAmount('');
+  };
+
+  const handleCreateSale = async () => {
+    if (!selectedProduct || !user?.id) return;
+    
+    // Make sure we have the shop data
+    let currentShop = shop;
+    if (!currentShop?.id) {
+      try {
+        currentShop = await getShopBySalesmanId(user.id);
+      } catch (error) {
+        Alert.alert('Error', 'Could not retrieve shop information. Please try again.');
+        return;
+      }
+    }
+    
+    if (!currentShop?.id) {
+      Alert.alert('Error', 'Shop information is missing. Please try again later.');
+      return;
+    }
+    
+    const qtyNum = parseInt(quantity);
+    const priceNum = parseFloat(customPrice);
+    
+    if (isNaN(qtyNum) || qtyNum <= 0) {
+      Alert.alert('Invalid quantity', 'Please enter a valid quantity');
+      return;
+    }
+    
+    if (isNaN(priceNum) || priceNum <= 0) {
+      Alert.alert('Invalid price', 'Please enter a valid price');
+      return;
+    }
+    
+    if (qtyNum > selectedProduct.stockQuantity) {
+      Alert.alert('Insufficient stock', `Only ${selectedProduct.stockQuantity} units available`);
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      // Create the sale with explicit parameters
+      const saleData = {
         productId: selectedProduct.id,
-        salesmanId: salesman.id,
-        quantity: saleForm.quantity,
-        totalAmount: saleForm.totalAmount,
-        commission,
-        status: 'pending',
-        createdAt: currentDate,
-        updatedAt: currentDate
+        salesmanId: user.id,
+        shopId: currentShop.id,
+        quantity: qtyNum,
+        soldAt: priceNum.toString(),
       };
       
-      // Update sales in AsyncStorage
-      const updatedSales = [...sales, newSale];
-      await AsyncStorage.setItem('sales', JSON.stringify(updatedSales));
+      await createSale(saleData);
       
-      // Update local state
-      setSales(updatedSales);
-      setPendingSales(prev => prev + 1);
+      // Close the modal and reset state
+      setModalVisible(false);
+      resetModalState();
       
-      // Close modal
-      setShowModal(false);
-      Alert.alert(
-        'Sale Recorded', 
-        'Your sale has been recorded and is pending approval. You will earn ₹' + 
-        commission.toFixed(2) + ' in commission when approved.'
-      );
+      // Refresh data in the correct order
       
-      // Reset form
-      setSaleForm({
-        productId: '',
-        productName: '',
-        customerName: '',
-        quantity: 1,
-        sellingPrice: 0,
-        totalAmount: 0,
-      });
-      setSelectedProduct(null);
+      // 1. Refresh sales data
+      await fetchAllSales({ salesmanId: user.id });
+      
+      // 2. Refresh commission data (this will include the new commission summary)
+      await fetchCommissionsBySalesman(user.id);
+      
+      // 3. Refresh inventory to reflect stock changes
+      if (currentShop.id) {
+        await fetchInventoryByShopId(currentShop.id);
+      }
+      
+      // 4. Update the local sales state
+      if (sales && Array.isArray(sales)) {
+        //set sales count
+        setMetrics({
+          ...metrics,
+          totalSales: sales.length,
+          pendingSales: sales.filter(sale => sale.status === 'pending').length
+        });
+      }
+      
+      Alert.alert('Success', 'Sale created successfully');
+      
+      console.log('Sale created and data refreshed successfully');
     } catch (error) {
-      console.error('Error recording sale:', error);
-      Alert.alert('Error', 'Failed to record sale');
+      console.error('Failed to create sale:', error);
+      Alert.alert('Error', 'Failed to create sale. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              router.replace('/(auth)/salesman-login');
-            } catch (error) {
-              console.error('Error during logout:', error);
-            }
-          },
-        },
-      ]
-    );
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
   };
 
-  if (isLoading) {
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadData();
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user?.id]);
+
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#007bff" />
         <Text style={styles.loadingText}>Loading dashboard...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.contentContainer}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <Stack.Screen
+        options={{
+          title: 'Dashboard',
+        }}
+      />
+
+      {/* Dashboard Header */}
+        <View style={styles.header}>
+        <Animated.View style={[styles.welcomeContainer, headerStyle]}>
+          <View style={styles.welcomeTextContainer}>
+            <Text style={styles.welcomeText}>Welcome back,</Text>
+            <Text style={styles.userName}>{user?.email}</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => handleLogout()} //handle logout,we don't need to push to profile screen
+          >
+            <MaterialCommunityIcons name="logout" size={40} color="#007bff" />
+          </TouchableOpacity>
+        </Animated.View>
+        </View>
+
+      {/* Dashboard Content */}
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onScroll={(e) => {
+          scrollY.value = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007bff']}
+            tintColor="#007bff"
+            title="Pull to refresh"
+            titleColor="#64748B"
+          />
         }
       >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.welcomeText}>
-              Welcome, {salesman?.name ?? 'Salesman'}
-            </Text>
-            <Text style={styles.dateText}>
-              {new Date().toDateString()}
-            </Text>
+        {/* Sales Metrics */}
+        <View style={styles.metricsContainer}>
+          <View style={styles.metricsRow}>
+            <View style={[styles.metricCard, styles.primaryMetricCard]}>
+              <Text style={styles.metricValue}>{metrics.totalSales}</Text>
+              <Text style={styles.metricLabel}>Total Sales</Text>
+            </View>
+            <View style={[styles.metricCard, styles.warningMetricCard]}>
+              <Text style={styles.metricValue}>{metrics.pendingSales}</Text>
+              <Text style={styles.metricLabel}>Pending Sales</Text>
+            </View>
           </View>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <MaterialCommunityIcons name="logout" size={24} color="#666" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.kpiContainer}>
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiValue}>₹{todaySales.toFixed(2)}</Text>
-            <Text style={styles.kpiTitle}>Today's Sales</Text>
-          </View>
-          
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiValue}>₹{totalCommission.toFixed(2)}</Text>
-            <Text style={styles.kpiTitle}>Total Commission</Text>
-          </View>
-          
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiValue}>{pendingSales}</Text>
-            <Text style={styles.kpiTitle}>Pending Sales</Text>
-          </View>
-          
-          <View style={styles.kpiCard}>
-            <Text style={styles.kpiValue}>{completedSales}</Text>
-            <Text style={styles.kpiTitle}>Completed Sales</Text>
+          <View style={styles.metricsRow}>
+            <View style={[styles.metricCard, styles.successMetricCard]}>
+              <Text style={styles.metricValue}>₹{metrics.totalCommission.toFixed(2)}</Text>
+              <Text style={styles.metricLabel}>Earned Commission</Text>
+            </View>
+            <View style={[styles.metricCard, styles.infoMetricCard]}>
+              <Text style={styles.metricValue}>₹{metrics.pendingCommission.toFixed(2)}</Text>
+              <Text style={styles.metricLabel}>Pending Commission</Text>
+            </View>
           </View>
         </View>
 
+        {/* Quick Actions */}
+        <View style={styles.actionContainer}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.actionButtonsContainer}>
         <TouchableOpacity 
-          style={styles.addSaleButton}
-          onPress={handleOpenSaleForm}
-        >
-          <MaterialCommunityIcons name="cart-plus" size={24} color="#fff" />
-          <Text style={styles.addSaleButtonText}>Record New Sale</Text>
+              style={styles.actionButton}
+              onPress={() => router.push('/(salesman)/sales-history')}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#E3F2FD' }]}>
+                <MaterialCommunityIcons name="receipt" size={24} color="#1976D2" />
+              </View>
+              <Text style={styles.actionText}>Sales History</Text>
         </TouchableOpacity>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Sales</Text>
-            <TouchableOpacity onPress={() => router.push('/(salesman)/sales-history')}>
-              <Text style={styles.viewAllText}>View All</Text>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => router.push('/(salesman)/commissions-history')}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#E8F5E9' }]}>
+                <MaterialCommunityIcons name="cash-multiple" size={24} color="#388E3C" />
+              </View>
+              <Text style={styles.actionText}>Commissions</Text>
             </TouchableOpacity>
           </View>
+          </View>
           
-          {sales.filter(sale => sale.salesmanId === salesman?.id).length === 0 ? (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="cart-off" size={48} color="#ccc" />
-              <Text style={styles.emptyStateText}>No sales recorded yet</Text>
+        {/* Products */}
+        <View style={styles.productsContainer}>
+          <Text style={styles.sectionTitle}>Available Products</Text>
+          
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <MaterialCommunityIcons name="magnify" size={20} color="#64748B" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search products..."
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+            />
+            {searchTerm ? (
+              <TouchableOpacity onPress={() => setSearchTerm('')}>
+                <MaterialCommunityIcons name="close-circle" size={20} color="#64748B" />
+              </TouchableOpacity>
+            ) : null}
             </View>
-          ) : (
-            sales
-              .filter(sale => sale.salesmanId === salesman?.id)
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-              .slice(0, 5)
-              .map((sale) => {
-                const product = products.find(p => p.id === sale.productId);
-                return (
-                  <View key={sale.id} style={styles.saleItem}>
-                    <View style={styles.saleInfo}>
-                      <Text style={styles.saleProductName}>{product ? product.name : 'Unknown Product'}</Text>
-                      <Text style={styles.saleDetail}>
-                        Customer: {sale.customerName}
-                      </Text>
-                      <Text style={styles.saleDetail}>
-                        {new Date(sale.createdAt).toLocaleDateString()}
-                      </Text>
-                    </View>
-                    <View style={styles.saleDetails}>
-                      <Text style={styles.saleAmount}>₹{sale.totalAmount.toFixed(2)}</Text>
-                      <View style={[
-                        styles.statusBadge, 
-                        sale.status === 'completed' ? styles.statusCompleted : 
-                        sale.status === 'rejected' ? styles.statusRejected : 
-                        styles.statusPending
-                      ]}>
-                        <Text style={styles.statusText}>{sale.status}</Text>
+          
+          {/* Products Grid */}
+          {filteredProducts.length > 0 ? (
+            <View style={styles.productsGrid}>
+              {filteredProducts.map((product) => (
+                <TouchableOpacity
+                  key={product.id}
+                  style={[
+                    styles.productCard,
+                    product.stockQuantity === 0 && styles.disabledProductCard
+                  ]}
+                  onPress={() => product.stockQuantity > 0 && handleProductSelect(product)}
+                  disabled={product.stockQuantity === 0}
+                >
+                  <View style={styles.productImageContainer}>
+                    {product.productImageUrl ? (
+                      <Image
+                        source={{ uri: product.productImageUrl }}
+                        style={styles.productImage}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View style={styles.productImagePlaceholder}>
+                        <MaterialCommunityIcons name="package-variant" size={32} color="#9CA3AF" />
                       </View>
-                    </View>
+                    )}
+                    {product.stockQuantity === 0 && (
+                      <View style={styles.outOfStockOverlay}>
+                        <Text style={styles.outOfStockText}>Out of Stock</Text>
+                      </View>
+                    )}
                   </View>
-                );
-              })
+                  <View style={styles.productInfo}>
+                    <Text style={styles.productName} numberOfLines={1}>
+                      {product.productName}
+                      </Text>
+                    <Text style={styles.productPrice}>
+                      ₹{safeNumberConversion(product.sellingPrice).toFixed(2)}
+                    </Text>
+                    <View style={styles.stockContainer}>
+                      <Text
+                        style={[
+                          styles.stockText,
+                          product.stockQuantity === 0
+                            ? styles.outOfStock
+                            : product.stockQuantity < 5
+                            ? styles.lowStock
+                            : styles.inStock
+                        ]}
+                      >
+                        {product.stockQuantity === 0
+                          ? 'Out of stock'
+                          : product.stockQuantity < 5
+                          ? `Low: ${product.stockQuantity} left`
+                          : `In stock: ${product.stockQuantity}`}
+                      </Text>
+                    </View>
+                      </View>
+                </TouchableOpacity>
+              ))}
+                    </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="package-variant" size={60} color="#CBD5E1" />
+              <Text style={styles.emptyStateTitle}>No products found</Text>
+              <Text style={styles.emptyStateDescription}>
+                {searchTerm
+                  ? "No products match your search criteria."
+                  : "No products are available in this shop."}
+              </Text>
+                  </View>
           )}
         </View>
       </ScrollView>
 
-      {/* Record Sale Modal */}
+      {/* Create Sale Modal */}
       <Modal
-        visible={showModal}
-        animationType="slide"
+        visible={modalVisible}
         transparent={true}
-        onRequestClose={() => setShowModal(false)}
+        animationType="slide"
+        onRequestClose={() => {
+          setModalVisible(false);
+          resetModalState();
+        }}
       >
         <View style={styles.modalContainer}>
+          <BlurView intensity={Platform.OS === 'ios' ? 50 : 100} style={StyleSheet.absoluteFill} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Record New Sale</Text>
-              <TouchableOpacity onPress={() => setShowModal(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#999" />
+              <Text style={styles.modalTitle}>Create Sale</Text>
+              <TouchableOpacity onPress={() => {
+                setModalVisible(false);
+                resetModalState();
+              }}>
+                <MaterialCommunityIcons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.modalScrollView}>
-              {!selectedProduct ? (
-                // Product selection view
-                <>
-                  <View style={styles.searchContainer}>
-                    <MaterialCommunityIcons name="magnify" size={24} color="#999" style={styles.searchIcon} />
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="Search products..."
-                      value={searchQuery}
-                      onChangeText={setSearchQuery}
-                    />
-                  </View>
-                  
-                  {filteredProducts.length === 0 ? (
-                    <View style={styles.emptyState}>
-                      <MaterialCommunityIcons name="package-variant" size={48} color="#ccc" />
-                      <Text style={styles.emptyStateText}>No products found</Text>
-                    </View>
-                  ) : (
-                    filteredProducts.map((product) => (
-                      <TouchableOpacity
-                        key={product.id}
-                        style={styles.productItem}
-                        onPress={() => handleSelectProduct(product)}
-                      >
-                        <View style={styles.productInfo}>
-                          <Text style={styles.productName}>{product.name}</Text>
-                          <Text style={styles.productDetail}>
-                            Selling Price: ₹{product.sellingPrice.toFixed(2)}
-                          </Text>
-                          <Text style={styles.productDetail}>
-                            Available: {product.quantity} units
-                          </Text>
+            {selectedProduct && (
+              <View style={styles.modalBody}>
+                <View style={styles.selectedProductContainer}>
+                  <View style={styles.selectedProductImageContainer}>
+                    {selectedProduct.productImageUrl ? (
+                      <Image
+                        source={{ uri: selectedProduct.productImageUrl }}
+                        style={styles.selectedProductImage}
+                        contentFit="cover"
+                      />
+                    ) : (
+                      <View style={styles.selectedProductImagePlaceholder}>
+                        <MaterialCommunityIcons name="package-variant" size={32} color="#9CA3AF" />
                         </View>
-                        <MaterialCommunityIcons name="chevron-right" size={24} color="#999" />
-                      </TouchableOpacity>
-                    ))
-                  )}
-                </>
-              ) : (
-                // Sale form view
-                <>
-                  <View style={styles.selectedProduct}>
+                    )}
+                  </View>
                     <View style={styles.selectedProductInfo}>
-                      <Text style={styles.selectedProductName}>{selectedProduct.name}</Text>
-                      <Text style={styles.selectedProductDetail}>
-                        Available: {selectedProduct.quantity} units
+                    <Text style={styles.selectedProductName}>{selectedProduct.productName}</Text>
+                    <Text style={styles.selectedProductPrice}>
+                      Selling Price: ₹{safeNumberConversion(selectedProduct.sellingPrice).toFixed(2)}
+                    </Text>
+                    <Text style={styles.selectedProductStock}>
+                      Available: {selectedProduct.stockQuantity} units
                       </Text>
                     </View>
-                    <TouchableOpacity 
-                      style={styles.changeProductButton}
-                      onPress={() => setSelectedProduct(null)}
-                    >
-                      <Text style={styles.changeProductText}>Change</Text>
-                    </TouchableOpacity>
                   </View>
                   
                   <View style={styles.formGroup}>
-                    <Text style={styles.label}>Customer Name*</Text>
+                    <Text style={styles.formLabel}>Quantity</Text>
+                    <View style={styles.quantityContainer}>
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => {
+                          const current = parseInt(quantity) || 0;
+                          if (current > 1) {
+                            const newQty = (current - 1).toString();
+                            setQuantity(newQty);
+                            handleQuantityChange(newQty);
+                          }
+                        }}
+                      >
+                        <MaterialCommunityIcons name="minus" size={20} color="#007bff" />
+                      </TouchableOpacity>
+                        <TextInput
+                        style={styles.quantityInput}
+                        value={quantity}
+                        onChangeText={handleQuantityChange}
+                        keyboardType="number-pad"
+                      />
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => {
+                          const current = parseInt(quantity) || 0;
+                          const max = selectedProduct.stockQuantity;
+                          if (current < max) {
+                            const newQty = (current + 1).toString();
+                            setQuantity(newQty);
+                            handleQuantityChange(newQty);
+                          } else {
+                            Alert.alert('Maximum stock reached', `Only ${max} units available.`);
+                          }
+                        }}
+                      >
+                        <MaterialCommunityIcons name="plus" size={20} color="#007bff" />
+                      </TouchableOpacity>
+                      </View>
+                    </View>
+                    
+                  <View style={styles.formGroup}>
+                    <Text style={[styles.formLabel, styles.highlightedLabel]}>Total Selling Amount (₹)</Text>
                     <TextInput
-                      style={styles.input}
-                      value={saleForm.customerName}
-                      onChangeText={(text) => setSaleForm(prev => ({ ...prev, customerName: text }))}
-                      placeholder="Enter customer name"
+                      style={[styles.formInput, styles.highlightedInput]}
+                      value={totalAmount}
+                      onChangeText={handleTotalAmountChange}
+                      keyboardType="decimal-pad"
+                      placeholder="Enter total selling amount"
                     />
                   </View>
                   
-                  <View style={styles.formRow}>
-                    <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                      <Text style={styles.label}>Quantity*</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={saleForm.quantity.toString()}
-                        onChangeText={handleQuantityChange}
-                        keyboardType="numeric"
-                        placeholder="Quantity"
-                      />
-                    </View>
-                    
-                    <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                      <Text style={styles.label}>Price (₹)*</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={saleForm.sellingPrice.toString()}
-                        onChangeText={handleSellingPriceChange}
-                        keyboardType="numeric"
-                        placeholder="Selling price"
-                      />
-                    </View>
-                  </View>
-                  
-                  <View style={styles.totalSection}>
-                    <Text style={styles.totalLabel}>Total Amount:</Text>
-                    <Text style={styles.totalAmount}>₹{saleForm.totalAmount.toFixed(2)}</Text>
-                  </View>
-                  
-                  {salesman && (
-                    <View style={styles.commissionPreview}>
-                      <Text style={styles.commissionLabel}>Your Commission ({salesman.commissionRate}%):</Text>
-                      <Text style={styles.commissionAmount}>
-                        ₹{(saleForm.totalAmount * (salesman.commissionRate / 100)).toFixed(2)}
-                      </Text>
-                    </View>
-                  )}
-                  
-                  <TouchableOpacity
-                    style={styles.submitButton}
-                    onPress={handleSubmitSale}
-                  >
-                    <Text style={styles.submitButtonText}>Submit Sale for Approval</Text>
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Unit Price (₹)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={customPrice}
+                    onChangeText={handleUnitPriceChange}
+                    keyboardType="decimal-pad"
+                    placeholder="Per unit price"
+                    editable={true}
+                  />
+                </View>
+                
+                <TouchableOpacity style={styles.createSaleButton} onPress={handleCreateSale}>
+                  <Text style={styles.createSaleButtonText}>Create Sale</Text>
                   </TouchableOpacity>
-                </>
+              </View>
               )}
-            </ScrollView>
           </View>
         </View>
       </Modal>
-    </View>
+
+      <StatusBar style="auto" />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  contentContainer: {
-    paddingBottom: 20,
+    backgroundColor: '#F8FAFC',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: '#64748B',
   },
   header: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: '#F8FAFC',
+  },
+  welcomeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
+  },
+  welcomeTextContainer: {
+    flex: 1,
   },
   welcomeText: {
+    fontSize: 16,
+    color: '#64748B',
+  },
+  userName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#0F172A',
   },
-  dateText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+  profileButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
   },
-  logoutButton: {
-    padding: 8,
+  scrollView: {
+    flex: 1,
   },
-  kpiContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+  scrollContent: {
+    paddingBottom: 24,
   },
-  kpiCard: {
-    width: '50%',
-    padding: 12,
-  },
-  kpiValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  kpiTitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  addSaleButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#007AFF',
-    margin: 16,
+  metricsContainer: {
     padding: 16,
-    borderRadius: 8,
   },
-  addSaleButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  section: {
-    margin: 16,
-    marginTop: 0,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  sectionHeader: {
+  metricsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
+  },
+  metricCard: {
+    width: '48%',
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)'
+  },
+  primaryMetricCard: {
+    backgroundColor: '#EFF6FF',
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6'
+  },
+  warningMetricCard: {
+    backgroundColor: '#FEF9C3',
+    borderLeftWidth: 4,
+    borderLeftColor: '#EAB308'
+  },
+  successMetricCard: {
+    backgroundColor: '#ECFDF5',
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981'
+  },
+  infoMetricCard: {
+    backgroundColor: '#F0F9FF',
+    borderLeftWidth: 4,
+    borderLeftColor: '#0EA5E9'
+  },
+  metricValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  metricLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  actionContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#0F172A',
+    marginBottom: 16,
   },
-  viewAllText: {
-    color: '#007AFF',
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionButton: {
+    width: '48%',
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  actionText: {
     fontSize: 14,
+    fontWeight: '500',
+    color: '#0F172A',
+  },
+  productsContainer: {
+    paddingHorizontal: 16,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    height: 48,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    height: 48,
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#0F172A',
+  },
+  productsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  productCard: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  disabledProductCard: {
+    opacity: 0.7,
+  },
+  productImageContainer: {
+    height: 140,
+    position: 'relative',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+  },
+  productImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  outOfStockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  outOfStockText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  productInfo: {
+    padding: 12,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  productPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007bff',
+    marginBottom: 4,
+  },
+  stockContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stockText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  inStock: {
+    color: '#10B981',
+  },
+  lowStock: {
+    color: '#F59E0B',
+  },
+  outOfStock: {
+    color: '#EF4444',
   },
   emptyState: {
     alignItems: 'center',
-    padding: 24,
+    justifyContent: 'center',
+    paddingVertical: 40,
   },
-  emptyStateText: {
-    marginTop: 8,
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  saleItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    paddingVertical: 12,
-  },
-  saleInfo: {
-    flex: 1,
-  },
-  saleProductName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  saleDetail: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  saleDetails: {
-    alignItems: 'flex-end',
-  },
-  saleAmount: {
-    fontSize: 16,
+  emptyStateTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    color: '#0F172A',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusCompleted: {
-    backgroundColor: '#4CAF50',
-  },
-  statusPending: {
-    backgroundColor: '#FF9800',
-  },
-  statusRejected: {
-    backgroundColor: '#F44336',
-  },
-  statusText: {
-    fontSize: 12,
-    color: '#fff',
-    fontWeight: '600',
+  emptyStateDescription: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    height: '90%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#F1F5F9',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#0F172A',
   },
-  modalScrollView: {
-    padding: 16,
+  modalBody: {
+    padding: 20,
   },
-  searchContainer: {
+  selectedProductContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f9f9f9',
+    marginBottom: 20,
+  },
+  selectedProductImageContainer: {
+    width: 80,
+    height: 80,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginBottom: 16,
+    overflow: 'hidden',
   },
-  searchIcon: {
-    marginRight: 8,
+  selectedProductImage: {
+    width: '100%',
+    height: '100%',
   },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    fontSize: 16,
-  },
-  productItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  selectedProductImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  productInfo: {
-    flex: 1,
-  },
-  productName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  productDetail: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  selectedProduct: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f0f8ff',
-    borderRadius: 8,
-    marginBottom: 16,
   },
   selectedProductInfo: {
     flex: 1,
+    marginLeft: 16,
+    justifyContent: 'center',
   },
   selectedProductName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 4,
   },
-  selectedProductDetail: {
+  selectedProductPrice: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    color: '#64748B',
+    marginBottom: 4,
   },
-  changeProductButton: {
-    padding: 8,
-  },
-  changeProductText: {
-    color: '#007AFF',
+  selectedProductStock: {
     fontSize: 14,
+    color: '#64748B',
   },
   formGroup: {
     marginBottom: 16,
   },
-  formRow: {
-    flexDirection: 'row',
-  },
-  label: {
-    fontSize: 16,
-    color: '#333',
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
     marginBottom: 8,
   },
-  input: {
-    backgroundColor: '#f9f9f9',
+  formInput: {
+    backgroundColor: '#F8FAFC',
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
   },
-  totalSection: {
+  quantityContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    marginTop: 16,
   },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  totalAmount: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  commissionPreview: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  quantityButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f0f8ff',
+    backgroundColor: '#F8FAFC',
     borderRadius: 8,
-    marginVertical: 16,
   },
-  commissionLabel: {
-    fontSize: 14,
-    color: '#333',
+  quantityInput: {
+    flex: 1,
+    marginHorizontal: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    fontSize: 16,
+    textAlign: 'center',
   },
-  commissionAmount: {
+  highlightedLabel: {
+    color: '#007bff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  highlightedInput: {
+    borderColor: '#007bff',
+    borderWidth: 2,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  createSaleButton: {
+    backgroundColor: '#007bff',
+    borderRadius: 8,
+    paddingVertical: 14,
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  createSaleButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  submitButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 }); 

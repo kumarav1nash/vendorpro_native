@@ -1,16 +1,16 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { useShop } from '../contexts/ShopContext';
+import { useShop } from '../../src/contexts/ShopContext';
 
 export default function SalesmenRedirectScreen() {
-  const { currentShop } = useShop();
+  const { shop } = useShop();
   
   useEffect(() => {
     const redirectToShop = async () => {
-      if (currentShop) {
+      if (shop) {
         // If there's a current shop, redirect to its salesmen tab
-        router.replace(`/shop/${currentShop.id}?tab=salesmen`);
+        router.replace(`/shop/${shop.id}?tab=salesmen`);
       } else {
         // Otherwise redirect to shops list
         router.replace('/(tabs)/shops');
@@ -18,7 +18,7 @@ export default function SalesmenRedirectScreen() {
     };
     
     redirectToShop();
-  }, [currentShop]);
+  }, [shop]);
   
   return (
     <View style={styles.container}>

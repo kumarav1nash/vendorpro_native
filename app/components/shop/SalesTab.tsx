@@ -12,256 +12,335 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSales, Sale } from '../../contexts/SalesContext';
-import { useProducts, Product } from '../../contexts/ProductContext';
-import { useSalesmen, Salesman } from '../../contexts/SalesmenContext';
+import { Sale, CreateSaleDto, UpdateSaleDto } from '../../../src/types/sales';
+
+import { useInventory } from '../../../src/contexts/InventoryContext';
+import { useSales } from '../../../src/contexts/SalesContext';
+import { useShop } from '../../../src/contexts/ShopContext';
+import { Inventory } from '@/src/types/inventory';
+import { getUserById } from '@/src/services/user.service';
+import { User } from '@/src/types/user';
+import { Shop } from '@/src/types/shop';
+
+// Define a separate type for API response to avoid TypeScript errors
+interface SaleWithNestedObjects {
+  id: string;
+  quantity: number;
+  salePrice: string | number; // Accept both string and number
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  salesman?: User;
+  shop?: Shop;
+  product?: Inventory;
+}
 
 type SalesTabProps = {
   shopId: string;
 };
 
 export default function SalesTab({ shopId }: SalesTabProps) {
-  const { sales, addSale, updateSale, getShopSales } = useSales();
-  const { products, getProductById } = useProducts();
-  const { salesmen, getSalesmanById } = useSalesmen();
+  const { 
+    sales, 
+    loading: salesLoading, 
+    error: salesError,
+    fetchAllSales, 
+    approveSale, 
+    rejectSale 
+  } = useSales();
   
-  const [shopSales, setShopSales] = useState<Sale[]>([]);
+  const { inventories } = useInventory();
+  const { shop } = useShop();
+  
+  // Local state
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
-  const [sortField, setSortField] = useState<'date' | 'amount' | 'createdAt'>('createdAt');
+  const [filteredSales, setFilteredSales] = useState<SaleWithNestedObjects[]>([]);
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
+  const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
-  const [showModal, setShowModal] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [showRejectionModal, setShowRejectionModal] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const [saleToReject, setSaleToReject] = useState<string | null>(null);
-  const [saleForm, setSaleForm] = useState({
-    productId: '',
-    quantity: 1,
-    salePrice: 0,
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSale, setSelectedSale] = useState<SaleWithNestedObjects | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  
+  // Format currency - handles undefined and string values safely
+  const formatCurrency = (amount: string | number | undefined) => {
+    if (amount === undefined || amount === null) {
+      return '₹0.00';
+    }
+    
+    // Convert to number if it's a string
+    const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    // Check if it's a valid number
+    if (isNaN(numericAmount)) {
+      return '₹0.00';
+    }
+    
+    return `₹${numericAmount.toFixed(2)}`;
+  };
+  
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
   });
+  };
   
+  // Load sales data
   useEffect(() => {
-    loadSales();
-  }, [shopId, sales]);
+    loadSalesData();
+  }, [shopId]);
   
+  // Filter and sort sales when data changes
   useEffect(() => {
-    if (shopSales.length > 0) {
-      let filtered = [...shopSales];
+    if (!sales) {
+      console.log('No sales data available');
+      return;
+    }
+    
+    console.log(`Processing sales data. Total sales: ${sales.length}`);
+    console.log('Sample sale item:', sales.length > 0 ? JSON.stringify(sales[0]) : 'No sales');
+    
+    // Convert the sales array to match our expected structure
+    const salesWithNestedObjects = sales.map(sale => sale as unknown as SaleWithNestedObjects);
+    
+    // For debugging - check the structure of the first item
+    if (salesWithNestedObjects.length > 0) {
+      console.log('First sale structure:', JSON.stringify(salesWithNestedObjects[0]));
+    }
+    
+    // IMPORTANT: Temporarily show all sales instead of filtering by shopId
+    // This will help us debug if any sales are loading at all
+    let filtered = [...salesWithNestedObjects];
+    
+    console.log(`Working with ${filtered.length} sales after removing shopId filter`);
       
       // Apply status filter
-      if (filterStatus !== 'all') {
-        filtered = filtered.filter(sale => sale.status === filterStatus);
+    if (activeTab === 'pending') {
+      filtered = filtered.filter(sale => sale.status === 'pending');
+    } else if (activeTab === 'completed') {
+      filtered = filtered.filter(sale => sale.status === 'approved');
+    } else if (activeTab === 'rejected') {
+      filtered = filtered.filter(sale => sale.status === 'rejected');
       }
+    
+    console.log(`After status filter: ${filtered.length} sales`);
       
-      // Apply search filter
-      if (searchQuery.trim() !== '') {
+    // Apply search filter if present
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
         filtered = filtered.filter(sale => {
-          const customer = sale.customerName.toLowerCase();
-          const product = getProductById(sale.productId)?.name.toLowerCase() || '';
-          const salesman = getSalesmanById(sale.salesmanId)?.name.toLowerCase() || '';
-          const query = searchQuery.toLowerCase();
-          
-          return customer.includes(query) || 
-                 product.includes(query) || 
-                 salesman.includes(query);
-        });
+        // Search by id, product name, or salesman email
+        return (
+          sale.id?.toLowerCase().includes(query) ||
+          sale.product?.productName?.toLowerCase().includes(query) ||
+          sale.salesman?.email?.toLowerCase().includes(query)
+        );
+      });
+      
+      console.log(`After search filter: ${filtered.length} sales`);
       }
       
-      // Apply sorting
+    // Sort the filtered sales
       filtered.sort((a, b) => {
-        if (sortField === 'date') {
-          return sortDirection === 'asc' 
-            ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        } else if (sortField === 'amount') {
-          return sortDirection === 'asc' 
-            ? a.totalAmount - b.totalAmount
-            : b.totalAmount - a.totalAmount;
+      if (sortBy === 'date') {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
         } else {
+        // Convert string salePrice to number for comparison
+        const priceA = typeof a.salePrice === 'string' ? parseFloat(a.salePrice) : (a.salePrice || 0);
+        const priceB = typeof b.salePrice === 'string' ? parseFloat(b.salePrice) : (b.salePrice || 0);
           return sortDirection === 'asc' 
-            ? new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          ? priceA - priceB
+          : priceB - priceA;
         }
       });
       
       setFilteredSales(filtered);
-    }
-  }, [searchQuery, shopSales, sortField, sortDirection, filterStatus]);
+    console.log(`Final: Displaying ${filtered.length} sales after filtering and sorting`);
+  }, [sales, activeTab, sortBy, sortDirection, searchQuery, shopId, inventories]);
   
-  const loadSales = () => {
+  // Load sales data from the API
+  const loadSalesData = async () => {
+    try {
+      console.log(`Loading sales data for shop: ${shopId}`);
     setIsLoading(true);
-    const salesForShop = getShopSales(shopId);
-    setShopSales(salesForShop);
-    setFilteredSales(salesForShop);
+      
+      await fetchAllSales({ shopId });
+      console.log("Sales fetch completed");
+      
+    } catch (err) {
+      console.error('Error loading sales:', err);
+      Alert.alert('Error', 'Failed to load sales data');
+    } finally {
     setIsLoading(false);
-  };
-  
-  const handleSort = (field: 'date' | 'amount') => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
     }
   };
   
-  const handleStatusFilter = (status: 'all' | 'pending' | 'completed' | 'rejected') => {
-    setFilterStatus(status);
-  };
-  
-  const handleMarkAsCompleted = (saleId: string) => {
-    const sale = shopSales.find(sale => sale.id === saleId);
-    if (sale) {
-      const updatedSale: Sale = { 
-        ...sale, 
-        status: 'completed',
-        updatedAt: new Date().toISOString() 
-      };
-      updateSale(updatedSale);
-      Alert.alert('Success', 'Sale marked as completed');
-      loadSales();
-    }
-  };
-
-  const handleRejectButtonPress = (saleId: string) => {
-    setSaleToReject(saleId);
-    setRejectionReason('');
-    setShowRejectionModal(true);
-  };
-
-  const handleRejectConfirm = () => {
-    if (saleToReject) {
-      const sale = shopSales.find(sale => sale.id === saleToReject);
-      if (sale) {
-        const updatedSale: Sale = { 
-          ...sale, 
-          status: 'rejected',
-          rejectionReason: rejectionReason || 'No reason provided',
-          updatedAt: new Date().toISOString() 
-        };
-        updateSale(updatedSale);
-        Alert.alert('Success', 'Sale rejected');
-        loadSales();
-      }
-      setShowRejectionModal(false);
-      setSaleToReject(null);
-    }
-  };
-  
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric'
-    });
-  };
-
-  // Calculate summary data
-  const getSummaryData = () => {
-    const totalSales = filteredSales.length;
-    const pendingSales = filteredSales.filter(sale => sale.status === 'pending').length;
-    const completedSales = filteredSales.filter(sale => sale.status === 'completed').length;
-    const totalRevenue = filteredSales
-      .filter(sale => sale.status === 'completed')
-      .reduce((sum, sale) => sum + sale.totalAmount, 0);
-    
-    return { totalSales, pendingSales, completedSales, totalRevenue };
-  };
-  
-  const renderSaleItem = ({ item }: { item: Sale }) => {
-    const product = getProductById(item.productId);
-    const salesman = getSalesmanById(item.salesmanId);
+  // Debug function for development
+  const renderDebugControls = () => {
+    if (!__DEV__) return null;
     
     return (
-      <View style={[styles.saleCard, item.status === 'completed' ? styles.completedSale : null]}>
+      <View style={styles.debugContainer}>
+        <TouchableOpacity
+          style={styles.debugButton}
+          onPress={() => {
+            console.log("Debug - Current sales state:");
+            console.log(`Total sales count: ${sales?.length || 0}`);
+            console.log(`Filtered sales count: ${filteredSales.length}`);
+            console.log(`Shop ID: ${shopId}`);
+            console.log(`Loading state: ${isLoading}`);
+            console.log(`Sales loading state: ${salesLoading}`);
+            console.log(`Error state: ${salesError}`);
+            console.log("Sample sale item:", sales && sales.length > 0 ? JSON.stringify(sales[0]) : 'No sales');
+            
+            // Log specific properties to check structure
+            if (sales && sales.length > 0) {
+              const sampleSale = sales[0] as unknown as SaleWithNestedObjects;
+              console.log("Product name:", sampleSale.product?.productName);
+              console.log("Sale price:", sampleSale.salePrice);
+              console.log("Status:", sampleSale.status);
+            }
+            
+            // Force refresh
+            loadSalesData();
+          }}
+        >
+          <Text style={styles.debugButtonText}>Debug Sales</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+  
+  // Handle sale approval
+  const handleApproveSale = async (saleId: string) => {
+    try {
+      setIsLoading(true);
+      await approveSale(saleId);
+      Alert.alert('Success', 'Sale approved successfully');
+      
+      // Close modal if open
+      if (showDetailsModal) {
+        setShowDetailsModal(false);
+        setSelectedSale(null);
+      }
+      
+      // Refresh data
+      await loadSalesData();
+    } catch (error) {
+      console.error('Error approving sale:', error);
+      Alert.alert('Error', 'Failed to approve sale');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle sale rejection
+  const handleRejectSale = async (saleId: string) => {
+    try {
+      setIsLoading(true);
+      await rejectSale(saleId);
+      Alert.alert('Success', 'Sale rejected successfully');
+      
+      // Close modal if open
+      if (showDetailsModal) {
+        setShowDetailsModal(false);
+        setSelectedSale(null);
+    }
+      
+      // Refresh data
+      await loadSalesData();
+    } catch (error) {
+      console.error('Error rejecting sale:', error);
+      Alert.alert('Error', 'Failed to reject sale');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Render individual sale item
+  const renderSaleItem = ({ item }: { item: SaleWithNestedObjects }) => {
+    // Add safety check
+    if (!item) {
+      console.log('Undefined sale item encountered');
+      return null;
+    }
+    
+    // Handle both flat and nested product structures
+    const productName = item.product?.productName || 'Unknown Product';
+    console.log(`Rendering sale item: ${item.id}, product: ${productName}`);
+    
+    return (
+      <TouchableOpacity
+        style={styles.saleItem}
+        onPress={() => {
+          setSelectedSale(item);
+          setShowDetailsModal(true);
+        }}
+      >
         <View style={styles.saleHeader}>
-          <View>
-            <Text style={styles.customerId}>Order #{item.id.slice(-6)}</Text>
-            <Text style={styles.customerName}>{item.customerName}</Text>
-          </View>
-          <View style={[styles.statusBadge, 
-            item.status === 'completed' ? styles.completedBadge : 
-            item.status === 'rejected' ? styles.rejectedBadge : styles.pendingBadge]}>
-            <Text style={styles.statusText}>{item.status}</Text>
+          <Text style={styles.invoiceNumber}>#{item.id || 'N/A'}</Text>
+          <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
+            <Text style={styles.statusText}>{item.status?.toUpperCase() || 'UNKNOWN'}</Text>
           </View>
         </View>
         
         <View style={styles.saleDetails}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Product:</Text>
-            <Text style={styles.detailValue}>{product ? product.name : 'Unknown Product'}</Text>
+          <View style={styles.productInfo}>
+            <Text style={styles.productName}>{productName}</Text>
+            <Text style={styles.quantity}>Qty: {item.quantity || 0}</Text>
           </View>
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Quantity:</Text>
-            <Text style={styles.detailValue}>{item.quantity} {product ? product.unit || '' : ''}</Text>
+          <View style={styles.priceInfo}>
+            <Text style={styles.amount}>{formatCurrency(item.salePrice)}</Text>
+            <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
           </View>
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Salesman:</Text>
-            <Text style={styles.detailValue}>{salesman ? salesman.name : 'Unassigned'}</Text>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Commission:</Text>
-            <Text style={styles.detailValue}>₹{item.commission.toFixed(2)}</Text>
-          </View>
-          
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Date:</Text>
-            <Text style={styles.detailValue}>{formatDate(item.createdAt)}</Text>
-          </View>
-
-          {item.status === 'rejected' && item.rejectionReason && (
-            <View style={styles.rejectionContainer}>
-              <Text style={styles.rejectionLabel}>Rejection Reason:</Text>
-              <Text style={styles.rejectionText}>{item.rejectionReason}</Text>
-            </View>
-          )}
         </View>
         
         <View style={styles.saleFooter}>
-          <Text style={styles.totalAmount}>₹{item.totalAmount.toFixed(2)}</Text>
-          
-          {item.status === 'pending' && (
-            <View style={styles.actionButtons}>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.rejectButton]}
-                onPress={() => handleRejectButtonPress(item.id)}
-              >
-                <MaterialCommunityIcons name="close" size={16} color="#fff" />
-                <Text style={styles.actionButtonText}>Reject</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.actionButton, styles.completeButton]}
-                onPress={() => handleMarkAsCompleted(item.id)}
-              >
-                <MaterialCommunityIcons name="check-circle" size={16} color="#fff" />
-                <Text style={styles.actionButtonText}>Approve</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <Text style={styles.salesmanName}>
+            <MaterialCommunityIcons name="account" size={14} color="#666" />
+            {' '}{item.salesman?.phoneNumber || item.salesman?.email || 'Direct Sale'}
+          </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
   
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading sales...</Text>
-      </View>
-    );
-  }
+  // Helper function to get status style
+  const getStatusStyle = (status: string | undefined) => {
+    if (!status) return {};
+    
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return styles.statusPending;
+      case 'approved':
+        return styles.statusApproved;
+      case 'rejected':
+        return styles.statusRejected;
+      default:
+        return {};
+    }
+  };
+  
+  // Toggle sort direction
+  const toggleSortDirection = () => {
+    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
+  
+  // Calculate unit price safely
+  const calculateUnitPrice = (sale: SaleWithNestedObjects) => {
+    if (!sale || !sale.quantity || sale.quantity <= 0) return 0;
+    const salePrice = typeof sale.salePrice === 'string' ? parseFloat(sale.salePrice) : (sale.salePrice || 0);
+    return salePrice / sale.quantity;
+  };
   
   return (
     <View style={styles.container}>
-      <View style={styles.filtersContainer}>
         <View style={styles.searchContainer}>
           <MaterialCommunityIcons name="magnify" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
@@ -270,208 +349,208 @@ export default function SalesTab({ shopId }: SalesTabProps) {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <MaterialCommunityIcons name="close" size={20} color="#666" />
-            </TouchableOpacity>
-          )}
         </View>
         
-        <View style={styles.filterChips}>
+      <View style={styles.tabsContainer}>
           <TouchableOpacity 
-            style={[
-              styles.filterChip, 
-              filterStatus === 'all' ? styles.activeChip : null
-            ]}
-            onPress={() => handleStatusFilter('all')}
+          style={[styles.tab, activeTab === 'all' && styles.activeTab]}
+          onPress={() => setActiveTab('all')}
           >
-            <Text style={[
-              styles.filterChipText,
-              filterStatus === 'all' ? styles.activeChipText : null
-            ]}>All</Text>
+          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>All</Text>
           </TouchableOpacity>
-          
           <TouchableOpacity 
-            style={[
-              styles.filterChip, 
-              filterStatus === 'pending' ? styles.activeChip : null
-            ]}
-            onPress={() => handleStatusFilter('pending')}
+          style={[styles.tab, activeTab === 'pending' && styles.activeTab]}
+          onPress={() => setActiveTab('pending')}
           >
-            <Text style={[
-              styles.filterChipText,
-              filterStatus === 'pending' ? styles.activeChipText : null
-            ]}>Pending</Text>
+          <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>Pending</Text>
           </TouchableOpacity>
-          
           <TouchableOpacity 
-            style={[
-              styles.filterChip, 
-              filterStatus === 'completed' ? styles.activeChip : null
-            ]}
-            onPress={() => handleStatusFilter('completed')}
+          style={[styles.tab, activeTab === 'completed' && styles.activeTab]}
+          onPress={() => setActiveTab('completed')}
           >
-            <Text style={[
-              styles.filterChipText,
-              filterStatus === 'completed' ? styles.activeChipText : null
-            ]}>Completed</Text>
+          <Text style={[styles.tabText, activeTab === 'completed' && styles.activeTabText]}>Completed</Text>
           </TouchableOpacity>
-          
           <TouchableOpacity 
-            style={[
-              styles.filterChip, 
-              filterStatus === 'rejected' ? styles.activeChip : null
-            ]}
-            onPress={() => handleStatusFilter('rejected')}
+          style={[styles.tab, activeTab === 'rejected' && styles.activeTab]}
+          onPress={() => setActiveTab('rejected')}
           >
-            <Text style={[
-              styles.filterChipText,
-              filterStatus === 'rejected' ? styles.activeChipText : null
-            ]}>Rejected</Text>
+          <Text style={[styles.tabText, activeTab === 'rejected' && styles.activeTabText]}>Rejected</Text>
           </TouchableOpacity>
-        </View>
-      </View>
-      
-      {/* Summary cards */}
-      <View style={styles.summaryContainer}>
-        {(() => {
-          const { totalSales, pendingSales, completedSales, totalRevenue } = getSummaryData();
-          return (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={[styles.summaryCard, { backgroundColor: '#E3F2FD' }]}>
-                <Text style={styles.summaryValue}>{totalSales}</Text>
-                <Text style={styles.summaryLabel}>Total Sales</Text>
-              </View>
-              
-              <View style={[styles.summaryCard, { backgroundColor: '#FFF8E1' }]}>
-                <Text style={styles.summaryValue}>{pendingSales}</Text>
-                <Text style={styles.summaryLabel}>Pending</Text>
-              </View>
-              
-              <View style={[styles.summaryCard, { backgroundColor: '#E8F5E9' }]}>
-                <Text style={styles.summaryValue}>{completedSales}</Text>
-                <Text style={styles.summaryLabel}>Completed</Text>
-              </View>
-              
-              <View style={[styles.summaryCard, { backgroundColor: '#F3E5F5' }]}>
-                <Text style={styles.summaryValue}>₹{totalRevenue.toFixed(2)}</Text>
-                <Text style={styles.summaryLabel}>Revenue</Text>
-              </View>
-            </ScrollView>
-          );
-        })()}
       </View>
       
       <View style={styles.sortContainer}>
         <Text style={styles.sortLabel}>Sort by:</Text>
         <TouchableOpacity 
-          style={styles.sortButton}
-          onPress={() => handleSort('date')}
+          style={[styles.sortButton, sortBy === 'date' && styles.activeSortButton]}
+          onPress={() => {
+            if (sortBy === 'date') {
+              toggleSortDirection();
+            } else {
+              setSortBy('date');
+            }
+          }}
         >
-          <Text style={[
-            styles.sortButtonText,
-            sortField === 'date' ? styles.activeSortText : null
-          ]}>Date</Text>
-          {sortField === 'date' && (
-            <MaterialCommunityIcons 
-              name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} 
-              size={16} 
-              color="#007AFF" 
-            />
-          )}
+          <Text style={[styles.sortButtonText, sortBy === 'date' && styles.activeSortText]}>
+            Date {sortBy === 'date' && (sortDirection === 'asc' ? '↑' : '↓')}
+          </Text>
         </TouchableOpacity>
-        
         <TouchableOpacity 
-          style={styles.sortButton}
-          onPress={() => handleSort('amount')}
+          style={[styles.sortButton, sortBy === 'amount' && styles.activeSortButton]}
+          onPress={() => {
+            if (sortBy === 'amount') {
+              toggleSortDirection();
+            } else {
+              setSortBy('amount');
+            }
+          }}
         >
-          <Text style={[
-            styles.sortButtonText,
-            sortField === 'amount' ? styles.activeSortText : null
-          ]}>Amount</Text>
-          {sortField === 'amount' && (
-            <MaterialCommunityIcons 
-              name={sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'} 
-              size={16} 
-              color="#007AFF" 
-            />
-          )}
+          <Text style={[styles.sortButtonText, sortBy === 'amount' && styles.activeSortText]}>
+            Amount {sortBy === 'amount' && (sortDirection === 'asc' ? '↑' : '↓')}
+          </Text>
         </TouchableOpacity>
       </View>
       
-      {filteredSales.length === 0 ? (
-        <View style={styles.emptyState}>
-          <MaterialCommunityIcons name="cart-off" size={64} color="#ccc" />
-          <Text style={styles.emptyStateText}>No sales found</Text>
-          <Text style={styles.emptyStateSubtext}>
-            {filterStatus !== 'all' 
-              ? `Try changing your filter from "${filterStatus}"` 
-              : 'Sales will appear here when they are created'}
+      {__DEV__ && renderDebugControls()}
+      
+      {isLoading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#0066cc" />
+          <Text style={styles.loaderText}>Loading sales data...</Text>
+        </View>
+      ) : filteredSales.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="receipt" size={60} color="#ccc" />
+          <Text style={styles.emptyText}>No sales found</Text>
+          <Text style={styles.emptySubtext}>
+            {searchQuery || activeTab !== 'all' 
+              ? "Try adjusting your search or filters" 
+              : "Sales will appear here once created"}
           </Text>
+          {salesError && (
+            <Text style={styles.errorText}>Error: {salesError}</Text>
+          )}
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={loadSalesData}
+          >
+            <Text style={styles.retryButtonText}>Refresh</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={filteredSales}
           renderItem={renderSaleItem}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id || Math.random().toString()}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
         />
       )}
 
-      {/* Add Sale Floating Button */}
-      <TouchableOpacity 
-        style={styles.fab}
-        onPress={() => setShowModal(true)}
-      >
-        <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-        <Text style={styles.fabText}>New Sale</Text>
-      </TouchableOpacity>
-
-      {/* Rejection Reason Modal */}
+      {/* Sale details modal */}
       <Modal
-        visible={showRejectionModal}
-        animationType="fade"
+        visible={showDetailsModal}
         transparent={true}
-        onRequestClose={() => setShowRejectionModal(false)}
+        animationType="slide"
+        onRequestClose={() => {
+          setShowDetailsModal(false);
+          setSelectedSale(null);
+        }}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { maxHeight: 300 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Rejection Reason</Text>
-              <TouchableOpacity onPress={() => setShowRejectionModal(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
-            
+        {selectedSale && (
+          <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <Text style={styles.label}>Please provide a reason for rejection:</Text>
-              <TextInput
-                style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-                value={rejectionReason}
-                onChangeText={setRejectionReason}
-                placeholder="Enter reason for rejection"
-                multiline
-              />
-              
-              <View style={styles.actionButtonsContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Sale Details</Text>
                 <TouchableOpacity
-                  style={[styles.button, styles.cancelButton]}
-                  onPress={() => setShowRejectionModal(false)}
+                  style={styles.closeButton}
+                  onPress={() => {
+                    setShowDetailsModal(false);
+                    setSelectedSale(null);
+                  }}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <MaterialCommunityIcons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.detailsContainer}>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Invoice:</Text>
+                  <Text style={styles.detailValue}>#{selectedSale.id || 'N/A'}</Text>
+                </View>
+                
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status:</Text>
+                  <View style={[
+                    styles.statusBadge, 
+                    getStatusStyle(selectedSale.status)
+                  ]}>
+                    <Text style={styles.statusText}>{selectedSale.status?.toUpperCase() || 'UNKNOWN'}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Date:</Text>
+                  <Text style={styles.detailValue}>{formatDate(selectedSale.createdAt)}</Text>
+                </View>
+                
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Product:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedSale.product?.productName || 'Unknown Product'}
+                  </Text>
+                </View>
+                
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Quantity:</Text>
+                  <Text style={styles.detailValue}>{selectedSale.quantity || 0}</Text>
+                </View>
+                
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Unit Price:</Text>
+                  <Text style={styles.detailValue}>
+                    {formatCurrency(calculateUnitPrice(selectedSale))}
+                  </Text>
+                </View>
+                
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Total Amount:</Text>
+                  <Text style={[styles.detailValue, styles.totalAmount]}>
+                    {formatCurrency(selectedSale.salePrice)}
+                  </Text>
+                </View>
+                
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Salesman:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedSale.salesman?.phoneNumber || selectedSale.salesman?.email || 'Direct Sale'}
+                  </Text>
+                </View>
+                
+                {selectedSale.status === 'pending' && (
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.approveButton]}
+                      onPress={() => handleApproveSale(selectedSale.id)}
+                      disabled={isLoading}
+                    >
+                      <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                      <Text style={styles.actionButtonText}>Approve</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  style={[styles.button, styles.confirmButton]}
-                  onPress={handleRejectConfirm}
+                      style={[styles.actionButton, styles.rejectButton]}
+                      onPress={() => handleRejectSale(selectedSale.id)}
+                      disabled={isLoading}
                 >
-                  <Text style={styles.confirmButtonText}>Confirm Rejection</Text>
+                      <MaterialCommunityIcons name="close" size={18} color="#fff" />
+                      <Text style={styles.actionButtonText}>Reject</Text>
                 </TouchableOpacity>
+                  </View>
+                )}
               </View>
             </View>
           </View>
-        </View>
+        )}
       </Modal>
     </View>
   );
@@ -481,13 +560,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  filtersContainer: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -505,51 +577,29 @@ const styles = StyleSheet.create({
     height: 36,
     fontSize: 14,
   },
-  filterChips: {
+  tabsContainer: {
     flexDirection: 'row',
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 16,
-    marginRight: 8,
-  },
-  activeChip: {
-    backgroundColor: '#007AFF',
-  },
-  filterChipText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  activeChipText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
-  summaryContainer: {
-    paddingVertical: 15,
-    paddingHorizontal: 10,
     backgroundColor: '#fff',
+    padding: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  summaryCard: {
-    width: 120,
-    padding: 15,
-    borderRadius: 10,
-    marginRight: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+  tab: {
+    padding: 12,
+    paddingBottom: 8,
   },
-  summaryValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 5,
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
   },
-  summaryLabel: {
+  tabText: {
     fontSize: 14,
+    fontWeight: '500',
     color: '#666',
+  },
+  activeTabText: {
+    color: '#007AFF',
+    fontWeight: 'bold',
   },
   sortContainer: {
     flexDirection: 'row',
@@ -572,6 +622,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     marginRight: 8,
   },
+  activeSortButton: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
+  },
   sortButtonText: {
     fontSize: 14,
     color: '#333',
@@ -581,83 +635,64 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '500',
   },
-  listContainer: {
-    padding: 16,
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  saleCard: {
+  loaderText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
+    padding: 20,
   },
-  completedSale: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CD964',
-  },
-  saleHeader: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  customerId: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
   },
-  customerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  pendingBadge: {
-    backgroundColor: '#FFC107',
-  },
-  completedBadge: {
-    backgroundColor: '#4CAF50',
-  },
-  rejectedBadge: {
-    backgroundColor: '#F44336',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#fff',
-    textTransform: 'capitalize',
-  },
-  saleDetails: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 12,
-  },
-  rejectionContainer: {
-    marginTop: 10,
+  closeButton: {
     padding: 10,
-    backgroundColor: '#FFF5F5',
-    borderRadius: 5,
-    borderLeftWidth: 3,
-    borderLeftColor: '#F44336',
   },
-  rejectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#F44336',
-    marginBottom: 5,
-  },
-  rejectionText: {
-    fontSize: 14,
-    color: '#666',
+  detailsContainer: {
+    padding: 20,
   },
   detailRow: {
     flexDirection: 'row',
@@ -672,11 +707,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
-  },
-  saleFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   totalAmount: {
     fontSize: 18,
@@ -694,11 +724,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginLeft: 8,
   },
-  completeButton: {
-    backgroundColor: '#4CD964',
+  approveButton: {
+    backgroundColor: '#4CAF50',
   },
   rejectButton: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#F44336',
   },
   actionButtonText: {
     color: '#fff',
@@ -706,124 +736,124 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 4,
   },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 30,
-    backgroundColor: '#007AFF',
-    borderRadius: 30,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-  },
-  fabText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
-    marginLeft: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
+  saleItem: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  modalHeader: {
+  saleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  invoiceNumber: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusPending: {
+    backgroundColor: '#FFC107',
+  },
+  statusApproved: {
+    backgroundColor: '#4CAF50',
+  },
+  statusRejected: {
+    backgroundColor: '#F44336',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#fff',
+    textTransform: 'capitalize',
+  },
+  saleDetails: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 12,
+  },
+  productInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
-  modalTitle: {
+  productName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  quantity: {
+    fontSize: 14,
+    color: '#666',
+  },
+  priceInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  amount: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#000',
-  },
-  modalContent: {
-    padding: 20,
-  },
-  label: {
-    fontSize: 16,
     color: '#333',
-    marginBottom: 8,
   },
-  input: {
-    backgroundColor: '#f8f8f8',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+  date: {
+    fontSize: 14,
+    color: '#666',
   },
-  actionButtonsContainer: {
+  saleFooter: {
     flexDirection: 'row',
-    marginTop: 20,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 10,
+    justifyContent: 'space-between',
     alignItems: 'center',
-    margin: 5,
-    borderRadius: 8,
   },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: '#ddd',
+  salesmanName: {
+    fontSize: 14,
+    color: '#666',
   },
-  confirmButton: {
-    backgroundColor: '#FF3B30',
+  debugContainer: {
+    padding: 8,
+    backgroundColor: '#f8f8f8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  cancelButtonText: {
-    color: '#333',
-    fontWeight: '500',
+  debugButton: {
+    backgroundColor: '#333',
+    padding: 8,
+    borderRadius: 4,
+    alignItems: 'center',
   },
-  confirmButtonText: {
+  debugButtonText: {
     color: '#fff',
-    fontWeight: '600',
+    fontSize: 12,
+  },
+  errorText: {
+    color: 'red',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 16,
+    backgroundColor: '#0066cc',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  listContainer: {
+    padding: 16,
   },
 }); 

@@ -2,12 +2,13 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { SalesProvider } from './contexts/SalesContext';
-import { ProductsProvider } from './contexts/ProductContext';
-import { ShopProvider } from './contexts/ShopContext';
-import { SalesmenProvider } from './contexts/SalesmenContext';
-import { UserProvider } from './contexts/UserContext';
+import { SalesProvider } from '../src/contexts/SalesContext';
+import { InventoryProvider } from '../src/contexts/InventoryContext';
+import { ShopProvider } from '../src/contexts/ShopContext';
+import { UserProvider } from '../src/contexts/UserContext';
 import { AuthProvider } from '../src/contexts/AuthContext';
+import { CommissionProvider } from '../src/contexts/CommissionContext';
+import { UserProfileProvider } from '../src/contexts/UserProfileContext';
 
 // Global layout component that wraps the entire app
 export default function RootLayout() {
@@ -20,10 +21,11 @@ export default function RootLayout() {
       {/* Context providers for data sharing across the app */}
       <AuthProvider>
       <UserProvider>
+        <UserProfileProvider>
         <ShopProvider>
-          <ProductsProvider>
-            <SalesmenProvider>
+            <InventoryProvider>
               <SalesProvider>
+                <CommissionProvider>
                 {/* Root stack navigator */}
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -47,10 +49,11 @@ export default function RootLayout() {
                     }} 
                   />
                 </Stack>
+                </CommissionProvider>
               </SalesProvider>
-            </SalesmenProvider>
-          </ProductsProvider>
+            </InventoryProvider>
         </ShopProvider>
+        </UserProfileProvider>
       </UserProvider>
       </AuthProvider>
     </SafeAreaProvider>
