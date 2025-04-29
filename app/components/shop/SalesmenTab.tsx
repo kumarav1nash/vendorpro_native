@@ -303,11 +303,11 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     // Calculate totals
     const totalSales = salesmanSales.length;
     const totalAmount = salesmanSales.reduce((sum, sale) => 
-      sum + (sale.salePrice * sale.quantity), 0);
+      sum + (parseInt(sale.soldAt) * sale.quantity), 0);
     
     // Get commission from actual commissions
     const totalCommission = salesmanCommissions.reduce((sum, commission) => 
-      sum + commission.amount, 0);
+      sum + parseInt(commission.amount), 0);
     
     // Count approved sales as "completed"
     const completedSales = salesmanSales.filter(sale => sale.status === 'approved').length;
@@ -724,7 +724,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
                     </View>
                     {commissions.filter(c => c.salesmanId === selectedSalesman.id).slice(0, 5).map(commission => (
                       <View key={commission.id} style={styles.commissionRow}>
-                        <Text style={styles.commissionAmount}>₹{commission.amount.toFixed(2)}</Text>
+                        <Text style={styles.commissionAmount}>₹{commission.amount}</Text>
                         <View style={[styles.statusBadge, commission.isPaid ? styles.paidBadge : styles.unpaidBadge]}>
                           <Text style={styles.statusText}>{commission.isPaid ? 'Paid' : 'Unpaid'}</Text>
                         </View>

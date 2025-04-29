@@ -3,7 +3,7 @@ export interface Commission {
   saleId: string;
   salesmanId: string;
   shopId: string;
-  amount: string | number;
+  amount: string;
   isPaid: boolean;
   commissionRuleId: string;
   createdAt: string;

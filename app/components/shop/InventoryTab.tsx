@@ -410,7 +410,6 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
     sellingPrice: 0,
     stockQuantity: 0,
     productImageUrl: '',
-    shopId: shopId,
   });
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -546,12 +545,12 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       return false;
     }
     
-    if (!formData.basePrice || isNaN(formData.basePrice) || formData.basePrice <= 0) {
+    if (!formData.basePrice || isNaN(Number(formData.basePrice)) || Number(formData.basePrice) <= 0) {
       Alert.alert('Error', 'Base price must be greater than 0');
       return false;
     }
     
-    if (!formData.sellingPrice || isNaN(formData.sellingPrice) || formData.sellingPrice <= 0) {
+    if (!formData.sellingPrice || isNaN(Number(formData.sellingPrice)) || Number(formData.sellingPrice) <= 0) {
       Alert.alert('Error', 'Selling price must be greater than 0');
       return false;
     }
@@ -593,7 +592,6 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         sellingPrice: formData.sellingPrice,
         stockQuantity: formData.stockQuantity,
         productImageUrl: formData.productImageUrl || '',
-        shopId: shopId,
       };
       
       try {
@@ -647,7 +645,6 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       sellingPrice: typeof product.sellingPrice === 'string' ? parseFloat(product.sellingPrice) : product.sellingPrice,
       stockQuantity: product.stockQuantity,
       productImageUrl: product.productImageUrl || '',
-      shopId: shopId,
     });
     setEditMode(true);
     setShowAddModal(true);
@@ -661,7 +658,6 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       sellingPrice: 0,
       stockQuantity: 0,
       productImageUrl: '',
-      shopId: shopId,
     });
     setEditMode(false);
     setEditId(null);

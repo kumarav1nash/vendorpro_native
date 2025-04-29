@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
-import { format } from 'date-fns';
+import { format, set } from 'date-fns';
 import { useSales } from '../../src/contexts/SalesContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { Sale } from '../../src/types/sales';
@@ -36,17 +36,13 @@ export default function SalesHistoryScreen() {
 
   useEffect(() => {
     if (user?.id && sales) {
-      console.log('Filtering sales for user:', user.id);
-      console.log('Total sales available:', sales.length);
-      
+
       // Filter sales for current user with strong type checking
-      const userSales = sales;
-      console.log('Filtered sales for user:', userSales.length);
       
       // Apply status filter
-      let statusFilteredSales = userSales;
+      let statusFilteredSales = sales;
       if (activeFilter !== FILTER_ALL) {
-        statusFilteredSales = userSales.filter(sale => sale.status === activeFilter);
+        statusFilteredSales = sales.filter(sale => sale.status === activeFilter);
         console.log(`Applied ${activeFilter} filter:`, statusFilteredSales.length, 'items');
       }
       
@@ -143,14 +139,19 @@ export default function SalesHistoryScreen() {
     const statusIcon = getStatusIcon(item.status);
     
     // Convert string values to numbers for calculations
-    const salePrice = typeof item.salePrice === 'string' ? parseFloat(item.salePrice) : item.salePrice;
+    const totalAmount = typeof item.soldAt === 'string' ? parseFloat(item.soldAt) : item.soldAt;
     const quantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
-    const totalAmount = salePrice * quantity;
-    
+    const sellingPrice = typeof item.product.sellingPrice === 'string' ? parseFloat(item.product.sellingPrice) : item.product.sellingPrice;
     const formattedDate = format(new Date(item.createdAt), 'dd MMM yyyy, HH:mm');
     
     return (
       <View style={styles.saleItem}>
+        <View style={styles.sellingPriceTag}>
+          <Text style={styles.sellingPriceText}>
+            MRP: {formatCurrency(sellingPrice)}
+          </Text>
+        </View>
+        
         <View style={styles.saleHeader}>
           <View style={styles.productInfo}>
             {item.product?.productImageUrl ? (
@@ -169,7 +170,7 @@ export default function SalesHistoryScreen() {
                 {item.product?.productName || 'Unknown Product'}
               </Text>
               <Text style={styles.productQuantity}>
-                {quantity} {quantity > 1 ? 'units' : 'unit'} × {formatCurrency(salePrice)}
+                {quantity} {quantity > 1 ? 'pcs' : 'pc'} x {formatCurrency(totalAmount/quantity)}
               </Text>
             </View>
           </View>
@@ -312,6 +313,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
+    position: 'relative',
   },
   saleHeader: {
     flexDirection: 'row',
@@ -346,6 +348,27 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0F172A',
     marginBottom: 4,
+  },
+  sellingPriceTag: {
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderTopLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderRightColor: '#0EA5E9',
+    borderRightWidth: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0EA5E9',
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    zIndex: 1,
+  },
+  sellingPriceText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0EA5E9',
   },
   productQuantity: {
     fontSize: 14,

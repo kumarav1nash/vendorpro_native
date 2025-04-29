@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, TextInput, Alert, Platform, RefreshControl } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,26 +13,26 @@ import { useInventory } from '../../src/contexts/InventoryContext';
 import { useSales } from '../../src/contexts/SalesContext';
 import { useCommission } from '../../src/contexts/CommissionContext';
 import { useUser } from '../../src/contexts/UserContext';
-import { useUserProfile } from '../../src/contexts/UserProfileContext';
 import { Inventory } from '../../src/types/inventory';
 import { Sale } from '../../src/types/sales';
 import { Commission } from '../../src/types/commission';
 
 export default function DashboardScreen() {
-  const { user } = useAuth();
+  const { user,logout } = useAuth();
   const { shop, getShopBySalesmanId } = useShop();
   const { sales, fetchAllSales, createSale } = useSales();
   const { inventories, fetchInventoryByShopId } = useInventory();
   const { commissions, fetchCommissionsBySalesman, commissionSummary } = useCommission();
-  const { profile, fetchProfileByUserId } = useUserProfile();
+ 
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Inventory | null>(null);
   const [quantity, setQuantity] = useState('1');
   const [modalVisible, setModalVisible] = useState(false);
   const [customPrice, setCustomPrice] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [userSales, setUserSales] = useState<Sale[]>([]);
   const [userCommissions, setUserCommissions] = useState<Commission[]>([]);
   const [metrics, setMetrics] = useState({
     totalSales: 0,
@@ -68,15 +68,6 @@ export default function DashboardScreen() {
       setLoading(false);
     }
     
-    // Refresh data every 60 seconds
-    const refreshInterval = setInterval(() => {
-      if (user?.id) {
-        console.log('Refreshing dashboard data...');
-        loadData();
-      }
-    }, 60000);
-    
-    return () => clearInterval(refreshInterval);
   }, [user?.id, shop?.id]);
 
   // Filter products based on search
@@ -98,45 +89,24 @@ export default function DashboardScreen() {
     console.log("Updating dashboard metrics");
     
     // Initialize with default values
-    const updatedMetrics = {
-      totalSales: 0,
-      pendingSales: 0,
-      totalCommission: 0,
-      pendingCommission: 0
-    };
+ 
     
     // If commission summary is available, use it directly
     if (commissionSummary) {
       console.log("Using commission summary for metrics:", commissionSummary);
-      updatedMetrics.totalCommission = safeNumberConversion(commissionSummary.approvedSalesCommission);
-      updatedMetrics.pendingCommission = safeNumberConversion(commissionSummary.pendingSalesCommission);
+      setMetrics({
+        ...metrics,
+        totalSales: safeNumberConversion(sales.length),
+        pendingSales:  safeNumberConversion(sales.filter(sale => sale.status === 'pending').length),
+        totalCommission: safeNumberConversion(commissionSummary.approvedSalesCommission),
+        pendingCommission: safeNumberConversion(commissionSummary.pendingSalesCommission)
+      });
     }
     
-    // Calculate sales metrics from user sales data
-    if (userSales && userSales.length > 0) {
-      console.log("Calculating sales metrics from", userSales.length, "sales");
-      
-      // Calculate total for approved sales
-      const totalSalesAmount = userSales
-        .filter(sale => sale.status === 'approved')
-        .reduce((total, sale) => {
-          const salePrice = safeNumberConversion(sale.salePrice);
-          const quantity = safeNumberConversion(sale.quantity);
-          return total + (salePrice * quantity);
-        }, 0);
-      
-      // Count pending sales
-      const pendingSalesCount = userSales
-        .filter(sale => sale.status === 'pending')
-        .length;
-        
-      updatedMetrics.totalSales = isNaN(totalSalesAmount) ? 0 : totalSalesAmount;
-      updatedMetrics.pendingSales = isNaN(pendingSalesCount) ? 0 : pendingSalesCount;
-    }
     
-    console.log("Setting new metrics:", updatedMetrics);
-    setMetrics(updatedMetrics);
-  }, [userSales, commissionSummary]);
+    
+    console.log("Setting new metrics:", metrics);
+  }, [ sales, commissionSummary]);
 
   const loadData = async () => {
     if (!user?.id) {
@@ -170,7 +140,6 @@ export default function DashboardScreen() {
       try {
         // Fetch sales with specific salesmanId parameter
         await fetchAllSales({ salesmanId: user.id });
-        
         // Fetch inventory for the shop
         await fetchInventoryByShopId(currentShop.id);
         
@@ -178,22 +147,17 @@ export default function DashboardScreen() {
         // This will now return SalesCommissionResponse with totalCommission, sales, and commissionRule
         await fetchCommissionsBySalesman(user.id);
         
-        // Load user profile
-        if (user.id) {
-          await fetchProfileByUserId(user.id).catch(err => {
-            console.log('Profile fetch error (non-critical):', err?.message || err);
-          });
-        }
-        
         // Process the fetched data
         if (sales && Array.isArray(sales)) {
-          // Ensure we're getting the latest data from context
-          const filteredSales = sales.filter(sale => sale.salesmanId === user.id);
-          setUserSales(filteredSales);
-          console.log(`Filtered ${filteredSales.length} sales for user`);
+          // Ensure we're getting the latest data from context          //set sales count
+          setMetrics({
+            ...metrics,
+            totalSales: safeNumberConversion(sales.length),
+            pendingSales: safeNumberConversion(sales.filter(sale => sale.status === 'pending').length)
+          });
+          console.log(`Filtered ${sales.length} sales for user`);
         } else {
           console.log('No sales data available');
-          setUserSales([]);
         }
         
         // We don't need to set userCommissions manually anymore since we're using commissionSummary directly
@@ -218,12 +182,87 @@ export default function DashboardScreen() {
   };
 
   const handleProductSelect = (product: Inventory) => {
+    // First reset any existing state to avoid stale values
+    resetModalState();
+    
+    // Then set the new product and values
     setSelectedProduct(product);
-    setCustomPrice(safeNumberConversion(product.sellingPrice).toString());
     setQuantity('1');
+    
+    // Set default prices based on product
+    const basePrice = safeNumberConversion(product.sellingPrice);
+    setCustomPrice(basePrice.toString());
+    setTotalAmount(basePrice.toString()); // Initially, total = unit price * 1
+    
+    // Show the modal after all state is updated
     setModalVisible(true);
   };
-  
+
+  // Calculate unit price when total amount or quantity changes
+  const updateUnitPrice = (newTotal: string, newQuantity: string) => {
+    // Guard against null or undefined inputs
+    if (!newTotal || !newQuantity) return;
+    
+    const total = parseFloat(newTotal) || 0;
+    const qty = parseInt(newQuantity) || 1;
+    
+    if (qty > 0 && total > 0) {
+      const unitPrice = total / qty;
+      setCustomPrice(unitPrice.toFixed(2));
+    } else {
+      setCustomPrice('0');
+    }
+  };
+
+  // Calculate total when unit price or quantity changes
+  const updateTotalAmount = (newPrice: string, newQuantity: string) => {
+    // Guard against null or undefined inputs
+    if (!newPrice || !newQuantity) return;
+    
+    const price = parseFloat(newPrice) || 0;
+    const qty = parseInt(newQuantity) || 1;
+    
+    const total = price * qty;
+    setTotalAmount(total.toFixed(2));
+  };
+
+  // Handle quantity change
+  const handleQuantityChange = (newQuantity: string) => {
+    // Ensure quantity is a positive number
+    const qty = parseInt(newQuantity) || 0;
+    if (qty < 0) return;
+    
+    setQuantity(newQuantity);
+    
+    // If we have a total amount, recalculate the unit price
+    if (totalAmount) {
+      updateUnitPrice(totalAmount, newQuantity);
+    } else if (customPrice) {
+      // Otherwise, recalculate the total from unit price
+      updateTotalAmount(customPrice, newQuantity);
+    }
+  };
+
+  // Handle total amount change
+  const handleTotalAmountChange = (newTotal: string) => {
+    setTotalAmount(newTotal);
+    updateUnitPrice(newTotal, quantity);
+  };
+
+  // Handle unit price change
+  const handleUnitPriceChange = (newPrice: string) => {
+    setCustomPrice(newPrice);
+    updateTotalAmount(newPrice, quantity);
+  };
+
+  // Reset modal state function
+  const resetModalState = () => {
+    setSelectedProduct(null);
+    setQuantity('1');
+    setCustomPrice('');
+    setTotalAmount('');
+  };
+
   const handleCreateSale = async () => {
     if (!selectedProduct || !user?.id) return;
     
@@ -269,13 +308,14 @@ export default function DashboardScreen() {
         salesmanId: user.id,
         shopId: currentShop.id,
         quantity: qtyNum,
-        salePrice: priceNum,
+        soldAt: priceNum.toString(),
       };
       
       await createSale(saleData);
       
-      // Close the modal
+      // Close the modal and reset state
       setModalVisible(false);
+      resetModalState();
       
       // Refresh data in the correct order
       
@@ -292,8 +332,12 @@ export default function DashboardScreen() {
       
       // 4. Update the local sales state
       if (sales && Array.isArray(sales)) {
-        const freshSales = sales.filter(sale => sale.salesmanId === user.id);
-        setUserSales(freshSales);
+        //set sales count
+        setMetrics({
+          ...metrics,
+          totalSales: sales.length,
+          pendingSales: sales.filter(sale => sale.status === 'pending').length
+        });
       }
       
       Alert.alert('Success', 'Sale created successfully');
@@ -307,10 +351,22 @@ export default function DashboardScreen() {
     }
   };
 
-  // Use user profile from context
-  const userName = profile 
-    ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() 
-    : user?.email || 'Salesman';
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
+
+  // Pull-to-refresh handler
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadData();
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user?.id]);
 
   if (loading) {
     return (
@@ -334,13 +390,13 @@ export default function DashboardScreen() {
         <Animated.View style={[styles.welcomeContainer, headerStyle]}>
           <View style={styles.welcomeTextContainer}>
             <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.userName}>{userName}</Text>
+            <Text style={styles.userName}>{user?.email}</Text>
           </View>
           <TouchableOpacity 
             style={styles.profileButton}
-            onPress={() => router.push('/(tabs)/profile')}
+            onPress={() => handleLogout()} //handle logout,we don't need to push to profile screen
           >
-            <MaterialCommunityIcons name="account-circle" size={40} color="#007bff" />
+            <MaterialCommunityIcons name="logout" size={40} color="#007bff" />
           </TouchableOpacity>
         </Animated.View>
         </View>
@@ -354,12 +410,22 @@ export default function DashboardScreen() {
           scrollY.value = e.nativeEvent.contentOffset.y;
         }}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007bff']}
+            tintColor="#007bff"
+            title="Pull to refresh"
+            titleColor="#64748B"
+          />
+        }
       >
         {/* Sales Metrics */}
         <View style={styles.metricsContainer}>
           <View style={styles.metricsRow}>
             <View style={[styles.metricCard, styles.primaryMetricCard]}>
-              <Text style={styles.metricValue}>₹{metrics.totalSales.toFixed(2)}</Text>
+              <Text style={styles.metricValue}>{metrics.totalSales}</Text>
               <Text style={styles.metricLabel}>Total Sales</Text>
             </View>
             <View style={[styles.metricCard, styles.warningMetricCard]}>
@@ -504,14 +570,20 @@ export default function DashboardScreen() {
         visible={modalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
+        onRequestClose={() => {
+          setModalVisible(false);
+          resetModalState();
+        }}
       >
         <View style={styles.modalContainer}>
           <BlurView intensity={Platform.OS === 'ios' ? 50 : 100} style={StyleSheet.absoluteFill} />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Create Sale</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <TouchableOpacity onPress={() => {
+                setModalVisible(false);
+                resetModalState();
+              }}>
                 <MaterialCommunityIcons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
             </View>
@@ -535,7 +607,7 @@ export default function DashboardScreen() {
                     <View style={styles.selectedProductInfo}>
                     <Text style={styles.selectedProductName}>{selectedProduct.productName}</Text>
                     <Text style={styles.selectedProductPrice}>
-                      Base Price: ₹{safeNumberConversion(selectedProduct.basePrice).toFixed(2)}
+                      Selling Price: ₹{safeNumberConversion(selectedProduct.sellingPrice).toFixed(2)}
                     </Text>
                     <Text style={styles.selectedProductStock}>
                       Available: {selectedProduct.stockQuantity} units
@@ -544,60 +616,69 @@ export default function DashboardScreen() {
                   </View>
                   
                   <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Selling Price (₹)</Text>
+                    <Text style={styles.formLabel}>Quantity</Text>
+                    <View style={styles.quantityContainer}>
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => {
+                          const current = parseInt(quantity) || 0;
+                          if (current > 1) {
+                            const newQty = (current - 1).toString();
+                            setQuantity(newQty);
+                            handleQuantityChange(newQty);
+                          }
+                        }}
+                      >
+                        <MaterialCommunityIcons name="minus" size={20} color="#007bff" />
+                      </TouchableOpacity>
+                        <TextInput
+                        style={styles.quantityInput}
+                        value={quantity}
+                        onChangeText={handleQuantityChange}
+                        keyboardType="number-pad"
+                      />
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() => {
+                          const current = parseInt(quantity) || 0;
+                          const max = selectedProduct.stockQuantity;
+                          if (current < max) {
+                            const newQty = (current + 1).toString();
+                            setQuantity(newQty);
+                            handleQuantityChange(newQty);
+                          } else {
+                            Alert.alert('Maximum stock reached', `Only ${max} units available.`);
+                          }
+                        }}
+                      >
+                        <MaterialCommunityIcons name="plus" size={20} color="#007bff" />
+                      </TouchableOpacity>
+                      </View>
+                    </View>
+                    
+                  <View style={styles.formGroup}>
+                    <Text style={[styles.formLabel, styles.highlightedLabel]}>Total Selling Amount (₹)</Text>
                     <TextInput
-                    style={styles.formInput}
-                    value={customPrice}
-                    onChangeText={setCustomPrice}
-                    keyboardType="decimal-pad"
-                    placeholder="Enter selling price"
+                      style={[styles.formInput, styles.highlightedInput]}
+                      value={totalAmount}
+                      onChangeText={handleTotalAmountChange}
+                      keyboardType="decimal-pad"
+                      placeholder="Enter total selling amount"
                     />
                   </View>
                   
                 <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Quantity</Text>
-                  <View style={styles.quantityContainer}>
-                    <TouchableOpacity
-                      style={styles.quantityButton}
-                      onPress={() => {
-                        const current = parseInt(quantity) || 0;
-                        if (current > 1) {
-                          setQuantity((current - 1).toString());
-                        }
-                      }}
-                    >
-                      <MaterialCommunityIcons name="minus" size={20} color="#007bff" />
-                    </TouchableOpacity>
-                      <TextInput
-                      style={styles.quantityInput}
-                      value={quantity}
-                      onChangeText={setQuantity}
-                      keyboardType="number-pad"
-                    />
-                    <TouchableOpacity
-                      style={styles.quantityButton}
-                      onPress={() => {
-                        const current = parseInt(quantity) || 0;
-                        const max = selectedProduct.stockQuantity;
-                        if (current < max) {
-                          setQuantity((current + 1).toString());
-                        } else {
-                          Alert.alert('Maximum stock reached', `Only ${max} units available.`);
-                        }
-                      }}
-                    >
-                      <MaterialCommunityIcons name="plus" size={20} color="#007bff" />
-                    </TouchableOpacity>
-                    </View>
-                  </View>
-                  
-                <View style={styles.totalContainer}>
-                    <Text style={styles.totalLabel}>Total Amount:</Text>
-                  <Text style={styles.totalValue}>
-                    ₹{((parseFloat(customPrice) || 0) * (parseInt(quantity) || 0)).toFixed(2)}
-                      </Text>
-                    </View>
-
+                  <Text style={styles.formLabel}>Unit Price (₹)</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={customPrice}
+                    onChangeText={handleUnitPriceChange}
+                    keyboardType="decimal-pad"
+                    placeholder="Per unit price"
+                    editable={true}
+                  />
+                </View>
+                
                 <TouchableOpacity style={styles.createSaleButton} onPress={handleCreateSale}>
                   <Text style={styles.createSaleButtonText}>Create Sale</Text>
                   </TouchableOpacity>
@@ -975,24 +1056,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  totalContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 24,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#0F172A',
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  highlightedLabel: {
     color: '#007bff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  highlightedInput: {
+    borderColor: '#007bff',
+    borderWidth: 2,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 18,
+    fontWeight: '600',
   },
   createSaleButton: {
     backgroundColor: '#007bff',
