@@ -345,7 +345,8 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
         }}
       >
         <View style={styles.saleHeader}>
-          <Text style={styles.invoiceNumber}>#{item.id || 'N/A'}</Text>
+          {/* only take first 8 char */}
+          <Text style={styles.invoiceNumber}>#{item.id?.slice(0, 8) ?? 'N/A'}</Text>
           <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
             <Text style={styles.statusText}>{item.status?.toUpperCase() || 'UNKNOWN'}</Text>
           </View>

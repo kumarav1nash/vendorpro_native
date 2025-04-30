@@ -677,12 +677,14 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         productName: formData.productName,
         basePrice: formData.basePrice,
         sellingPrice: formData.sellingPrice,
-        stockQuantity: formData.stockQuantity,
+        stockQuantity: Number(formData.stockQuantity),
         productImageUrl: formData.productImageUrl || '',
       };
       
       try {
-        await updateInventory(editId, updateData);
+          // remove productImageUrl if it is empty or undefined from newProduct 
+          const { productImageUrl, ...newProductWithoutImage } = updateData;
+        await updateInventory(editId, productImageUrl ? updateData : newProductWithoutImage);
       Alert.alert('Success', 'Product updated successfully');
       } catch (error) {
         console.error('Error updating product:', error);
