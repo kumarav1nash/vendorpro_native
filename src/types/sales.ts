@@ -2,21 +2,38 @@ import { Inventory } from './inventory';
 import { User } from './user';
 import { Shop } from './shop';
 
-export interface Sale {
+export interface SaleItem {
   id: string;
-  salesmanId: string;
-  shopId: string;
-  productId: string;
   product: Inventory;
   quantity: number;
   soldAt: number;
+}
+
+export interface Sale {
+  id: string;
+  salesman: User;
+  shop: Shop;
+  items: SaleItem[];
+  totalAmount: number
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
   updatedAt: string;
-  salesman: User;
-  shop: Shop;
 }
 
-export interface CreateSaleDto extends Omit<Sale, 'id' | 'status'| 'product' | 'salesman' | 'shop' | 'createdAt' | 'updatedAt'> {}
+export interface SaleWithCommission extends Sale {
+  commissionAmount: number;
+}
+
+export interface CreateSaleItemDto {
+  productId: string;
+  quantity: number;
+  soldAt: number;
+}
+
+export interface CreateSaleDto {
+  shopId: string;
+  items: CreateSaleItemDto[];
+  totalAmount: number
+}
 
 export interface UpdateSaleDto extends Partial<CreateSaleDto> {} 

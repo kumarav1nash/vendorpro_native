@@ -15,7 +15,8 @@ import { Stack, router } from 'expo-router';
 import { format, set } from 'date-fns';
 import { useSales } from '../../src/contexts/SalesContext';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { Sale } from '../../src/types/sales';
+import { Sale, SaleWithCommission } from '../../src/types/sales';
+import { useCommission } from '@/src/contexts/CommissionContext';
 
 // Filter options
 const FILTER_ALL = 'all';
@@ -23,10 +24,12 @@ const FILTER_PENDING = 'pending';
 const FILTER_APPROVED = 'approved';
 const FILTER_REJECTED = 'rejected';
 
+
 export default function SalesHistoryScreen() {
-  const { sales, fetchAllSales, loading } = useSales();
+  const { salesWithCommission, fetchAllSalesWithCommission, loading } = useSales();
+  const { activeCommissionRule,fetchActiveCommissionRule } = useCommission();
   const { user } = useAuth();
-  const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
+  const [filteredSales, setFilteredSales] = useState<SaleWithCommission[]>([]);
   const [activeFilter, setActiveFilter] = useState(FILTER_ALL);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -35,14 +38,14 @@ export default function SalesHistoryScreen() {
   }, []);
 
   useEffect(() => {
-    if (user?.id && sales) {
+    if (user?.id && salesWithCommission) {
 
       // Filter sales for current user with strong type checking
       
       // Apply status filter
-      let statusFilteredSales = sales;
+      let statusFilteredSales = salesWithCommission;
       if (activeFilter !== FILTER_ALL) {
-        statusFilteredSales = sales.filter(sale => sale.status === activeFilter);
+        statusFilteredSales = salesWithCommission.filter(sale => sale.status === activeFilter);
         console.log(`Applied ${activeFilter} filter:`, statusFilteredSales.length, 'items');
       }
       
@@ -56,7 +59,7 @@ export default function SalesHistoryScreen() {
       console.log('No user ID or sales available');
       setFilteredSales([]);
     }
-  }, [sales, activeFilter, user?.id]);
+  }, [salesWithCommission, activeFilter, user?.id]);
 
   const loadData = async () => {
     if (!user?.id) {
@@ -65,10 +68,13 @@ export default function SalesHistoryScreen() {
     }
     
     try {
+      await fetchActiveCommissionRule(user.id);
       console.log('Fetching sales for salesman ID:', user.id);
       // Explicitly pass salesmanId parameter to fetch only user's sales
-      await fetchAllSales({ salesmanId: user.id });
-      setFilteredSales(sales)
+      if(activeCommissionRule){
+        await fetchAllSalesWithCommission(activeCommissionRule, { salesmanId: user.id });
+      }
+      setFilteredSales(salesWithCommission)
       console.log('Sales fetched successfully');
     } catch (error: any) {
       if (error?.response?.status === 404) {
@@ -134,29 +140,19 @@ export default function SalesHistoryScreen() {
     return `₹${numAmount.toFixed(2)}`;
   };
 
-  const renderSaleItem = ({ item }: { item: Sale }) => {
+  const renderSaleItem = ({ item }: { item: SaleWithCommission }) => {
     const statusColor = getStatusColor(item.status);
     const statusIcon = getStatusIcon(item.status);
-    
-    // Convert string values to numbers for calculations
-    const totalAmount = typeof item.soldAt === 'string' ? parseFloat(item.soldAt) : item.soldAt;
-    const quantity = typeof item.quantity === 'string' ? parseFloat(item.quantity) : item.quantity;
-    const sellingPrice = typeof item.product.sellingPrice === 'string' ? parseFloat(item.product.sellingPrice) : item.product.sellingPrice;
     const formattedDate = format(new Date(item.createdAt), 'dd MMM yyyy, HH:mm');
-    
+    // Use the first product's image for the card
+    const firstProduct = item.items[0]?.product;
     return (
       <View style={styles.saleItem}>
-        <View style={styles.sellingPriceTag}>
-          <Text style={styles.sellingPriceText}>
-            MRP: {formatCurrency(sellingPrice)}
-          </Text>
-        </View>
-        
-        <View style={styles.saleHeader}>
+        <View style={styles.saleBody}>
           <View style={styles.productInfo}>
-            {item.product?.productImageUrl ? (
+            {firstProduct?.productImageUrl ? (
               <Image
-                source={{ uri: item.product.productImageUrl }}
+                source={{ uri: firstProduct.productImageUrl }}
                 style={styles.productImage}
                 contentFit="cover"
               />
@@ -166,17 +162,25 @@ export default function SalesHistoryScreen() {
               </View>
             )}
             <View style={styles.productDetails}>
-              <Text style={styles.productName} numberOfLines={1}>
-                {item.product?.productName || 'Unknown Product'}
-              </Text>
-              <Text style={styles.productQuantity}>
-                {quantity} {quantity > 1 ? 'pcs' : 'pc'} x {formatCurrency(totalAmount/quantity)}
-              </Text>
+              {/* List all products in the sale */}
+              {item.items.map((saleItem, idx) => (
+                <Text key={idx} style={styles.productName} numberOfLines={1}>
+                  {saleItem.product?.productName || 'Unknown Product'} x {saleItem.quantity} @ {formatCurrency(saleItem.soldAt)}
+                </Text>
+              ))}
             </View>
           </View>
-          <View style={[styles.saleStatus, { backgroundColor: `${statusColor}15` }]}>
+          {/* add the status just above footer aligned all the way right  */} 
+          <View style={[styles.sellingPriceTag, {backgroundColor: `${statusColor}15`} ]}>
+          <MaterialCommunityIcons name="cash-check" size={16} color={statusColor} />
+
+            <Text style={[styles.statusText, {color: statusColor}]}>
+              Earnings: {formatCurrency(item.commissionAmount)}
+          </Text>
+        </View>
+          <View style={[styles.saleStatus, { backgroundColor: `${statusColor}15`}]}>
             <MaterialCommunityIcons name={statusIcon} size={16} color={statusColor} />
-            <Text style={[styles.statusText, { color: statusColor }]}>
+            <Text style={[styles.statusText, { color: statusColor }]}> 
               {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
             </Text>
           </View>
@@ -185,7 +189,7 @@ export default function SalesHistoryScreen() {
           <Text style={styles.saleDate}>
             <MaterialCommunityIcons name="calendar" size={14} color="#64748B" /> {formattedDate}
           </Text>
-          <Text style={styles.saleTotal}>{formatCurrency(totalAmount)}</Text>
+          <Text style={styles.saleTotal}>{formatCurrency(item.totalAmount)}</Text>
         </View>
       </View>
     );
@@ -307,6 +311,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
+    paddingTop: 24,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -315,7 +320,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     position: 'relative',
   },
-  saleHeader: {
+  saleBody: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -350,19 +355,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sellingPriceTag: {
-    backgroundColor: '#F0F9FF',
+    flexDirection: 'row',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 12,
+    borderColor: '#0EA5E9',
     borderTopLeftRadius: 0,
     borderBottomRightRadius: 0,
-    borderRightColor: '#0EA5E9',
-    borderRightWidth: 3,
-    borderLeftWidth: 3,
-    borderLeftColor: '#0EA5E9',
-    position: 'absolute',
-    top: 0,
-    right: 0,
+    position: 'absolute', 
+    top: -24, 
+    right: -16,
     zIndex: 1,
   },
   sellingPriceText: {
@@ -376,10 +378,17 @@ const styles = StyleSheet.create({
   },
   saleStatus: {
     flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 16,
+    borderRightWidth: 2,
+    borderColor: '#0EA5E9',
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+    position: 'absolute', 
+    bottom: -12, 
+    right: -16,
+    zIndex: 1,
   },
   statusText: {
     fontSize: 12,

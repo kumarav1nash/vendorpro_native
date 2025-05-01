@@ -63,15 +63,10 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
   
   // Add new state for create sale modal
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createFormData, setCreateFormData] = useState<CreateSaleDto>({
-    productId: '',
-    salesmanId: shop?.owner.id,
-    shopId: shopId,
-    quantity: 1,
-    soldAt: 0
-  });
   const [selectedProduct, setSelectedProduct] = useState<Inventory | null>(null);
-  const [availableSalesmen, setAvailableSalesmen] = useState<any[]>([]);
+  const [addQuantity, setAddQuantity] = useState(1);
+  const [addSoldAt, setAddSoldAt] = useState(0);
+  const [saleItems, setSaleItems] = useState<{ product: Inventory; quantity: number; soldAt: number }[]>([]);
   
   // Add state for product picker modal
   const [showProductPickerModal, setShowProductPickerModal] = useState(false);
@@ -113,38 +108,25 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
   // Calculate metrics when sales data changes
   useEffect(() => {
     if (sales && sales.length > 0) {
-      // Convert to our expected structure
-      
-      // Filter for this shop
-      const shopSales = sales.map(sale => sale as unknown as Sale);
-      
       // Calculate metrics
-      const totalSales = shopSales.length;
-      const pendingSales = shopSales.filter(sale => sale.status === 'pending').length;
-      const approvedSales = shopSales.filter(sale => sale.status === 'approved').length;
-      const rejectedSales = shopSales.filter(sale => sale.status === 'rejected').length;
-      
-      // Calculate total revenue (only from approved sales)
+      const totalSales = sales.length;
+      let pendingSales = 0;
+      let approvedSales = 0;
+      let rejectedSales = 0;
       let totalRevenue = 0;
-      let approvedSalesAmount = 0;
-      
-      shopSales
-        .filter(sale => sale.status === 'approved')
-        .forEach(sale => {
-          const saleAmount = typeof sale.soldAt === 'string' 
-            ? parseFloat(sale.soldAt) 
-            : (sale.soldAt || 0);
-          
-          totalRevenue += saleAmount;
-          approvedSalesAmount++;
-        });
-      
-      // Calculate average sale amount
-      const averageSaleAmount = approvedSalesAmount > 0 
-        ? totalRevenue / approvedSalesAmount 
-        : 0;
-      
-      // Update metrics state
+      let approvedSalesCount = 0;
+      sales.forEach(sale => {
+        if (sale.status === 'pending') pendingSales++;
+        if (sale.status === 'approved') approvedSales++;
+        if (sale.status === 'rejected') rejectedSales++;
+        if (sale.status === 'approved') {
+          sale.items.forEach(item => {
+            totalRevenue += typeof item.soldAt === 'string' ? parseFloat(item.soldAt) : item.soldAt;
+          });
+          approvedSalesCount++;
+        }
+      });
+      const averageSaleAmount = approvedSalesCount > 0 ? totalRevenue / approvedSalesCount : 0;
       setMetrics({
         totalSales,
         pendingSales,
@@ -194,13 +176,14 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
         filtered = filtered.filter(sale => {
-        // Search by id, product name, or salesman email
+        // Search by sale id, any product name, or salesman email
+        const productNames = sale.items.map(item => item.product?.productName?.toLowerCase() || '').join(' ');
         return (
           sale.id?.toLowerCase().includes(query) ||
-          sale.product?.productName?.toLowerCase().includes(query) ||
+          productNames.includes(query) ||
           sale.salesman?.email?.toLowerCase().includes(query)
         );
-      });
+        });
       
       console.log(`After search filter: ${filtered.length} sales`);
       }
@@ -212,9 +195,9 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
         const dateB = new Date(b.createdAt || 0).getTime();
         return sortDirection === 'asc' ? dateA - dateB : dateB - dateA;
         } else {
-        // Convert string salePrice to number for comparison
-        const priceA = typeof a.soldAt === 'string' ? parseFloat(a.soldAt) : (a.soldAt || 0);
-        const priceB = typeof b.soldAt === 'string' ? parseFloat(b.soldAt) : (b.soldAt || 0);
+        // Sort by totalAmount
+        const priceA = typeof a.totalAmount === 'string' ? parseFloat(a.totalAmount) : (a.totalAmount || 0);
+        const priceB = typeof b.totalAmount === 'string' ? parseFloat(b.totalAmount) : (b.totalAmount || 0);
           return sortDirection === 'asc' 
           ? priceA - priceB
           : priceB - priceA;
@@ -263,8 +246,8 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
             // Log specific properties to check structure
             if (sales && sales.length > 0) {
               const sampleSale = sales[0] as unknown as Sale;
-              console.log("Product name:", sampleSale.product?.productName);
-              console.log("Sale price:", sampleSale.soldAt);
+              console.log("Product name:", sampleSale.items[0]?.product?.productName);
+              console.log("Sale price:", sampleSale.items[0]?.soldAt);
               console.log("Status:", sampleSale.status);
             }
             
@@ -323,19 +306,9 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
       setIsLoading(false);
     }
   };
-  
+
   // Render individual sale item
   const renderSaleItem = ({ item }: { item: Sale }) => {
-    // Add safety check
-    if (!item) {
-      console.log('Undefined sale item encountered');
-      return null;
-    }
-    
-    // Handle both flat and nested product structures
-    const productName = item.product?.productName || 'Unknown Product';
-    console.log(`Rendering sale item: ${item.id}, product: ${productName}`);
-    
     return (
       <TouchableOpacity
         style={styles.saleItem}
@@ -345,24 +318,25 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
         }}
       >
         <View style={styles.saleHeader}>
-          {/* only take first 8 char */}
           <Text style={styles.invoiceNumber}>#{item.id?.slice(0, 8) ?? 'N/A'}</Text>
           <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
             <Text style={styles.statusText}>{item.status?.toUpperCase() || 'UNKNOWN'}</Text>
           </View>
         </View>
-        
         <View style={styles.saleDetails}>
-          <View style={styles.productInfo}>
-            <Text style={styles.productName}>{productName}</Text>
-            <Text style={styles.quantity}>Qty: {item.quantity || 0}</Text>
-          </View>
+          {/* List all products in the sale */}
+          {item.items.map((saleItem, idx) => (
+            <View key={idx} style={{ marginBottom: 4 }}>
+              <Text style={styles.productName}>{saleItem.product?.productName || 'Unknown Product'}</Text>
+              <Text style={styles.quantity}>Qty: {saleItem.quantity || 0}</Text>
+              <Text style={styles.amount}>₹{saleItem.soldAt}</Text>
+            </View>
+          ))}
           <View style={styles.priceInfo}>
-            <Text style={styles.amount}>{formatCurrency(item.soldAt)}</Text>
+            <Text style={styles.amount}>Total: {formatCurrency(item.totalAmount)}</Text>
             <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
           </View>
         </View>
-        
         <View style={styles.saleFooter}>
           <Text style={styles.salesmanName}>
             <MaterialCommunityIcons name="account" size={14} color="#666" />
@@ -394,13 +368,6 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
     setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
   };
   
-  // Calculate unit price safely
-  const calculateUnitPrice = (sale: Sale) => {
-    if (!sale || !sale.quantity || sale.quantity <= 0) return 0;
-    const salePrice = typeof sale.soldAt === 'string' ? parseFloat(sale.soldAt) : (sale.soldAt || 0);
-    return salePrice / sale.quantity;
-  };
-  
   // Render KPI metrics section
   const renderMetricsCards = () => {
     return (
@@ -409,35 +376,35 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
           <View style={styles.metricCard}>
             <View style={styles.metricIconContainer}>
               <MaterialCommunityIcons name="cart-outline" size={24} color="#007AFF" />
-            </View>
+          </View>
             <View style={styles.metricTextContainer}>
               <Text style={styles.metricValue}>{metrics.totalSales}</Text>
               <Text style={styles.metricLabel}>Total Sales</Text>
-            </View>
-          </View>
-          
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIconContainer, { backgroundColor: '#E8F5E9' }]}>
-              <MaterialCommunityIcons name="cash-multiple" size={24} color="#4CAF50" />
-            </View>
-            <View style={styles.metricTextContainer}>
-              <Text style={styles.metricValue}>{formatCurrency(metrics.totalRevenue)}</Text>
-              <Text style={styles.metricLabel}>Total Revenue</Text>
-            </View>
           </View>
         </View>
         
+          <View style={styles.metricCard}>
+            <View style={[styles.metricIconContainer, { backgroundColor: '#E8F5E9' }]}>
+              <MaterialCommunityIcons name="cash-multiple" size={24} color="#4CAF50" />
+          </View>
+            <View style={styles.metricTextContainer}>
+              <Text style={styles.metricValue}>{formatCurrency(metrics.totalRevenue)}</Text>
+              <Text style={styles.metricLabel}>Total Revenue</Text>
+          </View>
+          </View>
+          </View>
+          
         <View style={styles.metricsRow}>
           <View style={styles.metricCard}>
             <View style={[styles.metricIconContainer, { backgroundColor: '#FFF8E1' }]}>
               <MaterialCommunityIcons name="clock-outline" size={22} color="#FFC107" />
-            </View>
+          </View>
             <View style={styles.metricTextContainer}>
               <Text style={styles.metricValue}>{metrics.pendingSales}</Text>
               <Text style={styles.metricLabel}>Pending</Text>
             </View>
-          </View>
-          
+        </View>
+        
           <View style={styles.metricCard}>
             <View style={[styles.metricIconContainer, { backgroundColor: '#E8F5E9' }]}>
               <MaterialCommunityIcons name="check-circle-outline" size={22} color="#4CAF50" />
@@ -458,7 +425,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
       // This is a placeholder - you need to implement or use an existing function to fetch salesmen
       // For example, you might have a function like: const salesmen = await fetchSalesmenByShopId(shopId);
       // For now, we'll just show an empty array
-      setAvailableSalesmen([]);
+      setSaleItems([]);
     } catch (error) {
       console.error('Error fetching salesmen:', error);
     }
@@ -467,15 +434,9 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
   // Function to handle opening the create sale modal
   const handleOpenCreateModal = () => {
     // Reset form data
-    setCreateFormData({
-      productId: selectedProduct?.id ?? '',
-      salesmanId: shop.owner.id,
-      shopId: shopId,
-      quantity: 1,
-      soldAt: 0
-    });
     setSelectedProduct(null);
-    
+    setAddQuantity(1);
+    setAddSoldAt(0);
     
     // Show modal
     setShowCreateModal(true);
@@ -511,66 +472,67 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
     console.log('Selected product:', product);
     
     // Update the form data with the selected product ID
-    setCreateFormData(prev => ({
-      ...prev,
-      productId: product.id,
-      soldAt: typeof product.sellingPrice === 'string' ? 
-        parseFloat(product.sellingPrice) : 
-        (product.sellingPrice || 0)
-    }));
+    setAddQuantity(product.stockQuantity);
+    setAddSoldAt(product.sellingPrice);
     
     console.log('Updated form data with product ID:', product.id);
     setShowProductPickerModal(false);
   };
 
-  // Function to handle input changes
-  const handleCreateInputChange = (field: string, value: string | number) => {
-    console.log(`Updating ${field} to:`, value);
-    setCreateFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    console.log('Form data after update:', createFormData);
+  // Helper to reset modal state
+  const resetCreateModalState = () => {
+    setSelectedProduct(null);
+    setAddQuantity(1);
+    setAddSoldAt(0);
+    setSaleItems([]);
   };
 
-  // Function to create a sale
+  // Add product to sale items list
+  const handleAddProductToSale = () => {
+    if (!selectedProduct) return;
+    const qty = addQuantity;
+    const price = addSoldAt;
+    if (!qty || qty <= 0 || !price || price <= 0) return;
+    if (qty > selectedProduct.stockQuantity) {
+      Alert.alert('Insufficient stock', `Only ${selectedProduct.stockQuantity} units available`);
+      return;
+    }
+    setSaleItems(prev => [...prev, { product: selectedProduct, quantity: qty, soldAt: price }]);
+    setSelectedProduct(null);
+    setAddQuantity(1);
+    setAddSoldAt(0);
+  };
+
+  // Remove product from sale items list
+  const handleRemoveProductFromSale = (idx: number) => {
+    setSaleItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // Refactor handleCreateSale to use saleItems
   const handleCreateSale = async () => {
+    if (saleItems.length === 0) {
+      Alert.alert('No products', 'Please add at least one product to the sale.');
+      return;
+    }
+    const items = saleItems.map(item => ({
+      productId: item.product.id,
+      quantity: item.quantity,
+      soldAt: item.soldAt,
+    }));
+    const totalAmount = saleItems.reduce((sum, item) => sum + item.soldAt, 0);
+    const saleData = { shopId: shopId, items, totalAmount };
+    setIsLoading(true);
     try {
-      // Debug: log the form data
-      console.log('Form data before validation:', createFormData);
-      console.log('Selected product before validation:', selectedProduct);
-      
-      // Validate inputs
-      if (!createFormData.productId) {
-        console.log('ProductId is empty or invalid:', createFormData.productId);
-        Alert.alert('Error', 'Please select a product');
-        return;
-      }
-      
-      if (!createFormData.quantity || createFormData.quantity <= 0) {
-        Alert.alert('Error', 'Quantity must be greater than 0');
-        return;
-      }
-      
-      if (!createFormData.soldAt || createFormData.soldAt <= 0) {
-        Alert.alert('Error', 'Selling price must be greater than 0');
-        return;
-      }
-      
-      setIsLoading(true);
-      
-      await createSale(createFormData);
-      console.log('Creating sale with data:', JSON.stringify(createFormData));
-      
+      await createSale(saleData);
       Alert.alert('Success', 'Sale created successfully');
       setShowCreateModal(false);
-      
-      // Refresh sales data
+      setSaleItems([]);
+      setAddQuantity(1);
+      setAddSoldAt(0);
+      setSelectedProduct(null);
       await loadSalesData();
-      //TODO: refresh inventory data
       await fetchInventoryByShopId(shopId);
     } catch (error) {
-      console.error('Error creating sale:', error);
       Alert.alert('Error', 'Failed to create sale');
     } finally {
       setIsLoading(false);
@@ -593,14 +555,14 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
           />
         </View>
         
-        <TouchableOpacity
+          <TouchableOpacity 
           style={styles.addButton}
           onPress={handleOpenCreateModal}
-        >
+          >
           <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-        </TouchableOpacity>
+          </TouchableOpacity>
       </View>
-      
+          
       <View style={styles.tabsContainer}>
           <TouchableOpacity 
           style={[styles.tab, activeTab === 'all' && styles.activeTab]}
@@ -711,23 +673,21 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Sale Details</Text>
-                <TouchableOpacity
+      <TouchableOpacity 
                   style={styles.closeButton}
                   onPress={() => {
                     setShowDetailsModal(false);
                     setSelectedSale(null);
                   }}
-                >
+      >
                   <MaterialCommunityIcons name="close" size={24} color="#333" />
-                </TouchableOpacity>
+      </TouchableOpacity>
               </View>
-              
               <View style={styles.detailsContainer}>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Invoice:</Text>
                   <Text style={styles.detailValue}>#{selectedSale.id || 'N/A'}</Text>
                 </View>
-                
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Status:</Text>
                   <View style={[
@@ -737,45 +697,33 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
                     <Text style={styles.statusText}>{selectedSale.status?.toUpperCase() || 'UNKNOWN'}</Text>
                   </View>
                 </View>
-                
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Date:</Text>
                   <Text style={styles.detailValue}>{formatDate(selectedSale.createdAt)}</Text>
                 </View>
-                
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Product:</Text>
-                  <Text style={styles.detailValue}>
-                    {selectedSale.product?.productName || 'Unknown Product'}
-                  </Text>
-                </View>
-                
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Quantity:</Text>
-                  <Text style={styles.detailValue}>{selectedSale.quantity || 0}</Text>
-                </View>
-                
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Unit Price:</Text>
-                  <Text style={styles.detailValue}>
-                    {formatCurrency(calculateUnitPrice(selectedSale))}
-                  </Text>
-                </View>
-                
+                {/* List all products in the sale */}
+                {selectedSale.items.map((saleItem, idx) => (
+                  <View key={idx} style={{ marginBottom: 4 }}>
+                    <Text style={styles.detailLabel}>Product:</Text>
+                    <Text style={styles.detailValue}>{saleItem.product?.productName || 'Unknown Product'}</Text>
+                    <Text style={styles.detailLabel}>Quantity:</Text>
+                    <Text style={styles.detailValue}>{saleItem.quantity}</Text>
+                    <Text style={styles.detailLabel}>Unit Price:</Text>
+                    <Text style={styles.detailValue}>{formatCurrency(saleItem.soldAt)}</Text>
+                  </View>
+                ))}
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Total Amount:</Text>
                   <Text style={[styles.detailValue, styles.totalAmount]}>
-                    {formatCurrency(selectedSale.soldAt)}
+                    {formatCurrency(selectedSale.totalAmount)}
                   </Text>
                 </View>
-                
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Salesman:</Text>
                   <Text style={styles.detailValue}>
                     {selectedSale.salesman?.phoneNumber || selectedSale.salesman?.email || 'Direct Sale'}
                   </Text>
                 </View>
-                
                 {selectedSale.status === 'pending' && (
                   <View style={styles.actionButtons}>
                     <TouchableOpacity
@@ -785,16 +733,15 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
                     >
                       <MaterialCommunityIcons name="check" size={18} color="#fff" />
                       <Text style={styles.actionButtonText}>Approve</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
+                    </TouchableOpacity>
+                    <TouchableOpacity
                       style={[styles.actionButton, styles.rejectButton]}
                       onPress={() => handleRejectSale(selectedSale.id)}
                       disabled={isLoading}
-                >
+                    >
                       <MaterialCommunityIcons name="close" size={18} color="#fff" />
                       <Text style={styles.actionButtonText}>Reject</Text>
-                </TouchableOpacity>
+                    </TouchableOpacity>
                   </View>
                 )}
               </View>
@@ -808,106 +755,119 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
         visible={showCreateModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowCreateModal(false)}
+        onRequestClose={() => {
+          setShowCreateModal(false);
+          resetCreateModalState();
+        }}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Create New Sale</Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setShowCreateModal(false)}
-              >
-                <MaterialCommunityIcons name="close" size={24} color="#333" />
-              </TouchableOpacity>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' }}>
+          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 24, maxHeight: '90%' }}>
+            <View style={{ alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#0F172A' }}>Create Sale</Text>
             </View>
-            
-            <ScrollView style={styles.createFormContainer}>
-              {/* Product Selection */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Product*</Text>
-                <View style={styles.selectContainer}>
-                  <TouchableOpacity 
-                    style={styles.select}
-                    onPress={openProductPicker}
-                  >
-                    <Text style={[
-                      styles.selectText, 
-                      !selectedProduct && { color: '#999' }
-                    ]}>
-                      {selectedProduct ? selectedProduct.productName : 'Select Product'}
-                    </Text>
-                    <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
-                  </TouchableOpacity>
+            <ScrollView style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+              {/* Add Product Section */}
+              <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Add Product</Text>
+              <View style={{ marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#ddd',
+                    borderRadius: 8,
+                    padding: 12,
+                    marginBottom: 8,
+                    backgroundColor: selectedProduct ? '#F0F9FF' : '#fff',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                  onPress={openProductPicker}
+                >
+                  <Text style={{ fontSize: 16, color: selectedProduct ? '#007AFF' : '#999' }}>
+                    {selectedProduct ? selectedProduct.productName : 'Select Product'}
+                  </Text>
+                  <MaterialCommunityIcons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+                <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={{ fontSize: 14, color: '#333', marginBottom: 4 }}>Quantity</Text>
+                    <TextInput
+                      style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, fontSize: 16, backgroundColor: '#F8FAFC' }}
+                      keyboardType="numeric"
+                      value={addQuantity.toString()}
+                      onChangeText={text => setAddQuantity(Number(text) || 1)}
+                      editable={!!selectedProduct}
+                    />
+            </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, color: '#333', marginBottom: 4 }}>Selling Price (₹)</Text>
+              <TextInput
+                      style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, fontSize: 16, backgroundColor: '#F8FAFC' }}
+                      keyboardType="numeric"
+                      value={addSoldAt.toString()}
+                      onChangeText={text => setAddSoldAt(Number(text) || 0)}
+                      editable={!!selectedProduct}
+                    />
+                  </View>
                 </View>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: selectedProduct ? '#007AFF' : '#ccc',
+                    borderRadius: 8,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    marginBottom: 8,
+                  }}
+                  onPress={handleAddProductToSale}
+                  disabled={!selectedProduct}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Add Product</Text>
+                </TouchableOpacity>
               </View>
-              
-              
-              {/* Quantity */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Quantity*</Text>
-                <TextInput
-                  style={styles.textInput}
-                  keyboardType="numeric"
-                  value={createFormData.quantity.toString()}
-                  onChangeText={(value) => handleCreateInputChange('quantity', parseInt(value) || 0)}
-                />
-              </View>
-              
-              {/* Selling Price */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Selling Price (₹)*</Text>
-                <TextInput
-                  style={styles.textInput}
-                  keyboardType="numeric"
-                  value={createFormData.soldAt.toString()}
-                  onChangeText={(value) => handleCreateInputChange('soldAt', parseFloat(value) || 0)}
-                />
-              </View>
-              
-              {selectedProduct && (
-                <View style={styles.productInfoBox}>
-                  <Text style={styles.productInfoTitle}>Product Information</Text>
-                  <View style={styles.productInfoRow}>
-                    <Text style={styles.productInfoLabel}>Base Price:</Text>
-                    <Text style={styles.productInfoValue}>
-                      {formatCurrency(selectedProduct.basePrice)}
-                    </Text>
-                  </View>
-                  <View style={styles.productInfoRow}>
-                    <Text style={styles.productInfoLabel}>Regular Price:</Text>
-                    <Text style={styles.productInfoValue}>
-                      {formatCurrency(selectedProduct.sellingPrice)}
-                    </Text>
-                  </View>
-                  <View style={styles.productInfoRow}>
-                    <Text style={styles.productInfoLabel}>Available Stock:</Text>
-                    <Text style={styles.productInfoValue}>
-                      {selectedProduct.stockQuantity} units
-                    </Text>
-                  </View>
+              <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 12 }} />
+              {/* Products in Sale Section */}
+              <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Products in Sale</Text>
+              {saleItems.length === 0 ? (
+                <Text style={{ color: '#999', marginBottom: 12 }}>No products added yet.</Text>
+              ) : (
+                <View style={{ marginBottom: 12 }}>
+                  {saleItems.map((item, idx) => (
+                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: '#0F172A' }}>{item.product.productName}</Text>
+                        <Text style={{ fontSize: 13, color: '#64748B' }}>Qty: {item.quantity}  |  Price: ₹{item.soldAt}</Text>
+                      </View>
+                      <TouchableOpacity onPress={() => handleRemoveProductFromSale(idx)} style={{ marginLeft: 8 }}>
+                        <MaterialCommunityIcons name="delete" size={22} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                 </View>
               )}
+              <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 12 }} />
+              {/* Total Section */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#0F172A' }}>Total</Text>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#007AFF' }}>₹{saleItems.reduce((sum, item) => sum + item.soldAt, 0)}</Text>
+              </View>
             </ScrollView>
-            
-            <View style={styles.modalFooter}>
+            {/* Bottom Buttons */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 8 }}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowCreateModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
+                style={{ flex: 1, backgroundColor: '#10B981', borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginRight: 8 }}
                 onPress={handleCreateSale}
-                disabled={isLoading}
+                disabled={saleItems.length === 0 || isLoading}
               >
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Create Sale</Text>
-                )}
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Create Sale</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: '#F1F5F9', borderRadius: 8, paddingVertical: 14, alignItems: 'center', marginLeft: 8 }}
+                onPress={() => {
+                  setShowCreateModal(false);
+                  resetCreateModalState();
+                }}
+              >
+                <Text style={{ color: '#64748B', fontWeight: 'bold', fontSize: 16 }}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -925,13 +885,13 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Select Product</Text>
-              <TouchableOpacity
+                <TouchableOpacity
                 style={styles.closeButton}
                 onPress={() => setShowProductPickerModal(false)}
-              >
+                >
                 <MaterialCommunityIcons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-            </View>
+                </TouchableOpacity>
+              </View>
             
             <View style={styles.searchContainer}>
               <MaterialCommunityIcons name="magnify" size={20} color="#666" style={styles.searchIcon} />
