@@ -34,10 +34,7 @@ interface UserWithProfile extends User {
   profile?: UserProfile;
 }
 
-// Extend the Sale type to include calculated fields
-interface ExtendedSale extends Sale {
-  totalAmount?: number;
-}
+
 
 type PerformanceMetrics = {
   totalSales: number;
@@ -53,6 +50,8 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   const { fetchAllSales, sales } = useSales();
   const { 
     commissions, 
+    commissionResponse,
+    commissionSummary,
     rules: commissionRules,
     fetchCommissionsBySalesman,
     fetchAllCommissionRules
@@ -64,6 +63,8 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   const [filteredSalesmen, setFilteredSalesmen] = useState<UserWithProfile[]>([]);
   const [salesmanCommissions, setSalesmanCommissions] = useState<Commission[]>([]);
   const [salesmanCommissionSummary, setSalesmanCommissionSummary] = useState<CommissionSummary[]>([]);
+  const [allSalesmenCommissionData, setAllSalesmenCommissionData] = useState<Map<string, CommissionSummary | null>>(new Map());
+  const [totalCommissionSum, setTotalCommissionSum] = useState(0);
   
   // Form state
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -107,6 +108,34 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     loadSales();
     loadCommissionRules();
   }, [shopId]);
+  
+  useEffect(() => {
+    if (shopSalesmen.length > 0) {
+      loadAllSalesmenCommissions();
+    }
+  }, [shopSalesmen]);
+  
+  useEffect(() => {
+    if (commissionResponse && selectedSalesman) {
+      // This is for the individual salesman view
+      if (commissionSummary) {
+        setSalesmanPerformance(prev => ({
+          ...prev,
+          totalCommission: commissionSummary.totalCommission
+        }));
+      }
+    }
+  }, [commissionResponse, commissionSummary]);
+  
+  useEffect(() => {
+    let total = 0;
+    allSalesmenCommissionData.forEach((summary) => {
+      if (summary) {
+        total += summary.totalCommission;
+      }
+    });
+    setTotalCommissionSum(total);
+  }, [allSalesmenCommissionData]);
   
   useEffect(() => {
     if (shopSalesmen.length > 0) {
@@ -155,12 +184,32 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     }
   };
 
+  // Function to load commissions for a specific salesman
   const loadSalesmanCommissions = async (salesmanId: string) => {
     try {
       await fetchCommissionsBySalesman(salesmanId);
     } catch (error) {
       console.error('Error loading salesman commissions:', error);
     }
+  };
+  
+  // Function to load commissions for all salesmen
+  const loadAllSalesmenCommissions = async () => {
+    const commissionMap = new Map<string, CommissionSummary | null>();
+    
+    for (const salesman of shopSalesmen) {
+      try {
+        await fetchCommissionsBySalesman(salesman.id);
+        
+        if (commissionSummary) {
+          commissionMap.set(salesman.id, commissionSummary);
+        }
+      } catch (error) {
+        console.error(`Error loading commissions for salesman ${salesman.id}:`, error);
+      }
+    }
+    
+    setAllSalesmenCommissionData(commissionMap);
   };
   
   const handleInputChange = (field: string, value: string | number | boolean) => {
@@ -234,7 +283,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   
   const handleDeleteSalesman = (salesmanId: string) => {
     // Check if salesman has any sales
-    const salesmanSales = sales.filter(sale => sale.salesmanId === salesmanId);
+    const salesmanSales = sales.filter(sale => sale.salesman.id === salesmanId);
     
     if (salesmanSales.length > 0) {
       Alert.alert(
@@ -309,12 +358,12 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     await loadSalesmanCommissions(salesman.id);
     
     // Calculate performance metrics
-    const salesmanSales = sales.filter(sale => sale.salesmanId === salesman.id) as ExtendedSale[];
+    const salesmanSales = sales.filter(sale => sale.salesman.id === salesman.id);
     
     // Calculate totals
     const totalSales = salesmanSales.length;
     const totalAmount = salesmanSales.reduce((sum, sale) => 
-      sum + (sale.soldAt * sale.quantity), 0);
+      sum + (typeof sale.totalAmount === 'string' ? parseFloat(sale.totalAmount) : sale.totalAmount || 0), 0);
     
     // Get commission from actual commissions
     const totalCommission = salesmanCommissionSummary.reduce((sum, commission) => 
@@ -430,8 +479,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       const totalSalesmen = shopSalesmen.length;
       const activeSalesmen = shopSalesmen.filter(s => s.isActive).length;
       
-      // Calculate total commission and find top performer
-      let totalCommission = 0;
+      // Calculate sales metrics and find top performer
       let topPerformerSales = 0;
       let topPerformer = '';
       
@@ -444,7 +492,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
         // Skip if not approved
         if (sale.status !== 'approved') return;
         
-        const salesmanId = sale.salesmanId || '';
+        const salesmanId = sale.salesman.id || '';
         if (!salesmanId) return;
         
         // Count sales by salesman
@@ -452,9 +500,9 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
         salesBySalesman.set(salesmanId, currentCount + 1);
         
         // Sum amount by salesman
-        const saleAmount = typeof sale.soldAt === 'string' 
-          ? parseFloat(sale.soldAt) 
-          : (sale.soldAt || 0);
+        const saleAmount = typeof sale.totalAmount === 'string' 
+          ? parseFloat(sale.totalAmount) 
+          : (sale.totalAmount || 0);
         
         const currentAmount = amountBySalesman.get(salesmanId) || 0;
         amountBySalesman.set(salesmanId, currentAmount + saleAmount);
@@ -469,26 +517,16 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
         }
       });
       
-      // Calculate total commission 
-      salesmanCommissionSummary?.forEach(commission => {
-          const amount = typeof commission.totalCommission === 'string'
-            ? parseFloat(commission.totalCommission)
-            : commission.totalCommission;
-          
-          totalCommission += amount;
-        
-      });
-      
       // Update metrics
       setMetrics({
         totalSalesmen,
         activeSalesmen,
-        totalCommission,
+        totalCommission: totalCommissionSum,
         topPerformer,
         topPerformerSales
       });
     }
-  }, [shopSalesmen, sales, commissions]);
+  }, [shopSalesmen, sales, totalCommissionSum]);
   
   // Render KPI metrics
   const renderMetricsCards = () => {

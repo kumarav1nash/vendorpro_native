@@ -34,6 +34,7 @@ export default function DashboardScreen() {
   const [customPrice, setCustomPrice] = useState('');
   const [totalAmount, setTotalAmount] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [userCommissions, setUserCommissions] = useState<Commission[]>([]);
   const [metrics, setMetrics] = useState({
     totalSales: 0,
@@ -71,11 +72,37 @@ export default function DashboardScreen() {
     
   }, [user?.id, shop?.id]);
 
-  // Filter products based on search
-  const filteredProducts = inventories.filter(product => {
-    if (!searchTerm) return true;
-    return product.productName.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  // Apply debouncing to search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+  
+  // Memoize filtered products to avoid recalculation on every render
+  const filteredProducts = React.useMemo(() => {
+    if (!debouncedSearchTerm) return inventories;
+    
+    const lowercaseSearch = debouncedSearchTerm.toLowerCase();
+    return inventories.filter(product => 
+      product.productName.toLowerCase().includes(lowercaseSearch)
+    );
+  }, [inventories, debouncedSearchTerm]);
+
+  // Optimize search input
+  const handleSearchChange = (text: string) => {
+    // Don't cause a render if the text hasn't changed
+    if (text === searchTerm) return;
+    setSearchTerm(text);
+  };
+
+  // Clear search with optimized handler
+  const clearSearch = () => {
+    setSearchTerm('');
+    setDebouncedSearchTerm('');
+  };
 
   // Helper function to safely convert potential string values to numbers
   const safeNumberConversion = (value: string | number): number => {
@@ -187,14 +214,22 @@ export default function DashboardScreen() {
 
   // Modify handleProductSelect to just select the product without clearing modal
   const handleProductSelect = (product: Inventory) => {
-    setSelectedProduct(product);
-    setProductSelectionMode(false);
-    
-    // Set default prices based on product
-    const basePrice = safeNumberConversion(product.sellingPrice);
-    setCustomPrice(basePrice.toString());
-    setTotalAmount(basePrice.toString()); // Initially, total = unit price * 1
-    setQuantity('1');
+    try {
+      // Batch state updates with minimal calculations
+      setSelectedProduct(product);
+      setProductSelectionMode(false);
+      
+      // Set default prices based on product
+      const basePrice = safeNumberConversion(product.sellingPrice);
+      setCustomPrice(basePrice.toString());
+      setTotalAmount(basePrice.toString()); // Initially, total = unit price * 1
+      setQuantity('1');
+              } catch (error) {
+      console.error("Error in handleProductSelect:", error);
+      // Fallback reset in case of error
+      setSelectedProduct(null);
+      setProductSelectionMode(true);
+    }
   };
 
   // Add a function to toggle product selection mode
@@ -239,21 +274,28 @@ export default function DashboardScreen() {
 
   // Handle quantity change
   const handleQuantityChange = (newQuantity: string) => {
-    // Ensure quantity is a positive number
-    const qty = parseInt(newQuantity) || 0;
-    if (qty < 0) return;
-    
-    setQuantity(newQuantity);
-    
-    if (!totalAmountManuallyEdited && selectedProduct) {
-      // If total hasn't been manually edited, calculate based on product price and new quantity
-      const basePrice = safeNumberConversion(selectedProduct.sellingPrice);
-      const newTotal = (basePrice * qty).toFixed(2);
-      setTotalAmount(newTotal);
-      updateUnitPrice(newTotal, newQuantity);
-    } else if (customPrice) {
-      // Otherwise, recalculate the total from unit price
-      updateTotalAmount(customPrice, newQuantity);
+    // Validate input before updating state
+    if (newQuantity === '' || /^\d+$/.test(newQuantity)) {
+      // Ensure quantity is a positive number
+      const qty = parseInt(newQuantity) || 0;
+      if (qty < 0) return;
+      
+      // Set quantity first to avoid calculation delays
+      setQuantity(newQuantity);
+      
+      // Use timeout to avoid blocking the UI
+      setTimeout(() => {
+        if (!totalAmountManuallyEdited && selectedProduct) {
+          // If total hasn't been manually edited, calculate based on product price and new quantity
+          const basePrice = safeNumberConversion(selectedProduct.sellingPrice);
+          const newTotal = (basePrice * qty).toFixed(2);
+          setTotalAmount(newTotal);
+          updateUnitPrice(newTotal, newQuantity);
+        } else if (customPrice) {
+          // Otherwise, recalculate the total from unit price
+          updateTotalAmount(customPrice, newQuantity);
+        }
+      }, 0);
     }
   };
 
@@ -285,15 +327,18 @@ export default function DashboardScreen() {
     updateTotalAmount(newPrice, quantity);
   };
 
-  // Reset modal state function
+  // Optimize resetModalState to prevent multiple state updates
   const resetModalState = () => {
-    setSelectedProduct(null);
-    setQuantity('1');
-    setCustomPrice('');
-    setTotalAmount('');
-    setTotalAmountManuallyEdited(false);
-    setSaleItems([]);
-    setProductSelectionMode(false);
+    // Batch these state updates to reduce rendering cycles
+    requestAnimationFrame(() => {
+      setSelectedProduct(null);
+      setQuantity('1');
+      setCustomPrice('');
+      setTotalAmount('');
+      setTotalAmountManuallyEdited(false);
+      setSaleItems([]);
+      setProductSelectionMode(false);
+    });
   };
 
   // Add new state for multi-product sale
@@ -303,34 +348,49 @@ export default function DashboardScreen() {
     soldAt: string;
   }[]>([]);
 
-  // Add product to sale items list
+  // Optimize handleAddProductToSale to improve performance
   const handleAddProductToSale = () => {
     if (!selectedProduct) return;
+    
     const qtyNum = parseInt(quantity);
     const soldAtNum = parseFloat(totalAmount);
+    
     if (!qtyNum || qtyNum <= 0 || !soldAtNum || soldAtNum <= 0) return;
+    
     if (qtyNum > selectedProduct.stockQuantity) {
       Alert.alert('Insufficient stock', `Only ${selectedProduct.stockQuantity} units available`);
       return;
     }
-    setSaleItems(prev => [
-      ...prev,
-      {
-        product: selectedProduct,
-        quantity,
-        soldAt: totalAmount,
-      },
-    ]);
     
-    // Reset product input fields but keep modal open
-    setSelectedProduct(null);
-    setQuantity('1');
-    setCustomPrice('');
-    setTotalAmount('');
-    setTotalAmountManuallyEdited(false);
+    // Clone the product to avoid reference issues
+    const productToAdd = {
+      ...selectedProduct
+    };
     
-    // Go back to selection mode
-    setProductSelectionMode(true);
+    // Update sale items in a single batch
+    requestAnimationFrame(() => {
+      // Add to sale items
+      setSaleItems(prev => [
+        ...prev,
+        {
+          product: productToAdd,
+          quantity,
+          soldAt: totalAmount,
+        },
+      ]);
+      
+      // Reset product input fields but keep modal open
+      setSelectedProduct(null);
+      setQuantity('1');
+      setCustomPrice('');
+      setTotalAmount('');
+      setTotalAmountManuallyEdited(false);
+      
+      // Go back to selection mode after a short delay
+      setTimeout(() => {
+        setProductSelectionMode(true);
+      }, 50);
+    });
   };
 
   // Remove product from sale items list
@@ -443,6 +503,28 @@ export default function DashboardScreen() {
       setRefreshing(false);
     }
   }, [user?.id]);
+
+  // Add product card click handler separate from product selection logic
+  const handleProductCardClick = (product: Inventory) => {
+    // First open the modal
+    setModalVisible(true);
+    
+    // Use setTimeout to prevent UI blocking when selecting product
+    setTimeout(() => {
+      handleProductSelect(product);
+    }, 100);
+  };
+
+  // Add an optimized modal close handler
+  const handleCloseModal = () => {
+    // Close the modal first for immediate visual feedback
+    setModalVisible(false);
+    
+    // Reset state after modal animation has started
+    setTimeout(() => {
+      resetModalState();
+    }, 100);
+  };
 
   if (loading) {
     return (
@@ -558,10 +640,10 @@ export default function DashboardScreen() {
               style={styles.searchInput}
               placeholder="Search products..."
               value={searchTerm}
-              onChangeText={setSearchTerm}
+              onChangeText={handleSearchChange}
             />
             {searchTerm ? (
-              <TouchableOpacity onPress={() => setSearchTerm('')}>
+              <TouchableOpacity onPress={clearSearch}>
                 <MaterialCommunityIcons name="close-circle" size={20} color="#64748B" />
               </TouchableOpacity>
             ) : null}
@@ -577,10 +659,7 @@ export default function DashboardScreen() {
                     styles.productCard,
                     product.stockQuantity === 0 && styles.disabledProductCard
                   ]}
-                  onPress={() => {
-                    handleProductSelect(product);
-                    setModalVisible(true);
-                  }}
+                  onPress={() => handleProductCardClick(product)}
                   disabled={product.stockQuantity === 0}
                 >
                   <View style={styles.productImageContainer}>
@@ -625,7 +704,7 @@ export default function DashboardScreen() {
                       </View>
                 </TouchableOpacity>
               ))}
-          </View>
+                    </View>
           ) : (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="package-variant" size={60} color="#CBD5E1" />
@@ -645,10 +724,7 @@ export default function DashboardScreen() {
         visible={modalVisible}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => {
-          setModalVisible(false);
-          resetModalState();
-        }}
+        onRequestClose={handleCloseModal}
       >
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' }}>
           <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 24, maxHeight: '90%' }}>
@@ -656,10 +732,7 @@ export default function DashboardScreen() {
               <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#0F172A' }}>Create Sale</Text>
               <TouchableOpacity 
                 style={{ position: 'absolute', right: 16, top: 16 }}
-                onPress={() => {
-                  setModalVisible(false);
-                  resetModalState();
-                }}
+                onPress={handleCloseModal}
               >
                 <MaterialCommunityIcons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
@@ -724,10 +797,10 @@ export default function DashboardScreen() {
                       style={{ flex: 1, paddingVertical: 10, marginLeft: 8, fontSize: 16 }}
                       placeholder="Search products..."
                       value={searchTerm}
-                      onChangeText={setSearchTerm}
+                      onChangeText={handleSearchChange}
                     />
                     {searchTerm ? (
-                      <TouchableOpacity onPress={() => setSearchTerm('')}>
+                      <TouchableOpacity onPress={clearSearch}>
                         <MaterialCommunityIcons name="close-circle" size={20} color="#64748B" />
                       </TouchableOpacity>
                     ) : null}
@@ -748,7 +821,7 @@ export default function DashboardScreen() {
                           borderColor: '#eee',
                           opacity: product.stockQuantity === 0 ? 0.6 : 1
                         }}
-                        onPress={() => product.stockQuantity > 0 && handleProductSelect(product)}
+                        onPress={() => product.stockQuantity > 0 && handleProductCardClick(product)}
                         disabled={product.stockQuantity === 0}
                       >
                         <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#0F172A', marginBottom: 4 }} numberOfLines={1}>

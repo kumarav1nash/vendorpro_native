@@ -51,7 +51,7 @@ export default function DashboardScreen() {
       loadShopData(selectedShop.id);
     }
   }, [selectedShop]);
-
+  
   useEffect(() => {
     if (!isLoading) {
       updateKPIData();
@@ -103,7 +103,7 @@ export default function DashboardScreen() {
     if (selectedShop) {
       await loadShopData(selectedShop.id);
     } else {
-      await loadInitialData();
+    await loadInitialData();
     }
     setRefreshing(false);
   };
@@ -310,7 +310,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </Modal>
       </View>
-
+      
       <View style={styles.kpiContainer}>
         {kpiData.map((kpi, index) => (
           <View key={index} style={styles.kpiCard}>
@@ -322,7 +322,7 @@ export default function DashboardScreen() {
           </View>
         ))}
       </View>
-
+      
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
       </View>
