@@ -12,7 +12,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Sale, CreateSaleDto, UpdateSaleDto } from '../../../src/types/sales';
+import { Sale, CreateSaleDto, UpdateSaleDto, CreateSaleItemDto } from '../../../src/types/sales';
 
 import { useInventory } from '../../../src/contexts/InventoryContext';
 import { useSales } from '../../../src/contexts/SalesContext';
@@ -472,7 +472,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
     console.log('Selected product:', product);
     
     // Update the form data with the selected product ID
-    setAddQuantity(product.stockQuantity);
+    //setAddQuantity(product.stockQuantity);
     setAddSoldAt(product.sellingPrice);
     
     console.log('Updated form data with product ID:', product.id);
@@ -516,11 +516,10 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
     }
     const items = saleItems.map(item => ({
       productId: item.product.id,
-      quantity: item.quantity,
-      soldAt: item.soldAt,
-    }));
-    const totalAmount = saleItems.reduce((sum, item) => sum + item.soldAt, 0);
-    const saleData = { shopId: shopId, items, totalAmount };
+      quantity: Number(item.quantity),
+      soldAt: Number(item.soldAt),
+    } as CreateSaleItemDto));
+    const saleData = { shopId: shopId, items };
     setIsLoading(true);
     try {
       await createSale(saleData);
@@ -848,7 +847,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
               {/* Total Section */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#0F172A' }}>Total</Text>
-                <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#007AFF' }}>₹{saleItems.reduce((sum, item) => sum + item.soldAt, 0)}</Text>
+                <Text style={{ fontSize: 17, fontWeight: 'bold', color: '#007AFF' }}>₹{saleItems.reduce((sum, item) => sum +  Number(item.soldAt), 0)}</Text>
               </View>
             </ScrollView>
             {/* Bottom Buttons */}

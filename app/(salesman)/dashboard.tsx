@@ -229,7 +229,7 @@ export default function DashboardScreen() {
       // Fallback reset in case of error
       setSelectedProduct(null);
       setProductSelectionMode(true);
-    }
+              }
   };
 
   // Add a function to toggle product selection mode
@@ -238,7 +238,7 @@ export default function DashboardScreen() {
     // Reset the selected product when entering selection mode
     if (!productSelectionMode) {
     setSelectedProduct(null);
-    }
+        }
   };
 
   // Calculate unit price when total amount or quantity changes

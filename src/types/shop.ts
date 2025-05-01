@@ -28,7 +28,7 @@ export interface CreateSalesmanDto {
   phoneNumber: string;
   username: string;
   password: string;
-  email: string;
+  email?: string;
   firstName: string;
   lastName: string;
 }

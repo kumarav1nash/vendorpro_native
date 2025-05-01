@@ -19,20 +19,18 @@ import { useUser } from '../../../src/contexts/UserContext';
 import { useShop } from '../../../src/contexts/ShopContext';
 import { useSales } from '../../../src/contexts/SalesContext';
 import { useCommission } from '../../../src/contexts/CommissionContext';
+import { useUserProfile } from '../../../src/contexts/UserProfileContext';
 import { User, UserRole, UserProfile } from '../../../src/types/user';
 import { CreateSalesmanDto, Shop } from '../../../src/types/shop';
 import { Sale } from '../../../src/types/sales';
 import { Commission, CommissionRule, CommissionSummary, SalesCommissionResponse } from '../../../src/types/commission';
+import { getCommissionsBySalesman } from '../../../src/services/commission.service';
+import { getUserProfileByUserId } from '../../../src/services/user-profile.service';
 
 type SalesmenTabProps = {
   shopId: string;
   shop: Shop;
 };
-
-// Extend the User type to include profile info
-interface UserWithProfile extends User {
-  profile?: UserProfile;
-}
 
 
 
@@ -56,11 +54,12 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     fetchCommissionsBySalesman,
     fetchAllCommissionRules
   } = useCommission();
+  const { fetchProfileByUserId } = useUserProfile();
   
-  const [shopSalesmen, setShopSalesmen] = useState<UserWithProfile[]>([]);
+  const [shopSalesmen, setShopSalesmen] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredSalesmen, setFilteredSalesmen] = useState<UserWithProfile[]>([]);
+  const [filteredSalesmen, setFilteredSalesmen] = useState<User[]>([]);
   const [salesmanCommissions, setSalesmanCommissions] = useState<Commission[]>([]);
   const [salesmanCommissionSummary, setSalesmanCommissionSummary] = useState<CommissionSummary[]>([]);
   const [allSalesmenCommissionData, setAllSalesmenCommissionData] = useState<Map<string, CommissionSummary | null>>(new Map());
@@ -69,7 +68,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   // Form state
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [currentSalesman, setCurrentSalesman] = useState<UserWithProfile | null>(null);
+  const [currentSalesman, setCurrentSalesman] = useState<User | null>(null);
   const [salesmanForm, setSalesmanForm] = useState({
     firstName: '',
     lastName: '',
@@ -81,7 +80,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   });
   
   // Performance metrics state
-  const [selectedSalesman, setSelectedSalesman] = useState<UserWithProfile | null>(null);
+  const [selectedSalesman, setSelectedSalesman] = useState<User | null>(null);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [salesmanPerformance, setSalesmanPerformance] = useState<PerformanceMetrics>({
     totalSales: 0,
@@ -157,7 +156,22 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   const loadSalesmen = async () => {
     setIsLoading(true);
     try {
-      const salesmenData = await getShopSalesmen(shopId) as UserWithProfile[];
+      const salesmenData = await getShopSalesmen(shopId) as User[];
+      
+      // Fetch profile data for each salesman
+      for (let i = 0; i < salesmenData.length; i++) {
+        try {
+          // Use the user-profile service directly
+          const profileData = await getUserProfileByUserId(salesmenData[i].id);
+          salesmenData[i] = {
+            ...salesmenData[i],
+            profile: profileData
+          };
+        } catch (error) {
+          console.error(`Error fetching profile for salesman ${salesmenData[i].id}:`, error);
+        }
+      }
+      
       setShopSalesmen(salesmenData);
       setFilteredSalesmen(salesmenData);
     } catch (error) {
@@ -197,12 +211,15 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   const loadAllSalesmenCommissions = async () => {
     const commissionMap = new Map<string, CommissionSummary | null>();
     
+    // Process salesmen one by one to avoid context state overwrite issues
     for (const salesman of shopSalesmen) {
       try {
-        await fetchCommissionsBySalesman(salesman.id);
+        // Call API directly instead of through context to avoid state issues
+        const response = await getCommissionsBySalesman(salesman.id);
         
-        if (commissionSummary) {
-          commissionMap.set(salesman.id, commissionSummary);
+        if (response && response.totalCommission) {
+          // Store this salesman's specific commission data
+          commissionMap.set(salesman.id, response.totalCommission);
         }
       } catch (error) {
         console.error(`Error loading commissions for salesman ${salesman.id}:`, error);
@@ -217,7 +234,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   };
   
   const validateForm = () => {
-    const requiredFields = ['firstName', 'lastName', 'phoneNumber'];
+    const requiredFields = ['firstName', 'lastName', 'phoneNumber', 'password', 'commissionRuleId'];
     
     for (const field of requiredFields) {
       if (!salesmanForm[field as keyof typeof salesmanForm]) {
@@ -248,7 +265,21 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     };
     
     try {
-      await createSalesman(shopId, newSalesmanData);
+
+      //add country code to the phone number if it is not already there
+      if (!salesmanForm.phoneNumber.startsWith('+91')) {
+        newSalesmanData.phoneNumber = '+91' + salesmanForm.phoneNumber;
+      }
+
+      // exclude email field if it is not provided or empty
+      const { email, ...salesmanDataWithoutEmail } = newSalesmanData;
+
+      if(email){
+        await createSalesman(shopId, newSalesmanData);
+      }else{
+        await createSalesman(shopId, salesmanDataWithoutEmail);
+      }
+
       setIsModalVisible(false);
       resetForm();
       Alert.alert('Success', 'Salesman added successfully');
@@ -323,7 +354,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     setIsModalVisible(true);
   };
   
-  const openEditModal = (salesman: UserWithProfile) => {
+  const openEditModal = (salesman: User) => {
     setIsEditMode(true);
     setCurrentSalesman(salesman);
     setSalesmanForm({
@@ -351,11 +382,8 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     setCurrentSalesman(null);
   };
   
-  const viewPerformance = async (salesman: UserWithProfile) => {
+  const viewPerformance = async (salesman: User) => {
     setSelectedSalesman(salesman);
-    
-    // Load commissions first
-    await loadSalesmanCommissions(salesman.id);
     
     // Calculate performance metrics
     const salesmanSales = sales.filter(sale => sale.salesman.id === salesman.id);
@@ -365,9 +393,9 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     const totalAmount = salesmanSales.reduce((sum, sale) => 
       sum + (typeof sale.totalAmount === 'string' ? parseFloat(sale.totalAmount) : sale.totalAmount || 0), 0);
     
-    // Get commission from actual commissions
-    const totalCommission = salesmanCommissionSummary.reduce((sum, commission) => 
-      sum + commission.totalCommission, 0);
+    // Get commission from the individual salesman's commission data we already loaded
+    const salesmanCommission = allSalesmenCommissionData.get(salesman.id);
+    const totalCommission = salesmanCommission ? salesmanCommission.totalCommission : 0;
     
     // Count approved sales as "completed"
     const completedSales = salesmanSales.filter(sale => sale.status === 'approved').length;
@@ -414,11 +442,11 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     handleInputChange('email', `${username}@example.com`);
   };
   
-  const getFullName = (user: UserWithProfile) => {
+  const getFullName = (user: User) => {
     return `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() || 'Unknown';
   };
   
-  const renderSalesmanItem = ({ item }: { item: UserWithProfile }) => (
+  const renderSalesmanItem = ({ item }: { item: User }) => (
     <View style={[styles.salesmanItem, !item.isActive && styles.inactiveSalesman]}>
       <View style={styles.salesmanHeader}>
         <View>
@@ -710,14 +738,14 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
                 {!isEditMode && (
                   <View style={styles.formField}>
                     <View style={styles.usernameContainer}>
-                      <Text style={styles.label}>Password</Text>
+                      <Text style={styles.label}>Password *</Text>
                       <TouchableOpacity onPress={generatePassword}>
                         <Text style={styles.generateText}>Generate</Text>
                       </TouchableOpacity>
                     </View>
                     <TextInput
                       style={styles.input}
-                      placeholder="Enter password (optional)"
+                      placeholder="Enter password"
                       value={salesmanForm.password}
                       onChangeText={(value) => handleInputChange('password', value)}
                       secureTextEntry={true}
@@ -727,7 +755,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
                 )}
                 
                 <View style={styles.formField}>
-                  <Text style={styles.label}>Commission Rule</Text>
+                  <Text style={styles.label}>Commission Rule *</Text>
                   <TouchableOpacity 
                     style={styles.dropdownButton}
                     onPress={() => {

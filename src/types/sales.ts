@@ -33,7 +33,7 @@ export interface CreateSaleItemDto {
 export interface CreateSaleDto {
   shopId: string;
   items: CreateSaleItemDto[];
-  totalAmount: number
+  totalAmount?: number
 }
 
 export interface UpdateSaleDto extends Partial<CreateSaleDto> {} 
