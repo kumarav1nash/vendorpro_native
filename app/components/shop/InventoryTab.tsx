@@ -732,7 +732,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   // Submit form
   const handleSubmit = async () => {
     if (!validateForm()) return;
-    
+
     try {
       // If we have a local image URI, upload it first using the context's uploadImageForEntity method
       let uploadedImageUrl = undefined;
@@ -812,7 +812,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       setFormSubmitting(true);
       
       if (editMode && editId) {
-        // Update existing product
+      // Update existing product
         const updateData: UpdateInventoryDto = {
           productName: formData.productName,
           basePrice: Number(formData.basePrice),
@@ -833,13 +833,13 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           } else {
             await updateInventory(editId, updateData);
           }
-          Alert.alert('Success', 'Product updated successfully');
+      Alert.alert('Success', 'Product updated successfully');
         } catch (error) {
           console.error('Error updating product:', error);
           Alert.alert('Error', 'Failed to update product');
         }
-      } else {
-        // Add new product
+    } else {
+      // Add new product
         const newProduct: CreateInventoryDto = {
           productName: formData.productName,
           basePrice: Number(formData.basePrice) || 0,
@@ -860,16 +860,16 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           } else {
             await createInventory(shopId, newProduct);
           }
-          Alert.alert('Success', 'Product added successfully');
+      Alert.alert('Success', 'Product added successfully');
         } catch (error) {
           console.error('Error adding product:', error);
           Alert.alert('Error', 'Failed to add product');
         }
-      }
-      
+    }
+    
       setShowAddModal(false);
-      resetForm();
-      loadInventory();
+    resetForm();
+    loadInventory();
     } catch (error: any) {
       console.error('Error during product submission:', error.message);
       Alert.alert('Error', `Failed to process your request: ${error.message}`);
@@ -1035,7 +1035,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         <View style={styles.productDetails}>
           <Text style={styles.productName} numberOfLines={1} ellipsizeMode="tail">
             {item.productName}
-          </Text>
+            </Text>
           
           <View style={styles.priceContainer}>
             <Text style={styles.sellingPrice}>{formatPrice(item.sellingPrice)}</Text>
@@ -1051,7 +1051,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         </View>
         
         <View style={styles.actionsContainer}>
-          <TouchableOpacity
+        <TouchableOpacity
             style={[styles.actionButton, styles.editButton]}
             onPress={() => handleEdit(item)}
           >
@@ -1060,10 +1060,10 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDelete(item.id)}
-          >
+          onPress={() => handleDelete(item.id)}
+        >
             <MaterialCommunityIcons name="delete" size={20} color="#fff" />
-          </TouchableOpacity>
+        </TouchableOpacity>
         </View>
       </View>
     );
@@ -1228,7 +1228,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                       <View style={styles.imageOverlay}>
                         <ActivityIndicator size="large" color="#fff" />
                         <Text style={styles.uploadingText}>Uploading...</Text>
-                      </View>
+              </View>
                     )}
                   </>
                 ) : formData.productImageUrl ? (
@@ -1242,14 +1242,14 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                   <View style={styles.imagePickerPlaceholder}>
                     <MaterialCommunityIcons name="camera" size={40} color="#999" />
                     <Text style={styles.imagePickerText}>Add Product Image</Text>
-                  </View>
+                </View>
                 )}
               </TouchableOpacity>
-              
+                
               {/* Form fields */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Product Name *</Text>
-                <TextInput
+                  <TextInput
                   style={styles.textInput}
                   placeholder="Enter product name"
                   value={formData.productName}
@@ -1272,7 +1272,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                     returnKeyType="next"
                   />
                 </View>
-              
+                
                 <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                   <Text style={styles.inputLabel}>Selling Price (₹) *</Text>
                   <TextInput
@@ -1301,7 +1301,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
             </ScrollView>
               
             <View style={styles.modalFooter}>
-              <TouchableOpacity 
+                      <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setShowAddModal(false);
@@ -1310,7 +1310,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                 disabled={formSubmitting}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+                      </TouchableOpacity>
               
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
@@ -1322,7 +1322,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                 ) : (
                   <Text style={styles.saveButtonText}>
                     {editMode ? 'Update' : 'Add Product'}
-                  </Text>
+                </Text>
                 )}
               </TouchableOpacity>
             </View>

@@ -340,7 +340,18 @@ export default function DashboardScreen() {
 
   // Refactor handleCreateSale to use saleItems
   const handleCreateSale = async () => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      Alert.alert('Error', 'User information is missing. Please try again later.');
+      return;
+    }
+    if (!shop?.id) {
+      Alert.alert('Error', 'Shop information is missing. Please try again later.');
+      return;
+    } 
+    if (saleItems.length === 0) {
+      Alert.alert('No products', 'Please add at least one product to the sale.');
+      return;
+    }
     let currentShop = shop;
     if (!currentShop?.id) {
       try {
@@ -614,7 +625,7 @@ export default function DashboardScreen() {
                       </View>
                 </TouchableOpacity>
               ))}
-                    </View>
+          </View>
           ) : (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="package-variant" size={60} color="#CBD5E1" />

@@ -14,7 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useShop } from '../../src/contexts/ShopContext';
 import { useUser } from '../../src/contexts/UserContext';
-import { Shop } from '../../src/types/shop';
+import { CreateShopDto, Shop } from '../../src/types/shop';
 
 export default function ShopsScreen() {
   // User context
@@ -100,9 +100,14 @@ export default function ShopsScreen() {
   const handleAddSubmit = async () => {
     if (!validateForm()) return;
     try {
-      await createShop({
-        ...shopForm,
-      });
+      //remove gstinNumber from shopForm if it is empty or undefined, pass the relevant fields to createShop
+      const { gstinNumber, ...shopFormWithoutGstin } = shopForm as CreateShopDto;
+      if(gstinNumber){
+        await createShop(shopForm);
+      }else{
+        await createShop(shopFormWithoutGstin);
+
+      }
       setShowAddModal(false);
       resetForm();
       Alert.alert('Success', 'Shop added successfully');

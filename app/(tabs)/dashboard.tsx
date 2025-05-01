@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -15,11 +17,12 @@ import { useUser } from '../../src/contexts/UserContext';
 import { useUserProfile } from '../../src/contexts/UserProfileContext';
 import { useInventory } from '../../src/contexts/InventoryContext';
 import { useSales } from '../../src/contexts/SalesContext';
+import { Shop } from '../../src/types/shop';
 
 // Explicit KPI type
 interface KPICard {
   title: string;
-  value: number;
+  value: number | string;
   icon: string;
   color: string;
 }
@@ -27,7 +30,7 @@ interface KPICard {
 export default function DashboardScreen() {
   const { user } = useUser();
   const { profile, fetchMyProfile } = useUserProfile();
-  const { shop, fetchAllShops, getShopSalesmen } = useShop();
+  const { shop, shops, fetchAllShops, getShopSalesmen, fetchMyShops } = useShop();
   const { inventories, fetchInventoryByShopId } = useInventory();
   const { sales, fetchAllSales } = useSales();
 
@@ -36,68 +39,150 @@ export default function DashboardScreen() {
   const [kpiData, setKpiData] = useState<KPICard[]>([]);
   const [salesmen, setSalesmen] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
+  const [shopDropdownVisible, setShopDropdownVisible] = useState(false);
   
   useEffect(() => {
     loadInitialData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
+  useEffect(() => {
+    if (selectedShop) {
+      loadShopData(selectedShop.id);
+    }
+  }, [selectedShop]);
+
   useEffect(() => {
     if (!isLoading) {
       updateKPIData();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, sales, inventories, salesmen, shop]);
+  }, [isLoading, sales, inventories, salesmen, selectedShop]);
   
   const loadInitialData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const shopId = shop?.id;
-      if (!shopId) {
-        throw new Error('Shop ID is undefined');
+      await fetchMyShops();
+      
+      if (shops.length > 0) {
+        setSelectedShop(shops[0]);
       }
-      await Promise.all([
-        fetchMyProfile(),
-        fetchAllShops(),
-        fetchInventoryByShopId(shopId),
-        fetchAllSales(),
-      ]);
-      const salesmenData = await getShopSalesmen(shopId);
-      setSalesmen(salesmenData);
+      
+      await fetchMyProfile();
       setIsLoading(false);
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard data');
       setIsLoading(false);
     }
   };
+
+  const loadShopData = async (shopId: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // Reset salesmen to avoid showing stale data
+      setSalesmen([]);
+      
+      // Fetch new data for the selected shop
+      const [_, __, salesmenData] = await Promise.all([
+        fetchInventoryByShopId(shopId),
+        fetchAllSales({shopId}),
+        getShopSalesmen(shopId)
+      ]);
+      
+      setSalesmen(salesmenData || []);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load shop data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadInitialData();
+    if (selectedShop) {
+      await loadShopData(selectedShop.id);
+    } else {
+      await loadInitialData();
+    }
     setRefreshing(false);
   };
   
   const updateKPIData = () => {
-    const shopId = shop?.id;
+    if (!selectedShop) return;
+    
+    // Calculate metrics directly from current state
+    const totalProducts = inventories.length;
+    const totalSales = sales.length;
+    const totalSalesmen = salesmen.length;
+    
+    // Calculate pending sales
+    const pendingSales = sales.filter(sale => sale.status === 'pending').length;
+    
+    // Calculate low stock items
+    const LOW_STOCK_THRESHOLD = 10;
+    const lowStockItems = inventories.filter(item => 
+      item.stockQuantity > 0 && item.stockQuantity <= LOW_STOCK_THRESHOLD
+    ).length;
+    
+    // Calculate revenue
+    let totalRevenue = 0;
+    let todayRevenue = 0;
+    const todayDate = new Date().toISOString().split('T')[0];
+    
+    sales.forEach(sale => {
+      const saleAmount = typeof sale.totalAmount === 'string' 
+        ? parseFloat(sale.totalAmount) 
+        : sale.totalAmount;
+      
+      totalRevenue += saleAmount;
+      
+      const saleDate = new Date(sale.createdAt).toISOString().split('T')[0];
+      if (saleDate === todayDate) {
+        todayRevenue += saleAmount;
+      }
+    });
+    
     const kpis: KPICard[] = [
       {
         title: 'Total Products',
-        value: shopId ? inventories.length : 0,
+        value: totalProducts,
         icon: 'package-variant',
         color: '#2196F3',
       },
       {
         title: 'Total Sales',
-        value: shopId
-          ? sales.filter((s: any) => s.shopId === shopId).length
-          : sales.length,
+        value: totalSales,
         icon: 'cart',
         color: '#FF9800',
       },
       {
+        title: 'Revenue Today',
+        value: `₹${todayRevenue.toFixed(2)}`,
+        icon: 'cash-register',
+        color: '#4CAF50',
+      },
+      {
+        title: 'Total Revenue',
+        value: `₹${totalRevenue.toFixed(2)}`,
+        icon: 'cash-multiple',
+        color: '#009688',
+      },
+      {
+        title: 'Low Stock Items',
+        value: lowStockItems,
+        icon: 'alert-circle-outline',
+        color: '#F44336',
+      },
+      {
+        title: 'Pending Sales',
+        value: pendingSales,
+        icon: 'clock-outline',
+        color: '#FFC107',
+      },
+      {
         title: 'Salesmen',
-        value: salesmen.length,
+        value: totalSalesmen,
         icon: 'account-group',
         color: '#9C27B0',
       },
@@ -111,6 +196,17 @@ export default function DashboardScreen() {
     } else {
       router.push('/(tabs)/shops');
     }
+  };
+
+  const handleShopSelect = (shop: Shop) => {
+    // Reset state before setting the new shop
+    setIsLoading(true);
+    
+    // Close dropdown
+    setShopDropdownVisible(false);
+    
+    // Set selected shop which will trigger loadShopData via useEffect
+    setSelectedShop(shop);
   };
   
   if (isLoading) {
@@ -147,18 +243,74 @@ export default function DashboardScreen() {
           <Text style={styles.greeting}>Hello,</Text>
           <Text style={styles.userName}>{greetingName}</Text>
         </View>
-        {shop && (
+
+        {selectedShop && (
           <TouchableOpacity 
             style={styles.currentShopButton}
-            onPress={() => navigateToShop(shop.id)}
+            onPress={() => setShopDropdownVisible(true)}
           >
             <Text style={styles.currentShopText} numberOfLines={1}>
-              {shop.shopName}
+              {selectedShop.shopName}
             </Text>
-            <MaterialCommunityIcons name="chevron-right" size={20} color="#007AFF" />
+            <MaterialCommunityIcons name="chevron-down" size={20} color="#007AFF" />
           </TouchableOpacity>
         )}
+
+        {/* Shop Selector Dropdown */}
+        <Modal
+          visible={shopDropdownVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShopDropdownVisible(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalOverlay} 
+            activeOpacity={1}
+            onPress={() => setShopDropdownVisible(false)}
+          >
+            <View style={styles.dropdownContainer}>
+              <View style={styles.dropdownHeader}>
+                <Text style={styles.dropdownTitle}>Select Shop</Text>
+                <TouchableOpacity onPress={() => setShopDropdownVisible(false)}>
+                  <MaterialCommunityIcons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              <FlatList
+                data={shops}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={[
+                      styles.shopItem,
+                      selectedShop?.id === item.id && styles.selectedShopItem
+                    ]}
+                    onPress={() => handleShopSelect(item)}
+                  >
+                    <MaterialCommunityIcons 
+                      name="store" 
+                      size={24} 
+                      color={selectedShop?.id === item.id ? "#007AFF" : "#666"} 
+                    />
+                    <Text 
+                      style={[
+                        styles.shopItemText,
+                        selectedShop?.id === item.id && styles.selectedShopItemText
+                      ]}
+                    >
+                      {item.shopName}
+                    </Text>
+                    {selectedShop?.id === item.id && (
+                      <MaterialCommunityIcons name="check" size={24} color="#007AFF" />
+                    )}
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
+
       <View style={styles.kpiContainer}>
         {kpiData.map((kpi, index) => (
           <View key={index} style={styles.kpiCard}>
@@ -170,6 +322,7 @@ export default function DashboardScreen() {
           </View>
         ))}
       </View>
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
       </View>
@@ -183,10 +336,10 @@ export default function DashboardScreen() {
           </View>
           <Text style={styles.actionText}>Manage Shops</Text>
         </TouchableOpacity>
-        {shop && (
+        {selectedShop && (
             <TouchableOpacity 
               style={styles.actionButton}
-            onPress={() => navigateToShop(shop.id)}
+            onPress={() => navigateToShop(selectedShop.id)}
             >
               <View style={[styles.actionIcon, { backgroundColor: '#4CAF50' }]}>
                 <MaterialCommunityIcons name="view-dashboard" size={24} color="#fff" />
@@ -254,6 +407,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     marginRight: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dropdownContainer: {
+    width: '80%',
+    maxHeight: '60%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  dropdownHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  shopItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  selectedShopItem: {
+    backgroundColor: '#f0f7ff',
+  },
+  shopItemText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 16,
+  },
+  selectedShopItemText: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
   kpiContainer: {
     flexDirection: 'row',
