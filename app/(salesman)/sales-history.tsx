@@ -53,10 +53,10 @@ export default function SalesHistoryScreen() {
       // Sort by most recent first
       statusFilteredSales.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
+        );
       
       setFilteredSales(statusFilteredSales);
-    } else {
+        } else {
       console.log('No user ID or sales available');
       setFilteredSales([]);
     }
@@ -152,8 +152,7 @@ export default function SalesHistoryScreen() {
         <View style={styles.saleBody}>
           <View style={styles.productInfo}>
             <ProductImage
-              filename={firstProduct?.productImageFilename}
-              fallbackUrl={firstProduct?.productImageUrl}
+              imageUrl={firstProduct?.productImageUrl}
               width={48}
               height={48}
               borderRadius={8}
@@ -168,7 +167,7 @@ export default function SalesHistoryScreen() {
                   {saleItem.product?.productName || 'Unknown Product'} x {saleItem.quantity} @ {formatCurrency(saleItem.soldAt)}
                 </Text>
               ))}
-            </View>
+        </View>
           </View>
           {/* add the status just above footer aligned all the way right  */} 
           <View style={[styles.sellingPriceTag, {backgroundColor: `${statusColor}15`} ]}>
@@ -176,7 +175,7 @@ export default function SalesHistoryScreen() {
 
             <Text style={[styles.statusText, {color: statusColor}]}>
               Earnings: {formatCurrency(item.commissionAmount)}
-          </Text>
+              </Text>
         </View>
           <View style={[styles.saleStatus, { backgroundColor: `${statusColor}15`}]}>
             <MaterialCommunityIcons name={statusIcon} size={16} color={statusColor} />
@@ -188,7 +187,7 @@ export default function SalesHistoryScreen() {
         <View style={styles.saleFooter}>
           <Text style={styles.saleDate}>
             <MaterialCommunityIcons name="calendar" size={14} color="#64748B" /> {formattedDate}
-          </Text>
+                  </Text>
           <Text style={styles.saleTotal}>{formatCurrency(item.totalAmount)}</Text>
         </View>
       </View>
@@ -203,7 +202,7 @@ export default function SalesHistoryScreen() {
         {activeFilter === FILTER_ALL
           ? "You haven't made any sales yet."
           : `No ${activeFilter} sales found.`}
-      </Text>
+        </Text>
       {activeFilter !== FILTER_ALL ? (
         <TouchableOpacity style={styles.createSaleButton} onPress={() => setActiveFilter(FILTER_ALL)}>
           <Text style={styles.createSaleButtonText}>Show All Sales</Text>
@@ -211,10 +210,10 @@ export default function SalesHistoryScreen() {
       ) : (
         <TouchableOpacity style={styles.createSaleButton} onPress={() => router.push('/(salesman)/dashboard')}>
           <Text style={styles.createSaleButtonText}>Go to Dashboard</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+          </TouchableOpacity>
+        )}
+      </View>
+    );
 
   if (loading && !refreshing && !filteredSales.length) {
     return (

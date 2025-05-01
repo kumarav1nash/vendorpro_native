@@ -130,7 +130,7 @@ export default function DashboardScreen() {
           console.error('Error fetching shop:', shopError?.message || shopError);
         }
       }
-      
+
       if (!currentShop?.id) {
         console.log("Cannot load shop-specific data: Shop ID is missing");
         setLoading(false);
@@ -202,7 +202,7 @@ export default function DashboardScreen() {
     setProductSelectionMode(!productSelectionMode);
     // Reset the selected product when entering selection mode
     if (!productSelectionMode) {
-      setSelectedProduct(null);
+    setSelectedProduct(null);
     }
   };
 
@@ -517,7 +517,7 @@ export default function DashboardScreen() {
         <TouchableOpacity 
               style={styles.actionButton}
               onPress={() => router.push('/(salesman)/sales-history')}
-            >
+        >
               <View style={[styles.actionIcon, { backgroundColor: '#E3F2FD' }]}>
                 <MaterialCommunityIcons name="receipt" size={24} color="#1976D2" />
               </View>
@@ -567,18 +567,16 @@ export default function DashboardScreen() {
                     product.stockQuantity === 0 && styles.disabledProductCard
                   ]}
                   onPress={() => {
+                    handleProductSelect(product);
                     setModalVisible(true);
-                    // Set product selection mode initially to true
-                    setProductSelectionMode(true);
                   }}
                   disabled={product.stockQuantity === 0}
                 >
                   <View style={styles.productImageContainer}>
                     <ProductImage
-                      filename={product.productImageFilename}
-                      fallbackUrl={product.productImageUrl}
-                      width={60}
-                      height={60}
+                      imageUrl={product.productImageUrl}
+                      width="100%"
+                      height="100%"
                       borderRadius={8}
                       placeholderIconName="package-variant"
                     />
@@ -827,10 +825,9 @@ export default function DashboardScreen() {
                           justifyContent: 'center'
                         }}>
                           <ProductImage
-                            filename={selectedProduct.productImageFilename}
-                            fallbackUrl={selectedProduct.productImageUrl}
-                            width={60}
-                            height={60}
+                            imageUrl={selectedProduct.productImageUrl}
+                            width="100%"
+                            height="100%"
                             borderRadius={8}
                             placeholderIconName="package-variant"
                           />

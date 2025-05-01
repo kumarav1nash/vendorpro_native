@@ -49,38 +49,7 @@ export function ProfileImage({
 
   useEffect(() => {
     // If we have a filename, try to load it from the API
-    if (filename) {
-      setLoading(true);
-      setError(false);
-      
-      // For profile images, we want square images with some extra resolution
-      const targetSize = size * 2; // For higher resolution screens
-      
-      // Try to fetch the resized image
-      fetchResizedImageByFilename(filename, {
-        width: targetSize,
-        height: targetSize,
-        quality: 90, // Higher quality for profile images
-      })
-        .then(() => {
-          if (currentImage && currentImage.url) {
-            setImageUrl(currentImage.url);
-            setError(false);
-          } else {
-            // If the API doesn't return a URL, use the fallback
-            setImageUrl(fallbackUrl || null);
-            if (!fallbackUrl) setError(true);
-          }
-        })
-        .catch(() => {
-          // On error, use the fallback URL if available
-          setImageUrl(fallbackUrl || null);
-          if (!fallbackUrl) setError(true);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    } else if (fallbackUrl) {
+     if (fallbackUrl) {
       // If we don't have a filename but have a fallback, use it
       setImageUrl(fallbackUrl);
       setLoading(false);

@@ -18,6 +18,7 @@ import {
   createImageFormData, 
   ImagePickerResult 
 } from '../utils/imageHelpers';
+import { Platform } from 'react-native';
 
 interface ImageContextProps {
   isLoading: boolean;
@@ -25,14 +26,14 @@ interface ImageContextProps {
   uploadError: string | null;
   entityImages: Record<string, ImageResponse[]>;
   images: ImageResponse[];
-  currentImage: ImageResponse | null;
+  currentImage: FormData | null;
   
   // Image selection and upload operations
   pickImageFromGallery: () => Promise<ImagePickerResult | null>;
   captureImageFromCamera: () => Promise<ImagePickerResult | null>;
   uploadImageWithPicker: (description?: string) => Promise<ImageResponse | null>;
   captureAndUploadImage: (description?: string) => Promise<ImageResponse | null>;
-  uploadImageForEntity: (image: ImagePickerResult, description?: string) => Promise<ImageResponse | null>;
+  uploadImageForEntity: (image: ImagePickerResult, description?: string) => Promise<ImageResponse>;
   
   // Image management
   fetchAnImageByFilename: (filename: string) => Promise<void>;
@@ -60,7 +61,7 @@ export function ImageProvider({ children }: { children: ReactNode }) {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [entityImages, setEntityImages] = useState<Record<string, ImageResponse[]>>({});
   const [images, setImages] = useState<ImageResponse[]>([]);
-  const [currentImage, setCurrentImage] = useState<ImageResponse | null>(null);
+  const [currentImage, setCurrentImage] = useState<FormData | null>(null);
 
   // Helper to generate entity key
   function getEntityKey(entityId: string, entityType: string) {
@@ -92,7 +93,7 @@ export function ImageProvider({ children }: { children: ReactNode }) {
   const uploadImageForEntity = async (
     image: ImagePickerResult,
     description?: string
-  ): Promise<ImageResponse | null> => {
+  ): Promise<ImageResponse> => {
     setIsLoading(true);
     setError(null);
     setUploadError(null);
@@ -104,20 +105,33 @@ export function ImageProvider({ children }: { children: ReactNode }) {
         const errorMsg = validation.error || 'Invalid image';
         setUploadError(errorMsg);
         setError(errorMsg);
-        return null;
+        throw new Error(errorMsg);
       }
       
-      // Create form data
-      const formData = createImageFormData(image);
+      // Create a simple FormData object
+      const formData = new FormData();
       
-      // Create upload request with optional description
-      const uploadRequest: ImageUploadRequest = {
-        file: formData,
-        description
-      };
+      // Add the file with just the 'file' field name as expected by the API
+      formData.append('file', {
+        uri: Platform.OS === 'android' ? image.uri : image.uri.replace('file://', ''),
+        name: image.name,
+        type: image.type,
+      } as any);
       
-      // Upload image
-      const uploadedImage = await uploadImage(uploadRequest);
+      console.log('Uploading image with URI:', image.uri);
+      
+      // Upload image directly using fetch to match the curl command exactly
+      const uploadedImage = await uploadImage(formData);
+      
+      // Log the complete response structure
+      console.log('Upload successful, complete response:', JSON.stringify(uploadedImage, null, 2));
+      
+      // Verify we have a URL in the response
+      if (!uploadedImage || !uploadedImage.url) {
+        console.error('Error: Upload response missing URL property', uploadedImage);
+        setError('Upload response missing URL property');
+        throw new Error('Upload response missing URL property');
+      }
       
       // Update local state
       setImages(prev => [...prev, uploadedImage]);
@@ -125,9 +139,10 @@ export function ImageProvider({ children }: { children: ReactNode }) {
       return uploadedImage;
     } catch (err: any) {
       const errorMsg = err.message || 'Failed to upload image';
+      console.error('Upload error:', errorMsg);
       setUploadError(errorMsg);
       setError(errorMsg);
-      return null;
+      throw new Error(errorMsg);
     } finally {
       setIsLoading(false);
     }
