@@ -4,7 +4,7 @@ export interface CreateShopDto {
   shopName: string;
   ownerName: string;
   email: string;
-  gstinNumber: string;
+  gstinNumber?: string;
 }
 
 
