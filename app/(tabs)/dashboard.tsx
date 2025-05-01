@@ -27,7 +27,7 @@ interface KPICard {
 export default function DashboardScreen() {
   const { user } = useUser();
   const { profile, fetchMyProfile } = useUserProfile();
-  const { shop, fetchAllShops, getShopSalesmen } = useShop();
+  const { shop,shops, fetchAllShops, getShopSalesmen,fetchMyShops } = useShop();
   const { inventories, fetchInventoryByShopId } = useInventory();
   const { sales, fetchAllSales } = useSales();
 
@@ -53,15 +53,16 @@ export default function DashboardScreen() {
     setIsLoading(true);
     setError(null);
     try {
-      const shopId = shop?.id;
+      //get shop by user id
+      await fetchMyShops();
+      const shopId = shops[0]?.id;
       if (!shopId) {
         throw new Error('Shop ID is undefined');
       }
       await Promise.all([
         fetchMyProfile(),
-        fetchAllShops(),
         fetchInventoryByShopId(shopId),
-        fetchAllSales(),
+        fetchAllSales({shopId}),
       ]);
       const salesmenData = await getShopSalesmen(shopId);
       setSalesmen(salesmenData);
@@ -83,15 +84,13 @@ export default function DashboardScreen() {
     const kpis: KPICard[] = [
       {
         title: 'Total Products',
-        value: shopId ? inventories.length : 0,
+        value: inventories.length,
         icon: 'package-variant',
         color: '#2196F3',
       },
       {
         title: 'Total Sales',
-        value: shopId
-          ? sales.filter((s: any) => s.shopId === shopId).length
-          : sales.length,
+        value: sales.length,
         icon: 'cart',
         color: '#FF9800',
       },
