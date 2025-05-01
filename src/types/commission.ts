@@ -1,3 +1,5 @@
+import { User } from "./user";
+
 export interface Commission {
   id: string;
   saleId: string;
@@ -42,12 +44,22 @@ export interface SalesCommissionResponse {
 export interface CommissionRule {
   id: string;
   type: 'PERCENTAGE_OF_SALES' | 'FIXED_AMOUNT' | 'PERCENTAGE_ON_DIFFERENCE';
-  value: string | number;
+  value: number;
   description: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
+export interface SalesmanCommissionRule {
+  id: string;
+  ownerId: string;
+  isActive: boolean;
+  salesman: User;
+  commissionRule: CommissionRule;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 export interface CreateCommissionDto {
   amount: number;

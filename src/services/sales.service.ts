@@ -1,5 +1,9 @@
 import apiClient from './api-client';
 import { Sale, CreateSaleDto, UpdateSaleDto } from '../types/sales';
+import { SaleWithCommission } from '../types/sales';
+import { calculateCommission } from '../utils/commissions';
+import { CommissionRule } from '../types/commission';
+
 
 export async function createSale(data: CreateSaleDto): Promise<Sale> {
   try {

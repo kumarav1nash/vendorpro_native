@@ -18,7 +18,8 @@ import {
   getCommissionsBySalesman,
   getCommissionsByShop,
   markCommissionAsPaid,
-  getCommissionsByDateRange
+  getCommissionsByDateRange,
+  getActiveCommissionRule
 } from '../services/commission.service';
 
 interface CommissionContextType {
@@ -37,6 +38,7 @@ interface CommissionContextType {
   createCommission: (data: CreateCommissionDto) => Promise<void>;
   createCommissionRule: (data: CreateCommissionRuleDto) => Promise<void>;
   fetchAllCommissionRules: () => Promise<void>;
+  fetchActiveCommissionRule: (salesmanId: string) => Promise<void>;
   assignCommissionRule: (data: AssignCommissionRuleDto) => Promise<void>;
   fetchCommissionsBySalesman: (salesmanId: string) => Promise<void>;
   fetchCommissionsByShop: (shopId: string) => Promise<void>;
@@ -131,6 +133,19 @@ export const CommissionProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const fetchActiveCommissionRule = async (salesmanId: string) => {
+    setLoading(true); 
+    setError(null);
+    try {
+      const data = await getActiveCommissionRule(salesmanId);
+      setActiveCommissionRule(data.commissionRule);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch active commission rule');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const assignCommissionRuleContext = async (data: AssignCommissionRuleDto) => {
     setLoading(true);
     setError(null);
@@ -161,22 +176,6 @@ export const CommissionProvider = ({ children }: { children: ReactNode }) => {
         
         // Set active commission rule
         setActiveCommissionRule(response.commissionRule);
-        
-        // Also update the commissions array for backward compatibility
-        // This will be derived from the sales data
-        const derivedCommissions: Commission[] = (response.sales || []).map(sale => ({
-          id: `${sale.id}-commission`,
-          saleId: sale.id,
-          salesmanId: salesmanId,
-          shopId: '',  // We don't have this in the response
-          amount: response.commissionRule?.value || 0,
-          isPaid: sale.status === 'approved',
-          commissionRuleId: response.commissionRule?.id || '',
-          createdAt: sale.createdAt,
-          updatedAt: sale.updatedAt
-        }));
-        
-        setCommissions(derivedCommissions);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch commissions by salesman');
@@ -240,6 +239,7 @@ export const CommissionProvider = ({ children }: { children: ReactNode }) => {
     createCommission: createCommissionContext,
     createCommissionRule: createCommissionRuleContext,
     fetchAllCommissionRules,
+    fetchActiveCommissionRule,
     assignCommissionRule: assignCommissionRuleContext,
     fetchCommissionsBySalesman,
     fetchCommissionsByShop,
@@ -253,4 +253,4 @@ export const CommissionProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </CommissionContext.Provider>
   );
-}; 
+};

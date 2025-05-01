@@ -6,7 +6,8 @@ import {
   CreateCommissionRuleDto,
   AssignCommissionRuleDto,
   CommissionDateRangeResult,
-  SalesCommissionResponse
+  SalesCommissionResponse,
+  SalesmanCommissionRule
 } from '../types/commission';
 
 export async function createCommission(data: CreateCommissionDto): Promise<Commission> {
@@ -37,6 +38,16 @@ export async function getAllCommissionRules(): Promise<CommissionRule[]> {
 export async function assignCommissionRule(data: AssignCommissionRuleDto): Promise<any> {
   const res = await apiClient.post('commissions/rules/assign', data);
   return res.data;
+}
+
+export async function getActiveCommissionRule(salesmanId: string): Promise<SalesmanCommissionRule> {
+  try {
+    const res = await apiClient.get<SalesmanCommissionRule>(`commissions/salesman/${salesmanId}/assigned-rule`);
+    return res.data;
+  } catch (error) {
+    console.error(`Error fetching active commission rule for salesman ${salesmanId}:`, error);
+    throw error;
+  }
 }
 
 export async function getCommissionsBySalesman(salesmanId: string): Promise<SalesCommissionResponse> {

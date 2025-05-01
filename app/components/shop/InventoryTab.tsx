@@ -477,7 +477,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   useEffect(() => {
     loadInventory();
   }, [shopId]);
-  
+
   // Calculate metrics
   useEffect(() => {
     if (inventories && inventories.length > 0) {
@@ -936,7 +936,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
             onChangeText={setSearchQuery}
           />
         </View>
-        <TouchableOpacity
+          <TouchableOpacity
           style={styles.addButton}
           onPress={() => {
             resetForm();
@@ -944,7 +944,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           }}
         >
           <MaterialCommunityIcons name="plus" size={24} color="#fff" />
-            </TouchableOpacity>
+          </TouchableOpacity>
       </View>
       
       {__DEV__ && renderDebugControls()}

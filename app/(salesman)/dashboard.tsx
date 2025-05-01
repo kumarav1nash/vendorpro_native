@@ -61,7 +61,7 @@ export default function DashboardScreen() {
       }
       
       if (!dataLoadedRef.current) {
-        loadData();
+    loadData();
         dataLoadedRef.current = true;
       }
     } else {
@@ -181,21 +181,28 @@ export default function DashboardScreen() {
     }
   };
 
+  // Add a state to track product selection mode
+  const [productSelectionMode, setProductSelectionMode] = useState(false);
+
+  // Modify handleProductSelect to just select the product without clearing modal
   const handleProductSelect = (product: Inventory) => {
-    // First reset any existing state to avoid stale values
-    resetModalState();
-    
-    // Then set the new product and values
     setSelectedProduct(product);
-    setQuantity('1');
+    setProductSelectionMode(false);
     
     // Set default prices based on product
     const basePrice = safeNumberConversion(product.sellingPrice);
     setCustomPrice(basePrice.toString());
     setTotalAmount(basePrice.toString()); // Initially, total = unit price * 1
-    
-    // Show the modal after all state is updated
-    setModalVisible(true);
+    setQuantity('1');
+  };
+
+  // Add a function to toggle product selection mode
+  const toggleProductSelectionMode = () => {
+    setProductSelectionMode(!productSelectionMode);
+    // Reset the selected product when entering selection mode
+    if (!productSelectionMode) {
+      setSelectedProduct(null);
+    }
   };
 
   // Calculate unit price when total amount or quantity changes
@@ -284,12 +291,55 @@ export default function DashboardScreen() {
     setCustomPrice('');
     setTotalAmount('');
     setTotalAmountManuallyEdited(false);
+    setSaleItems([]);
+    setProductSelectionMode(false);
   };
 
-  const handleCreateSale = async () => {
-    if (!selectedProduct || !user?.id) return;
+  // Add new state for multi-product sale
+  const [saleItems, setSaleItems] = useState<{
+    product: Inventory | null;
+    quantity: string;
+    soldAt: string;
+  }[]>([]);
+
+  // Add product to sale items list
+  const handleAddProductToSale = () => {
+    if (!selectedProduct) return;
+    const qtyNum = parseInt(quantity);
+    const soldAtNum = parseFloat(totalAmount);
+    if (!qtyNum || qtyNum <= 0 || !soldAtNum || soldAtNum <= 0) return;
+    if (qtyNum > selectedProduct.stockQuantity) {
+      Alert.alert('Insufficient stock', `Only ${selectedProduct.stockQuantity} units available`);
+      return;
+    }
+    setSaleItems(prev => [
+      ...prev,
+      {
+        product: selectedProduct,
+        quantity,
+        soldAt: totalAmount,
+      },
+    ]);
     
-    // Make sure we have the shop data
+    // Reset product input fields but keep modal open
+    setSelectedProduct(null);
+    setQuantity('1');
+    setCustomPrice('');
+    setTotalAmount('');
+    setTotalAmountManuallyEdited(false);
+    
+    // Go back to selection mode
+    setProductSelectionMode(true);
+  };
+
+  // Remove product from sale items list
+  const handleRemoveProductFromSale = (index: number) => {
+    setSaleItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Refactor handleCreateSale to use saleItems
+  const handleCreateSale = async () => {
+    if (!user?.id) return;
     let currentShop = shop;
     if (!currentShop?.id) {
       try {
@@ -299,72 +349,63 @@ export default function DashboardScreen() {
         return;
       }
     }
-    
     if (!currentShop?.id) {
       Alert.alert('Error', 'Shop information is missing. Please try again later.');
       return;
     }
-    
-    const qtyNum = parseInt(quantity);
-    const totalAmountNum = parseFloat(totalAmount);
-    
-    if (isNaN(qtyNum) || qtyNum <= 0) {
-      Alert.alert('Invalid quantity', 'Please enter a valid quantity');
+    if (saleItems.length === 0) {
+      Alert.alert('No products', 'Please add at least one product to the sale.');
       return;
     }
-    
-    if (isNaN(totalAmountNum) || totalAmountNum <= 0) {
-      Alert.alert('Invalid total amount', 'Please enter a valid total selling amount');
-      return;
+    // Validate all items
+    for (const item of saleItems) {
+      if (!item.product || !item.quantity || !item.soldAt) {
+        Alert.alert('Invalid item', 'Each product must have a quantity and price.');
+        return;
+      }
+      const qtyNum = parseInt(item.quantity);
+      const soldAtNum = parseFloat(item.soldAt);
+      if (isNaN(qtyNum) || qtyNum <= 0 || isNaN(soldAtNum) || soldAtNum <= 0) {
+        Alert.alert('Invalid item', 'Each product must have a valid quantity and price.');
+        return;
+      }
+      if (qtyNum > item.product.stockQuantity) {
+        Alert.alert('Insufficient stock', `Only ${item.product.stockQuantity} units available for ${item.product.productName}`);
+        return;
+      }
     }
-    
-    if (qtyNum > selectedProduct.stockQuantity) {
-      Alert.alert('Insufficient stock', `Only ${selectedProduct.stockQuantity} units available`);
-      return;
-    }
-    
     setLoading(true);
     try {
-      // Create the sale with explicit parameters
+      const items = saleItems.map(item => ({
+        productId: item.product!.id,
+        quantity: parseInt(item.quantity),
+        soldAt: parseFloat(item.soldAt),
+      }));
+      
+      // Calculate totalAmount as the sum of all item prices
+      const totalAmount = items.reduce((sum, item) => sum + item.soldAt, 0);
+      
       const saleData = {
-        productId: selectedProduct.id,
-        salesmanId: user.id,
         shopId: currentShop.id,
-        quantity: qtyNum,
-        soldAt: Number(totalAmount),
+        items,
+        totalAmount,
       };
-      
       await createSale(saleData);
-      
-      // Close the modal and reset state
       setModalVisible(false);
       resetModalState();
-      
-      // Refresh data in the correct order
-      
-      // 1. Refresh sales data
       await fetchAllSales({ salesmanId: user.id });
-      
-      // 2. Refresh commission data (this will include the new commission summary)
       await fetchCommissionsBySalesman(user.id);
-      
-      // 3. Refresh inventory to reflect stock changes
       if (currentShop.id) {
         await fetchInventoryByShopId(currentShop.id);
       }
-      
-      // 4. Update the local sales state
       if (sales && Array.isArray(sales)) {
-        //set sales count
         setMetrics({
           ...metrics,
           totalSales: sales.length,
           pendingSales: sales.filter(sale => sale.status === 'pending').length
         });
       }
-      
       Alert.alert('Success', 'Sale created successfully');
-      
       console.log('Sale created and data refreshed successfully');
     } catch (error) {
       console.error('Failed to create sale:', error);
@@ -384,7 +425,7 @@ export default function DashboardScreen() {
     setRefreshing(true);
     try {
       await loadData();
-    } catch (error) {
+            } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setRefreshing(false);
@@ -425,7 +466,7 @@ export default function DashboardScreen() {
         </View>
 
       {/* Dashboard Content */}
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView} 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -450,21 +491,21 @@ export default function DashboardScreen() {
             <View style={[styles.metricCard, styles.primaryMetricCard]}>
               <Text style={styles.metricValue}>{metrics.totalSales}</Text>
               <Text style={styles.metricLabel}>Total Sales</Text>
-            </View>
+          </View>
             <View style={[styles.metricCard, styles.warningMetricCard]}>
               <Text style={styles.metricValue}>{metrics.pendingSales}</Text>
               <Text style={styles.metricLabel}>Pending Sales</Text>
-            </View>
+        </View>
           </View>
           <View style={styles.metricsRow}>
             <View style={[styles.metricCard, styles.successMetricCard]}>
               <Text style={styles.metricValue}>₹{metrics.totalCommission.toFixed(2)}</Text>
               <Text style={styles.metricLabel}>Earned Commission</Text>
-            </View>
+          </View>
             <View style={[styles.metricCard, styles.infoMetricCard]}>
               <Text style={styles.metricValue}>₹{metrics.pendingCommission.toFixed(2)}</Text>
               <Text style={styles.metricLabel}>Pending Commission</Text>
-            </View>
+          </View>
           </View>
         </View>
 
@@ -524,7 +565,11 @@ export default function DashboardScreen() {
                     styles.productCard,
                     product.stockQuantity === 0 && styles.disabledProductCard
                   ]}
-                  onPress={() => product.stockQuantity > 0 && handleProductSelect(product)}
+                  onPress={() => {
+                    setModalVisible(true);
+                    // Set product selection mode initially to true
+                    setProductSelectionMode(true);
+                  }}
                   disabled={product.stockQuantity === 0}
                 >
                   <View style={styles.productImageContainer}>
@@ -598,136 +643,458 @@ export default function DashboardScreen() {
           resetModalState();
         }}
       >
-        <View style={styles.modalContainer}>
-          <BlurView intensity={Platform.OS === 'ios' ? 50 : 100} style={StyleSheet.absoluteFill} />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Create Sale</Text>
-              <TouchableOpacity onPress={() => {
-                setModalVisible(false);
-                resetModalState();
-              }}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' }}>
+          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 24, maxHeight: '90%' }}>
+            <View style={{ alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#0F172A' }}>Create Sale</Text>
+              <TouchableOpacity 
+                style={{ position: 'absolute', right: 16, top: 16 }}
+                onPress={() => {
+                  setModalVisible(false);
+                  resetModalState();
+                }}
+              >
                 <MaterialCommunityIcons name="close" size={24} color="#64748B" />
               </TouchableOpacity>
             </View>
             
-            {selectedProduct && (
-              <View style={styles.modalBody}>
-                <View style={styles.selectedProductContainer}>
-                  <View style={styles.selectedProductImageContainer}>
-                    {selectedProduct.productImageUrl ? (
-                      <Image
-                        source={{ uri: selectedProduct.productImageUrl }}
-                        style={styles.selectedProductImage}
-                        contentFit="cover"
-                      />
-                    ) : (
-                      <View style={styles.selectedProductImagePlaceholder}>
-                        <MaterialCommunityIcons name="package-variant" size={32} color="#9CA3AF" />
+            <ScrollView style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+              {/* Products in Sale Section */}
+              {saleItems.length > 0 && (
+                <>
+                  <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>Products in Sale</Text>
+                  <View style={{ marginBottom: 16 }}>
+                    {saleItems.map((item, idx) => (
+                      <View key={idx} style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        marginBottom: 8, 
+                        backgroundColor: '#F8FAFC', 
+                        borderRadius: 8, 
+                        padding: 10 
+                      }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 15, fontWeight: '600', color: '#0F172A' }}>
+                            {item.product?.productName}
+                          </Text>
+                          <Text style={{ fontSize: 13, color: '#64748B' }}>
+                            Qty: {item.quantity} | Price: ₹{item.soldAt}
+                          </Text>
                         </View>
-                    )}
+                        <TouchableOpacity 
+                          onPress={() => handleRemoveProductFromSale(idx)} 
+                          style={{ padding: 5 }}
+                        >
+                          <MaterialCommunityIcons name="delete" size={22} color="#EF4444" />
+                      </TouchableOpacity>
+                      </View>
+                    ))}
                   </View>
-                    <View style={styles.selectedProductInfo}>
-                    <Text style={styles.selectedProductName}>{selectedProduct.productName}</Text>
-                    <Text style={styles.selectedProductPrice}>
-                      Selling Price: ₹{safeNumberConversion(selectedProduct.sellingPrice).toFixed(2)}
-                    </Text>
-                    <Text style={styles.selectedProductStock}>
-                      Available: {selectedProduct.stockQuantity} units
+                  <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 12 }} />
+                </>
+              )}
+
+              {/* Product Selection Mode */}
+              {productSelectionMode ? (
+                <>
+                  <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
+                    Select a Product
+                  </Text>
+                  
+                  {/* Search bar for products */}
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center',
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#ddd',
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    marginBottom: 12,
+                  }}>
+                    <MaterialCommunityIcons name="magnify" size={20} color="#64748B" />
+                    <TextInput
+                      style={{ flex: 1, paddingVertical: 10, marginLeft: 8, fontSize: 16 }}
+                      placeholder="Search products..."
+                      value={searchTerm}
+                      onChangeText={setSearchTerm}
+                    />
+                    {searchTerm ? (
+                      <TouchableOpacity onPress={() => setSearchTerm('')}>
+                        <MaterialCommunityIcons name="close-circle" size={20} color="#64748B" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                  
+                  {/* Product grid */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                    {filteredProducts.map((product) => (
+                      <TouchableOpacity
+                        key={product.id}
+                        style={{
+                          width: '48%',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 12,
+                          marginBottom: 12,
+                          padding: 12,
+                          borderWidth: 1, 
+                          borderColor: '#eee',
+                          opacity: product.stockQuantity === 0 ? 0.6 : 1
+                        }}
+                        onPress={() => product.stockQuantity > 0 && handleProductSelect(product)}
+                        disabled={product.stockQuantity === 0}
+                      >
+                        <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#0F172A', marginBottom: 4 }} numberOfLines={1}>
+                          {product.productName}
+                        </Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#007bff', marginBottom: 4 }}>
+                          ₹{safeNumberConversion(product.sellingPrice).toFixed(2)}
+                        </Text>
+                        <Text style={{ 
+                          fontSize: 12, 
+                          color: product.stockQuantity === 0 
+                            ? '#EF4444' 
+                            : product.stockQuantity < 5 
+                            ? '#F59E0B' 
+                            : '#10B981',
+                          fontWeight: '500'
+                        }}>
+                          {product.stockQuantity === 0
+                            ? 'Out of stock'
+                            : product.stockQuantity < 5
+                            ? `Low: ${product.stockQuantity} left`
+                            : `In stock: ${product.stockQuantity}`}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  
+                  {filteredProducts.length === 0 && (
+                    <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                      <MaterialCommunityIcons name="package-variant" size={48} color="#CBD5E1" />
+                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#64748B', marginTop: 8 }}>
+                        No products found
+                      </Text>
+                      <Text style={{ fontSize: 14, color: '#94A3B8', textAlign: 'center', marginTop: 4 }}>
+                        {searchTerm 
+                          ? "No products match your search criteria." 
+                          : "No products are available in this shop."}
                       </Text>
                     </View>
-                  </View>
+                  )}
                   
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Quantity</Text>
-                    <View style={styles.quantityContainer}>
-                      <TouchableOpacity
-                        style={styles.quantityButton}
-                        onPress={() => {
-                          const current = parseInt(quantity) || 0;
-                          if (current > 1) {
-                            const newQty = (current - 1).toString();
-                            setQuantity(newQty);
-                            handleQuantityChange(newQty);
-                          }
-                        }}
-                      >
-                        <MaterialCommunityIcons name="minus" size={20} color="#007bff" />
-                      </TouchableOpacity>
-                        <TextInput
-                        style={styles.quantityInput}
-                        value={quantity}
-                        onChangeText={handleQuantityChange}
-                        keyboardType="number-pad"
-                      />
-                      <TouchableOpacity
-                        style={styles.quantityButton}
-                        onPress={() => {
-                          const current = parseInt(quantity) || 0;
-                          const max = selectedProduct.stockQuantity;
-                          if (current < max) {
-                            const newQty = (current + 1).toString();
-                            setQuantity(newQty);
-                            handleQuantityChange(newQty);
-                          } else {
-                            Alert.alert('Maximum stock reached', `Only ${max} units available.`);
-                          }
-                        }}
-                      >
-                        <MaterialCommunityIcons name="plus" size={20} color="#007bff" />
-                      </TouchableOpacity>
+                  {/* Button to go back to regular mode */}
+                  <TouchableOpacity
+                    style={{ 
+                      backgroundColor: '#F1F5F9',
+                      borderRadius: 8,
+                      paddingVertical: 14,
+                      alignItems: 'center',
+                      marginTop: 12,
+                      marginBottom: 16
+                    }}
+                    onPress={toggleProductSelectionMode}
+                  >
+                    <Text style={{ color: '#64748B', fontWeight: 'bold', fontSize: 16 }}>
+                      Cancel Selection
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                // Add Product Section
+                <>
+                  <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
+                    {saleItems.length > 0 ? 'Add Another Product' : 'Add Product'}
+                  </Text>
+                  
+                  {selectedProduct ? (
+                    <View style={{ marginBottom: 16 }}>
+                      {/* Product Info */}
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        backgroundColor: '#F0F9FF', 
+                        borderRadius: 8, 
+                        padding: 12, 
+                        marginBottom: 12 
+                      }}>
+                        <View style={{ 
+                          width: 60, 
+                          height: 60, 
+                          borderRadius: 8, 
+                          overflow: 'hidden', 
+                          marginRight: 12,
+                          backgroundColor: '#E0F2FE',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}>
+                          {selectedProduct.productImageUrl ? (
+                            <Image
+                              source={{ uri: selectedProduct.productImageUrl }}
+                              style={{ width: '100%', height: '100%' }}
+                              contentFit="cover"
+                            />
+                          ) : (
+                            <MaterialCommunityIcons name="package-variant" size={28} color="#0EA5E9" />
+                          )}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#0F172A', marginBottom: 4 }}>
+                            {selectedProduct.productName}
+                          </Text>
+                          <Text style={{ fontSize: 14, color: '#64748B' }}>
+                            Available: {selectedProduct.stockQuantity} units | MRP: ₹{safeNumberConversion(selectedProduct.sellingPrice).toFixed(2)}
+                          </Text>
+                        </View>
                       </View>
-                      
-                      {/* Quick quantity buttons */}
-                      <View style={styles.quickQuantityContainer}>
+
+                      {/* Quantity Input */}
+                      <Text style={{ fontSize: 14, fontWeight: '500', color: '#0F172A', marginBottom: 4 }}>Quantity</Text>
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        marginBottom: 12,
+                        borderWidth: 1,
+                        borderColor: '#ddd',
+                        borderRadius: 8,
+                        backgroundColor: '#F8FAFC',
+                      }}>
                         <TouchableOpacity
-                          style={styles.quickQuantityButton}
+                          style={{ 
+                            width: 40, 
+                            height: 40, 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            borderRightWidth: 1,
+                            borderRightColor: '#eee'
+                          }}
+                          onPress={() => {
+                            const current = parseInt(quantity) || 0;
+                            if (current > 1) {
+                              const newQty = (current - 1).toString();
+                              setQuantity(newQty);
+                              handleQuantityChange(newQty);
+                            }
+                          }}
+                        >
+                          <MaterialCommunityIcons name="minus" size={20} color="#007bff" />
+                        </TouchableOpacity>
+                        <TextInput
+                          style={{ 
+                            flex: 1,
+                            height: 40,
+                            textAlign: 'center',
+                            fontSize: 16
+                          }}
+                          value={quantity}
+                          onChangeText={handleQuantityChange}
+                          keyboardType="number-pad"
+                        />
+                        <TouchableOpacity
+                          style={{ 
+                            width: 40, 
+                            height: 40, 
+                            alignItems: 'center', 
+                            justifyContent: 'center',
+                            borderLeftWidth: 1,
+                            borderLeftColor: '#eee'
+                          }}
+                          onPress={() => {
+                            const current = parseInt(quantity) || 0;
+                            const max = selectedProduct.stockQuantity;
+                            if (current < max) {
+                              const newQty = (current + 1).toString();
+                              setQuantity(newQty);
+                              handleQuantityChange(newQty);
+                            } else {
+                              Alert.alert('Maximum stock reached', `Only ${max} units available.`);
+                            }
+                          }}
+                        >
+                          <MaterialCommunityIcons name="plus" size={20} color="#007bff" />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Quick quantity buttons */}
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        justifyContent: 'flex-end', 
+                        marginBottom: 12 
+                      }}>
+                        <TouchableOpacity
+                          style={{ 
+                            backgroundColor: '#E3F2FD',
+                            borderRadius: 4,
+                            paddingVertical: 6,
+                            paddingHorizontal: 12,
+                            marginLeft: 8,
+                            borderWidth: 1,
+                            borderColor: '#BBDEFB'
+                          }}
                           onPress={() => quickUpdateQuantity(2)}
                         >
-                          <Text style={styles.quickQuantityButtonText}>+2</Text>
+                          <Text style={{ color: '#007bff', fontWeight: '600', fontSize: 12 }}>+2</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={styles.quickQuantityButton}
+                          style={{ 
+                            backgroundColor: '#E3F2FD',
+                            borderRadius: 4,
+                            paddingVertical: 6,
+                            paddingHorizontal: 12,
+                            marginLeft: 8,
+                            borderWidth: 1,
+                            borderColor: '#BBDEFB'
+                          }}
                           onPress={() => quickUpdateQuantity(5)}
                         >
-                          <Text style={styles.quickQuantityButtonText}>+5</Text>
+                          <Text style={{ color: '#007bff', fontWeight: '600', fontSize: 12 }}>+5</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                          style={styles.quickQuantityButton}
+                          style={{ 
+                            backgroundColor: '#E3F2FD',
+                            borderRadius: 4,
+                            paddingVertical: 6,
+                            paddingHorizontal: 12,
+                            marginLeft: 8,
+                            borderWidth: 1,
+                            borderColor: '#BBDEFB'
+                          }}
                           onPress={() => quickUpdateQuantity(10)}
                         >
-                          <Text style={styles.quickQuantityButtonText}>+10</Text>
+                          <Text style={{ color: '#007bff', fontWeight: '600', fontSize: 12 }}>+10</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Total Price Input */}
+                      <Text style={{ 
+                        fontSize: 14, 
+                        fontWeight: '600', 
+                        color: '#007bff', 
+                        marginBottom: 4 
+                      }}>Total Selling Amount (₹)</Text>
+                      <TextInput
+                        style={{ 
+                          borderWidth: 2,
+                          borderColor: '#007bff',
+                          borderRadius: 8,
+                          padding: 12,
+                          fontSize: 16,
+                          fontWeight: '600',
+                          backgroundColor: '#EFF6FF',
+                          marginBottom: 12
+                        }}
+                        value={totalAmount}
+                        onChangeText={handleTotalAmountChange}
+                        keyboardType="decimal-pad"
+                        placeholder="Enter total selling amount"
+                      />
+
+                      {/* Unit Price (Read Only) */}
+                      <Text style={{ fontSize: 14, fontWeight: '500', color: '#0F172A', marginBottom: 4 }}>Unit Price (₹)</Text>
+                      <TextInput
+                        style={{ 
+                          borderWidth: 1,
+                          borderColor: '#ddd',
+                          borderRadius: 8,
+                          padding: 12,
+                          fontSize: 16,
+                          backgroundColor: '#F0F0F0',
+                          color: '#666',
+                          marginBottom: 16
+                        }}
+                        value={customPrice}
+                        keyboardType="decimal-pad"
+                        placeholder="Per unit price"
+                        editable={false}
+                      />
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                        {/* Add Product Button */}
+                        <TouchableOpacity 
+                          style={{ 
+                            flex: 1,
+                            backgroundColor: '#007AFF',
+                            borderRadius: 8,
+                            paddingVertical: 14,
+                            alignItems: 'center',
+                            marginBottom: 16,
+                            marginRight: 8
+                          }}
+                          onPress={handleAddProductToSale}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Add to Sale</Text>
+                        </TouchableOpacity>
+                        
+                        {/* Cancel Button */}
+                        <TouchableOpacity 
+                          style={{ 
+                            flex: 1,
+                            backgroundColor: '#F1F5F9',
+                            borderRadius: 8,
+                            paddingVertical: 14,
+                            alignItems: 'center',
+                            marginBottom: 16,
+                            marginLeft: 8
+                          }}
+                          onPress={() => {
+                            setSelectedProduct(null);
+                            setProductSelectionMode(true);
+                          }}
+                        >
+                          <Text style={{ color: '#64748B', fontWeight: 'bold', fontSize: 16 }}>Cancel</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
-                    
-                  <View style={styles.formGroup}>
-                    <Text style={[styles.formLabel, styles.highlightedLabel]}>Total Selling Amount (₹)</Text>
-                    <TextInput
-                      style={[styles.formInput, styles.highlightedInput]}
-                      value={totalAmount}
-                      onChangeText={handleTotalAmountChange}
-                      keyboardType="decimal-pad"
-                      placeholder="Enter total selling amount"
-                    />
+                  ) : (
+                    <TouchableOpacity
+                      style={{ 
+                        backgroundColor: '#0EA5E9',
+                        borderRadius: 8,
+                        paddingVertical: 14,
+                        alignItems: 'center',
+                        marginBottom: 16
+                      }}
+                      onPress={() => setProductSelectionMode(true)}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Select a Product</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+
+              {/* Divider and Total */}
+              {saleItems.length > 0 && !productSelectionMode && !selectedProduct && (
+                <>
+                  <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 16 }} />
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    marginBottom: 16 
+                  }}>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A' }}>Grand Total</Text>
+                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#007AFF' }}>
+                      ₹{saleItems.reduce((sum, item) => sum + parseFloat(item.soldAt), 0).toFixed(2)}
+                    </Text>
                   </View>
                   
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Unit Price (₹)</Text>
-                  <TextInput
-                    style={[styles.formInput, styles.readonlyInput]}
-                    value={customPrice}
-                    keyboardType="decimal-pad"
-                    placeholder="Per unit price"
-                    editable={false}
-                  />
-                </View>
-                
-                <TouchableOpacity style={styles.createSaleButton} onPress={handleCreateSale}>
-                  <Text style={styles.createSaleButtonText}>Create Sale</Text>
+                  {/* Create Sale Button */}
+                  <TouchableOpacity 
+                    style={{ 
+                      backgroundColor: '#10B981',
+                      borderRadius: 8,
+                      paddingVertical: 16,
+                      alignItems: 'center',
+                      marginBottom: 8
+                    }}
+                    onPress={handleCreateSale}
+                    disabled={saleItems.length === 0 || loading}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Create Sale</Text>
                   </TouchableOpacity>
-              </View>
+                </>
               )}
+            </ScrollView>
           </View>
         </View>
       </Modal>

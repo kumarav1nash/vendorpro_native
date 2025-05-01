@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useMemo, ReactNode } from '
 import {
   Sale,
   CreateSaleDto,
-  UpdateSaleDto
+  UpdateSaleDto,
+  SaleWithCommission
 } from '../types/sales';
 import {
   createSale,
@@ -13,13 +14,17 @@ import {
   approveSale,
   rejectSale
 } from '../services/sales.service';
+import { CommissionRule } from '../types/commission';
+import { calculateCommission } from '../utils/commissions';
 
 interface SalesContextType {
   sale: Sale | null;
   sales: Sale[];
+  salesWithCommission: SaleWithCommission[];
   loading: boolean;
   error: string | null;
   fetchAllSales: (params?: { shopId?: string; salesmanId?: string }) => Promise<void>;
+  fetchAllSalesWithCommission: (activeCommissionRule: CommissionRule,params?: { shopId?: string; salesmanId?: string }) => Promise<void>;
   fetchSaleById: (id: string) => Promise<void>;
   createSale: (data: CreateSaleDto) => Promise<void>;
   updateSale: (id: string, data: UpdateSaleDto) => Promise<void>;
@@ -41,6 +46,7 @@ export const useSales = () => {
 export const SalesProvider = ({ children }: { children: ReactNode }) => {
   const [sale, setSale] = useState<Sale | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
+  const [salesWithCommission, setSalesWithCommission] = useState<SaleWithCommission[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +58,28 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
       setSales(data);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch sales');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAllSalesWithCommission = async (activeCommissionRule: CommissionRule,params?: { shopId?: string; salesmanId?: string }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getAllSales(params);
+      const salesWithCommission = await Promise.all(data.map(async (sale) => {
+        const commissionAmount = await calculateCommission(sale, activeCommissionRule);
+
+        const saleWithCommission = {
+          ...sale,
+          commissionAmount
+        }
+        return saleWithCommission; 
+      }));
+      setSalesWithCommission(salesWithCommission);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch sales with commission');
     } finally {
       setLoading(false);
     }
@@ -138,9 +166,11 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo(() => ({
     sale,
     sales,
+    salesWithCommission,
     loading,
     error,
     fetchAllSales,
+    fetchAllSalesWithCommission,
     fetchSaleById,
     createSale: createSaleContext,
     updateSale: updateSaleContext,
