@@ -3,24 +3,42 @@ import { ImageResponse, ImageDeleteResponse, ImageUploadRequest } from '../types
 
 /**
  * Upload an image to the server
- * @param file - FormData containing the image file
- * @param entityId - Optional ID of the entity this image is associated with
- * @param entityType - Optional type of entity (e.g., 'product', 'user')
+ * @param formData - FormData containing the image file with 'file' field
  */
 export async function uploadImage(
-  imageUploadRequest: ImageUploadRequest
+  formData: FormData
 ): Promise<ImageResponse> {
-  // In a FormData object, the file should already be properly formatted
-  const res = await apiClient.post<ImageResponse>(
-    'images/upload',
-    imageUploadRequest,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  console.log('Sending image upload request to API');
+  
+  try {
+    const res = await apiClient.post<ImageResponse>(
+      'images/upload',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Accept': '*/*'
+        },
+      }
+    );
+    
+    console.log('Image upload response status:', res.status);
+    
+    // Validate that we have a URL in the response
+    if (!res.data || !res.data.url) {
+      console.error('Missing URL in image upload response:', res.data);
+      throw new Error('Missing URL in image upload response');
     }
-  );
-  return res.data;
+    
+    return res.data;
+  } catch (error: any) {
+    console.error('Image upload error:', error.message);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -30,8 +48,8 @@ export async function uploadImage(
  */
 export async function getAnImageByFilename(
   filename: string
-): Promise<ImageResponse> {
-  const res = await apiClient.get<ImageResponse>(`images/filename/${filename}`);
+): Promise<FormData> {
+  const res = await apiClient.get<FormData>(`images/filename/${filename}`);
   return res.data;
 }
 
@@ -39,8 +57,8 @@ export async function getAnImageByFilename(
  * Get an image by its ID
  * @param imageId - ID of the image to fetch
  */
-export async function getResizedImageByFilename(filename: string,params: {width: number, height: number,quality: number}): Promise<ImageResponse> {
-  const res = await apiClient.get<ImageResponse>(`images/${filename}/resize`,{params});
+export async function getResizedImageByFilename(filename: string,params: {width: number, height: number,quality: number}): Promise<FormData> {
+  const res = await apiClient.get<FormData>(`images/${filename}/resize`,{params});
   return res.data;
 }
 

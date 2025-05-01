@@ -1,3 +1,5 @@
+import { Shop } from "./shop";
+
 export interface Inventory {
   id: string;
   productName: string;
@@ -5,17 +7,19 @@ export interface Inventory {
   sellingPrice: number;
   stockQuantity: number;
   productImageUrl?: string;
-  shopId: string;
+  productImageFilename?: string;
+  shop: Shop | string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateInventoryDto {
   productName: string;
-  basePrice:  number;
+  basePrice: number;
   sellingPrice: number;
   stockQuantity: number;
   productImageUrl?: string;
+  productImageFilename?: string;
 }
 
 export interface UpdateInventoryDto {
@@ -24,4 +28,5 @@ export interface UpdateInventoryDto {
   sellingPrice?: number;
   stockQuantity?: number;
   productImageUrl?: string;
+  productImageFilename?: string;
 } 

@@ -16,6 +16,7 @@ import { useUser } from '../../src/contexts/UserContext';
 import { Inventory } from '../../src/types/inventory';
 import { Sale } from '../../src/types/sales';
 import { Commission } from '../../src/types/commission';
+import { ProductImage } from '../components/ui/ProductImage';
 
 export default function DashboardScreen() {
   const { user,logout } = useAuth();
@@ -129,7 +130,7 @@ export default function DashboardScreen() {
           console.error('Error fetching shop:', shopError?.message || shopError);
         }
       }
-      
+
       if (!currentShop?.id) {
         console.log("Cannot load shop-specific data: Shop ID is missing");
         setLoading(false);
@@ -201,7 +202,7 @@ export default function DashboardScreen() {
     setProductSelectionMode(!productSelectionMode);
     // Reset the selected product when entering selection mode
     if (!productSelectionMode) {
-      setSelectedProduct(null);
+    setSelectedProduct(null);
     }
   };
 
@@ -516,7 +517,7 @@ export default function DashboardScreen() {
         <TouchableOpacity 
               style={styles.actionButton}
               onPress={() => router.push('/(salesman)/sales-history')}
-            >
+        >
               <View style={[styles.actionIcon, { backgroundColor: '#E3F2FD' }]}>
                 <MaterialCommunityIcons name="receipt" size={24} color="#1976D2" />
               </View>
@@ -566,24 +567,19 @@ export default function DashboardScreen() {
                     product.stockQuantity === 0 && styles.disabledProductCard
                   ]}
                   onPress={() => {
+                    handleProductSelect(product);
                     setModalVisible(true);
-                    // Set product selection mode initially to true
-                    setProductSelectionMode(true);
                   }}
                   disabled={product.stockQuantity === 0}
                 >
                   <View style={styles.productImageContainer}>
-                    {product.productImageUrl ? (
-                      <Image
-                        source={{ uri: product.productImageUrl }}
-                        style={styles.productImage}
-                        contentFit="cover"
-                      />
-                    ) : (
-                      <View style={styles.productImagePlaceholder}>
-                        <MaterialCommunityIcons name="package-variant" size={32} color="#9CA3AF" />
-                      </View>
-                    )}
+                    <ProductImage
+                      imageUrl={product.productImageUrl}
+                      width="100%"
+                      height="100%"
+                      borderRadius={8}
+                      placeholderIconName="package-variant"
+                    />
                     {product.stockQuantity === 0 && (
                       <View style={styles.outOfStockOverlay}>
                         <Text style={styles.outOfStockText}>Out of Stock</Text>
@@ -746,10 +742,10 @@ export default function DashboardScreen() {
                       >
                         <Text style={{ fontWeight: 'bold', fontSize: 14, color: '#0F172A', marginBottom: 4 }} numberOfLines={1}>
                           {product.productName}
-                        </Text>
+                          </Text>
                         <Text style={{ fontSize: 14, fontWeight: '600', color: '#007bff', marginBottom: 4 }}>
                           ₹{safeNumberConversion(product.sellingPrice).toFixed(2)}
-                        </Text>
+                          </Text>
                         <Text style={{ 
                           fontSize: 12, 
                           color: product.stockQuantity === 0 
@@ -805,7 +801,7 @@ export default function DashboardScreen() {
                 <>
                   <Text style={{ fontWeight: 'bold', fontSize: 16, marginBottom: 8 }}>
                     {saleItems.length > 0 ? 'Add Another Product' : 'Add Product'}
-                  </Text>
+                      </Text>
                   
                   {selectedProduct ? (
                     <View style={{ marginBottom: 16 }}>
@@ -828,16 +824,14 @@ export default function DashboardScreen() {
                           alignItems: 'center',
                           justifyContent: 'center'
                         }}>
-                          {selectedProduct.productImageUrl ? (
-                            <Image
-                              source={{ uri: selectedProduct.productImageUrl }}
-                              style={{ width: '100%', height: '100%' }}
-                              contentFit="cover"
-                            />
-                          ) : (
-                            <MaterialCommunityIcons name="package-variant" size={28} color="#0EA5E9" />
-                          )}
-                        </View>
+                          <ProductImage
+                            imageUrl={selectedProduct.productImageUrl}
+                            width="100%"
+                            height="100%"
+                            borderRadius={8}
+                            placeholderIconName="package-variant"
+                          />
+                    </View>
                         <View style={{ flex: 1 }}>
                           <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#0F172A', marginBottom: 4 }}>
                             {selectedProduct.productName}
@@ -859,7 +853,7 @@ export default function DashboardScreen() {
                         borderRadius: 8,
                         backgroundColor: '#F8FAFC',
                       }}>
-                        <TouchableOpacity
+                    <TouchableOpacity 
                           style={{ 
                             width: 40, 
                             height: 40, 
@@ -878,8 +872,8 @@ export default function DashboardScreen() {
                           }}
                         >
                           <MaterialCommunityIcons name="minus" size={20} color="#007bff" />
-                        </TouchableOpacity>
-                        <TextInput
+                    </TouchableOpacity>
+                    <TextInput
                           style={{ 
                             flex: 1,
                             height: 40,
@@ -913,8 +907,8 @@ export default function DashboardScreen() {
                         >
                           <MaterialCommunityIcons name="plus" size={20} color="#007bff" />
                         </TouchableOpacity>
-                      </View>
-
+                  </View>
+                  
                       {/* Quick quantity buttons */}
                       <View style={{ 
                         flexDirection: 'row', 
@@ -1043,8 +1037,8 @@ export default function DashboardScreen() {
                         >
                           <Text style={{ color: '#64748B', fontWeight: 'bold', fontSize: 16 }}>Cancel</Text>
                         </TouchableOpacity>
-                      </View>
                     </View>
+                  </View>
                   ) : (
                     <TouchableOpacity
                       style={{ 
@@ -1075,11 +1069,11 @@ export default function DashboardScreen() {
                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A' }}>Grand Total</Text>
                     <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#007AFF' }}>
                       ₹{saleItems.reduce((sum, item) => sum + parseFloat(item.soldAt), 0).toFixed(2)}
-                    </Text>
-                  </View>
+                      </Text>
+                    </View>
                   
                   {/* Create Sale Button */}
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={{ 
                       backgroundColor: '#10B981',
                       borderRadius: 8,

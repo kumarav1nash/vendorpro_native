@@ -8,17 +8,22 @@ import {
   TextInput,
   Modal,
   ScrollView,
-  Image,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useInventory } from '../../../src/contexts/InventoryContext';
 import { Inventory, CreateInventoryDto, UpdateInventoryDto } from '../../../src/types/inventory';
 import { useUser } from '../../../src/contexts/UserContext';
 import { useShop } from '../../../src/contexts/ShopContext';
+import { useImages } from '../../../src/contexts/ImageContext';
+import { ProductImage } from '../ui/ProductImage';
 import { Shop } from '@/src/types/shop';
+import { ImagePickerResult } from '../../../src/utils/imageHelpers';
 
 type InventoryTabProps = {
   shopId: string;
@@ -126,18 +131,21 @@ const styles = StyleSheet.create({
   productCard: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   productImageContainer: {
     width: 100,
     height: 100,
+    backgroundColor: '#f5f5f5',
   },
   productImage: {
     width: '100%',
@@ -147,7 +155,7 @@ const styles = StyleSheet.create({
   imagePlaceholder: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -160,6 +168,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
+    color: '#333',
   },
   priceContainer: {
     flexDirection: 'row',
@@ -199,6 +208,8 @@ const styles = StyleSheet.create({
   actionsContainer: {
     justifyContent: 'space-between',
     padding: 8,
+    borderLeftWidth: 1,
+    borderLeftColor: '#f0f0f0',
   },
   actionButton: {
     width: 36,
@@ -252,8 +263,13 @@ const styles = StyleSheet.create({
     width: '90%',
     maxHeight: '80%',
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -262,10 +278,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    backgroundColor: '#f9f9f9',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
   },
   closeButton: {
     padding: 4,
@@ -277,11 +295,12 @@ const styles = StyleSheet.create({
   imagePicker: {
     width: '100%',
     height: 150,
-    borderRadius: 8,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 20,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    backgroundColor: '#f5f5f5',
   },
   pickedImage: {
     width: '100%',
@@ -306,7 +325,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 8,
     color: '#333',
   },
   textInput: {
@@ -314,8 +333,9 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     fontSize: 16,
+    backgroundColor: '#fff',
   },
   rowInputs: {
     flexDirection: 'row',
@@ -326,6 +346,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
     padding: 16,
+    backgroundColor: '#f9f9f9',
   },
   modalButton: {
     flex: 1,
@@ -333,10 +354,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
   },
   cancelButton: {
     backgroundColor: '#f5f5f5',
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   cancelButtonText: {
     color: '#666',
@@ -397,20 +425,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 12,
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 1,
+    shadowRadius: 2,
     width: '48%',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   metricIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -419,13 +448,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   metricValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
   metricLabel: {
     fontSize: 12,
     color: '#666',
+    marginTop: 2,
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  uploadingText: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 8,
+    fontWeight: 'bold',
   },
 });
 
@@ -441,12 +488,17 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   } = useInventory();
   const { user } = useUser();
   const { shop } = useShop();
+  const { uploadImageWithPicker, uploadImageForEntity } = useImages();
+  
+  // Enable this for detailed logging
+  const DEBUG_MODE = true;
   
   // State for the component
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [formSubmitting, setFormSubmitting] = useState(false);
   const [displayedInventory, setDisplayedInventory] = useState<Inventory[]>([]);
   const [showLowStock, setShowLowStock] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'stock'>('name');
@@ -456,11 +508,13 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
     basePrice: 0,
     sellingPrice: 0,
     stockQuantity: 0,
-    productImageUrl: '',
+    productImageFilename: '',
   });
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  
+
+  //import API_BASE_URL from env
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
   // KPI metrics state
   const [metrics, setMetrics] = useState({
     totalProducts: 0,
@@ -471,7 +525,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   });
 
   // Constants
-  const LOW_STOCK_THRESHOLD = 5;
+  const LOW_STOCK_THRESHOLD = 10;
 
   // Load inventory data when component mounts or shopId changes
   useEffect(() => {
@@ -592,6 +646,14 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         // There could be an API method to get all inventory, but we'll work with what we have
       }
       
+      if (__DEV__ && inventories) {
+        console.log(`Loaded ${inventories.length} inventory items`);
+        // Log the first item to see if it has image data
+        if (inventories.length > 0) {
+          console.log("First inventory item sample:", JSON.stringify(inventories[0], null, 2));
+        }
+      }
+      
       console.log("Inventory fetch completed");
       
     } catch (err) {
@@ -670,50 +732,150 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   // Submit form
   const handleSubmit = async () => {
     if (!validateForm()) return;
-
-    if (editMode && editId) {
-      // Update existing product
-      const updateData: UpdateInventoryDto = {
-        productName: formData.productName,
-        basePrice: formData.basePrice,
-        sellingPrice: formData.sellingPrice,
-        stockQuantity: Number(formData.stockQuantity),
-        productImageUrl: formData.productImageUrl || '',
-      };
-      
-      try {
-          // remove productImageUrl if it is empty or undefined from newProduct 
-          const { productImageUrl, ...newProductWithoutImage } = updateData;
-        await updateInventory(editId, productImageUrl ? updateData : newProductWithoutImage);
-      Alert.alert('Success', 'Product updated successfully');
-      } catch (error) {
-        console.error('Error updating product:', error);
-        Alert.alert('Error', 'Failed to update product');
-      }
-    } else {
-      // Add new product
-      const newProduct: CreateInventoryDto = {
-        productName: formData.productName,
-        basePrice: Number(formData.basePrice) || 0,
-        sellingPrice: Number(formData.sellingPrice) || 0  ,
-        stockQuantity: Number(formData.stockQuantity) || 0,
-        productImageUrl: formData.productImageUrl || '',
-      };
-      
-      try {
-        // remove productImageUrl if it is empty or undefined from newProduct 
-        const { productImageUrl, ...newProductWithoutImage } = newProduct;
-        await createInventory(shopId, productImageUrl ? newProduct : newProductWithoutImage);
-      Alert.alert('Success', 'Product added successfully');
-      } catch (error) {
-        console.error('Error adding product:', error);
-        Alert.alert('Error', 'Failed to add product');
-      }
-    }
     
-    setShowAddModal(false);
-    resetForm();
-    loadInventory();
+    try {
+      // If we have a local image URI, upload it first using the context's uploadImageForEntity method
+      let uploadedImageUrl = undefined;
+      if (formData.productImageFilename && !formData.productImageFilename.startsWith('http')) {
+        // Show loading state
+        setFormSubmitting(true);
+        
+        try {
+          // Get file info for creating a proper ImagePickerResult
+          const fileInfo = await FileSystem.getInfoAsync(formData.productImageFilename);
+          if (!fileInfo.exists) {
+            console.error('File not found:', formData.productImageFilename);
+            Alert.alert('Error', 'The selected image file was not found');
+            return;
+          }
+          
+          // Create the image object in the format expected by the context
+          const imagePickerResult: ImagePickerResult = {
+            uri: formData.productImageFilename,
+            name: formData.productImageFilename.split('/').pop() || `image_${Date.now()}.jpg`,
+            type: 'image/jpeg',
+            size: fileInfo.size,
+          };
+          
+          // Use the context's uploadImageForEntity method
+          // Note: We're not passing the description parameter anymore since the API only needs the file
+          console.log('Uploading image using ImageContext:', imagePickerResult.uri);
+          const uploadResult = await uploadImageForEntity(imagePickerResult);
+          
+          // Detailed logging to understand the response structure
+          console.log('Upload result type:', typeof uploadResult);
+          console.log('Upload result complete:', JSON.stringify(uploadResult, null, 2));
+          
+          if (uploadResult) {
+            // Check for URL in different possible response formats
+            if (typeof uploadResult === 'object') {
+              if (uploadResult.url) {
+                uploadedImageUrl = uploadResult.url;
+                //add the base url to the image url if it's a relative path
+                if (!uploadedImageUrl.startsWith('http')) {
+                  // Make sure we handle path joining correctly without extra slashes
+                  const baseUrl = API_BASE_URL?.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+                  const imagePath = uploadedImageUrl.startsWith('/') ? uploadedImageUrl : `/${uploadedImageUrl}`;
+                  uploadedImageUrl = `${baseUrl}${imagePath}`;
+                }
+                console.log('Image URL found at uploadResult.url:', uploadedImageUrl);
+              } else if (uploadResult.filename) {
+                uploadedImageUrl = uploadResult.filename;
+                //add the base url to the image url if it's a relative path
+                if (!uploadedImageUrl.startsWith('http')) {
+                  // Make sure we handle path joining correctly without extra slashes
+                  const baseUrl = API_BASE_URL?.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+                  const imagePath = uploadedImageUrl.startsWith('/') ? uploadedImageUrl : `/${uploadedImageUrl}`;
+                  uploadedImageUrl = `${baseUrl}${imagePath}`;
+                }
+                console.log('Image URL found at uploadResult.filename:', uploadedImageUrl);
+              }
+            }
+            
+            if (uploadedImageUrl) {
+              console.log('Final image URL to use:', uploadedImageUrl);
+            } else {
+              console.error('Could not extract URL from upload result');
+            }
+          } else {
+            console.error('Upload completed but returned null or undefined');
+          }
+        } catch (uploadError: any) {
+          console.error('Error uploading image:', uploadError);
+          Alert.alert('Upload Error', uploadError.message || 'Failed to upload image');
+          setFormSubmitting(false);
+          return;
+        }
+      }
+      
+      // Set form submitting state
+      setFormSubmitting(true);
+      
+      if (editMode && editId) {
+        // Update existing product
+        const updateData: UpdateInventoryDto = {
+          productName: formData.productName,
+          basePrice: Number(formData.basePrice),
+          sellingPrice: Number(formData.sellingPrice),
+          stockQuantity: Number(formData.stockQuantity),
+          productImageUrl: uploadedImageUrl || formData.productImageUrl,
+        };
+        
+        // Log the update data
+        console.log('Updating product with data:', JSON.stringify(updateData, null, 2));
+        
+        try {
+          // Only include image if we have one
+          if (!uploadedImageUrl && !formData.productImageUrl) {
+            const { productImageUrl, ...dataWithoutImage } = updateData;
+            console.log('Updating without image data:', JSON.stringify(dataWithoutImage, null, 2));
+            await updateInventory(editId, dataWithoutImage);
+          } else {
+            await updateInventory(editId, updateData);
+          }
+          Alert.alert('Success', 'Product updated successfully');
+        } catch (error) {
+          console.error('Error updating product:', error);
+          Alert.alert('Error', 'Failed to update product');
+        }
+      } else {
+        // Add new product
+        const newProduct: CreateInventoryDto = {
+          productName: formData.productName,
+          basePrice: Number(formData.basePrice) || 0,
+          sellingPrice: Number(formData.sellingPrice) || 0,
+          stockQuantity: Number(formData.stockQuantity) || 0,
+          productImageUrl: uploadedImageUrl,
+        };
+        
+        // Log the new product data
+        console.log('Creating product with data:', JSON.stringify(newProduct, null, 2));
+        
+        try {
+          // Only include image if we have one
+          if (!uploadedImageUrl) {
+            const { productImageUrl, ...newProductWithoutImage } = newProduct;
+            console.log('Creating without image data:', JSON.stringify(newProductWithoutImage, null, 2));
+            await createInventory(shopId, newProductWithoutImage);
+          } else {
+            await createInventory(shopId, newProduct);
+          }
+          Alert.alert('Success', 'Product added successfully');
+        } catch (error) {
+          console.error('Error adding product:', error);
+          Alert.alert('Error', 'Failed to add product');
+        }
+      }
+      
+      setShowAddModal(false);
+      resetForm();
+      loadInventory();
+    } catch (error: any) {
+      console.error('Error during product submission:', error.message);
+      Alert.alert('Error', `Failed to process your request: ${error.message}`);
+    } finally {
+      setFormSubmitting(false);
+    }
   };
 
   // Delete a product
@@ -752,6 +914,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       basePrice: typeof product.basePrice === 'string' ? parseFloat(product.basePrice) : product.basePrice,
       sellingPrice: typeof product.sellingPrice === 'string' ? parseFloat(product.sellingPrice) : product.sellingPrice,
       stockQuantity: typeof product.stockQuantity === 'string' ? parseInt(product.stockQuantity) : product.stockQuantity,
+      productImageFilename: product.productImageFilename || '',
       productImageUrl: product.productImageUrl || '',
     });
     setEditMode(true);
@@ -765,6 +928,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       basePrice: 0,
       sellingPrice: 0,
       stockQuantity: 0,
+      productImageFilename: '',
       productImageUrl: '',
     });
     setEditMode(false);
@@ -774,15 +938,40 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   // Pick an image from the gallery
   const pickImage = async () => {
     try {
+      // Use the same ImagePicker configuration as in the context
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 1,
+        quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setFormData({ ...formData, productImageUrl: result.assets[0].uri });
+        const selectedImageUri = result.assets[0].uri;
+        
+        if (DEBUG_MODE) {
+          console.log('Selected image:', selectedImageUri);
+          
+          // Get file info for debug purposes
+          const fileInfo = await FileSystem.getInfoAsync(selectedImageUri);
+          console.log('Selected image file info:', fileInfo);
+        }
+        
+        // Store the local URI in productImageFilename for display purposes only
+        // This will be used as the source for the image upload when submitting the form
+        setFormData({
+          ...formData,
+          productImageFilename: selectedImageUri,
+          // Clear any existing URL as we're selecting a new image
+          productImageUrl: ''
+        });
+        
+        // Show a message that the image will be uploaded when the form is submitted
+        Alert.alert(
+          'Image Selected',
+          'The image will be uploaded when you save the product.',
+          [{ text: 'OK' }]
+        );
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -815,6 +1004,14 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   const renderProductItem = ({ item }: { item: Inventory }) => {
     const isLowStock = item.stockQuantity <= LOW_STOCK_THRESHOLD;
     
+    // Log image URLs for debugging
+    if (__DEV__ && DEBUG_MODE) {
+      console.log(`Product ${item.productName} image data:`, {
+        productImageUrl: item.productImageUrl,
+        productImageFilename: item.productImageFilename
+      });
+    }
+    
     // Format prices safely, handling string values
     const formatPrice = (price: number | string) => {
       if (typeof price === 'string') {
@@ -826,17 +1023,19 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
     return (
       <View style={styles.productCard}>
         <View style={styles.productImageContainer}>
-          {item.productImageUrl ? (
-            <Image source={{ uri: item.productImageUrl }} style={styles.productImage} />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <MaterialCommunityIcons name="image-outline" size={40} color="#cccccc" />
-            </View>
-          )}
+          <ProductImage 
+            imageUrl={item.productImageUrl}
+            width="100%"
+            height="100%"
+            borderRadius={8}
+            resizeMode="cover"
+          />
         </View>
         
         <View style={styles.productDetails}>
-          <Text style={styles.productName}>{item.productName}</Text>
+          <Text style={styles.productName} numberOfLines={1} ellipsizeMode="tail">
+            {item.productName}
+          </Text>
           
           <View style={styles.priceContainer}>
             <Text style={styles.sellingPrice}>{formatPrice(item.sellingPrice)}</Text>
@@ -852,7 +1051,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         </View>
         
         <View style={styles.actionsContainer}>
-        <TouchableOpacity
+          <TouchableOpacity
             style={[styles.actionButton, styles.editButton]}
             onPress={() => handleEdit(item)}
           >
@@ -861,10 +1060,10 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDelete(item.id)}
-        >
+            onPress={() => handleDelete(item.id)}
+          >
             <MaterialCommunityIcons name="delete" size={20} color="#fff" />
-        </TouchableOpacity>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -1012,51 +1211,78 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
             
             <ScrollView style={styles.formContainer}>
               {/* Product image picker */}
-              <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-                {formData.productImageUrl ? (
+              <TouchableOpacity 
+                style={styles.imagePicker} 
+                onPress={pickImage}
+                disabled={formSubmitting}
+              >
+                {formData.productImageFilename ? (
+                  <>
+                    <Image
+                      source={{ uri: formData.productImageFilename }}
+                      style={styles.pickedImage}
+                      contentFit="cover"
+                      transition={100}
+                    />
+                    {formSubmitting && (
+                      <View style={styles.imageOverlay}>
+                        <ActivityIndicator size="large" color="#fff" />
+                        <Text style={styles.uploadingText}>Uploading...</Text>
+                      </View>
+                    )}
+                  </>
+                ) : formData.productImageUrl ? (
                   <Image
                     source={{ uri: formData.productImageUrl }}
                     style={styles.pickedImage}
+                    contentFit="cover"
+                    transition={100}
                   />
                 ) : (
                   <View style={styles.imagePickerPlaceholder}>
                     <MaterialCommunityIcons name="camera" size={40} color="#999" />
                     <Text style={styles.imagePickerText}>Add Product Image</Text>
-              </View>
+                  </View>
                 )}
               </TouchableOpacity>
               
               {/* Form fields */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Product Name *</Text>
-                  <TextInput
+                <TextInput
                   style={styles.textInput}
                   placeholder="Enter product name"
                   value={formData.productName}
                   onChangeText={(value) => handleInputChange('productName', value)}
-                  />
-                </View>
-                
+                  placeholderTextColor="#999"
+                  returnKeyType="next"
+                />
+              </View>
+              
               <View style={styles.rowInputs}>
                 <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
                   <Text style={styles.inputLabel}>Base Price (₹) *</Text>
                   <TextInput
                     style={styles.textInput}
                     placeholder="0.00"
-                    keyboardType="numeric"
+                    keyboardType="decimal-pad"
                     value={formData.basePrice.toString()}
                     onChangeText={(value) => handleInputChange('basePrice', value)}
+                    placeholderTextColor="#999"
+                    returnKeyType="next"
                   />
-              </View>
+                </View>
               
                 <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
                   <Text style={styles.inputLabel}>Selling Price (₹) *</Text>
                   <TextInput
                     style={styles.textInput}
                     placeholder="0.00"
-                    keyboardType="numeric"
+                    keyboardType="decimal-pad"
                     value={formData.sellingPrice.toString()}
                     onChangeText={(value) => handleInputChange('sellingPrice', value)}
+                    placeholderTextColor="#999"
+                    returnKeyType="next"
                   />
                 </View>
               </View>
@@ -1066,31 +1292,38 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                 <TextInput
                   style={styles.textInput}
                   placeholder="0"
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   value={formData.stockQuantity.toString()}
                   onChangeText={(value) => handleInputChange('stockQuantity', value)}
+                  placeholderTextColor="#999"
                 />
               </View>
             </ScrollView>
               
             <View style={styles.modalFooter}>
-                      <TouchableOpacity 
+              <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setShowAddModal(false);
                   resetForm();
                 }}
-                      >
+                disabled={formSubmitting}
+              >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
-                      </TouchableOpacity>
+              </TouchableOpacity>
               
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
                 onPress={handleSubmit}
+                disabled={formSubmitting}
               >
-                <Text style={styles.saveButtonText}>
-                  {editMode ? 'Update' : 'Add Product'}
-                </Text>
+                {formSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>
+                    {editMode ? 'Update' : 'Add Product'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

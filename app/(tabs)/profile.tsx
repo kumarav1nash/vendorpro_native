@@ -19,9 +19,11 @@ import { useUser } from '../../src/contexts/UserContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useUserProfile } from '../../src/contexts/UserProfileContext';
 import { useShop } from '../../src/contexts/ShopContext';
+import { useImages } from '../../src/contexts/ImageContext';
 import { UserProfile, UserProfilePreferences, UpdateUserProfileDto } from '@/src/types/user';
 import { shopService } from '../../src/services/shop.service';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { ProfileImage } from '../components/ui/ProfileImage';
 
 // Define an interface for creating a user profile
 interface CreateUserProfileDto {
@@ -49,6 +51,7 @@ export default function ProfileScreen() {
   const { isAuthenticated, isLoading: authLoading, logout } = useAuth();
   const { profile, updateProfile, fetchProfileByUserId, createProfile } = useUserProfile();
   const { shop, shops, setShops, fetchMyShops } = useShop();
+  const { uploadImageWithPicker } = useImages();
   const [isEditing, setIsEditing] = useState(false);
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -597,18 +600,51 @@ export default function ProfileScreen() {
   // Check if edit button should be disabled - add this as a separate variable
   const isEditButtonDisabled = isLoading || !localProfile || userLoading || authLoading;
 
+  // Replace the pickImage function with this implementation
+  const pickProfileImage = async () => {
+    try {
+      // Use the context function to pick and upload an image
+      const response = await uploadImageWithPicker('Profile picture');
+      
+      if (response && response.filename) {
+        // Update the profile with the new image filename
+        const updatedProfile: Partial<UserProfile> = {
+          ...localProfile,
+          profilePicture: response.filename
+        };
+        
+        // Call the API to update profile
+        if (user?.id) {
+          await updateProfile(user.id, updatedProfile);
+        } else {
+          console.error('User ID not available');
+        }
+        
+        // Update local state
+        setLocalProfile(prev => ({
+          ...prev!,
+          profilePicture: response.filename
+        }));
+      }
+    } catch (error) {
+      console.error('Error picking profile image:', error);
+      Alert.alert('Error', 'Failed to update profile picture');
+    }
+  };
+
   // Fix the Edit button styling conditionals
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
-          <MaterialCommunityIcons name="account-circle" size={80} color="#007AFF" />
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => setIsEditing(true)}
-            >
-              <MaterialCommunityIcons name="pencil" size={20} color="#fff" />
-            </TouchableOpacity>
+          <ProfileImage
+            filename={localProfile?.profilePicture}
+            fallbackUrl={localProfile?.profilePicture} // Backward compatibility with direct URLs
+            size={120}
+            editable={isEditing}
+            onPress={isEditing ? pickProfileImage : undefined}
+            showEditIcon={isEditing}
+          />
         </View>
         <Text style={styles.headerUsername}>
           {profile?.firstName || 'User'}
