@@ -18,6 +18,8 @@ import { useInventory } from '../../../src/contexts/InventoryContext';
 import { Inventory, CreateInventoryDto, UpdateInventoryDto } from '../../../src/types/inventory';
 import { useUser } from '../../../src/contexts/UserContext';
 import { useShop } from '../../../src/contexts/ShopContext';
+import { useImages } from '../../../src/contexts/ImageContext';
+import { ProductImage } from '../ui/ProductImage';
 import { Shop } from '@/src/types/shop';
 
 type InventoryTabProps = {
@@ -441,6 +443,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   } = useInventory();
   const { user } = useUser();
   const { shop } = useShop();
+  const { uploadImageWithPicker } = useImages();
   
   // State for the component
   const [searchQuery, setSearchQuery] = useState('');
@@ -456,7 +459,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
     basePrice: 0,
     sellingPrice: 0,
     stockQuantity: 0,
-    productImageUrl: '',
+    productImageFilename: '',
   });
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -471,7 +474,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   });
 
   // Constants
-  const LOW_STOCK_THRESHOLD = 5;
+  const LOW_STOCK_THRESHOLD = 10;
 
   // Load inventory data when component mounts or shopId changes
   useEffect(() => {
@@ -678,13 +681,13 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         basePrice: formData.basePrice,
         sellingPrice: formData.sellingPrice,
         stockQuantity: Number(formData.stockQuantity),
-        productImageUrl: formData.productImageUrl || '',
+        productImageFilename: formData.productImageFilename || undefined,
       };
       
       try {
           // remove productImageUrl if it is empty or undefined from newProduct 
-          const { productImageUrl, ...newProductWithoutImage } = updateData;
-        await updateInventory(editId, productImageUrl ? updateData : newProductWithoutImage);
+          const { productImageFilename, ...newProductWithoutImage } = updateData;
+        await updateInventory(editId, productImageFilename ? updateData : newProductWithoutImage);
       Alert.alert('Success', 'Product updated successfully');
       } catch (error) {
         console.error('Error updating product:', error);
@@ -697,13 +700,13 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
         basePrice: Number(formData.basePrice) || 0,
         sellingPrice: Number(formData.sellingPrice) || 0  ,
         stockQuantity: Number(formData.stockQuantity) || 0,
-        productImageUrl: formData.productImageUrl || '',
+        productImageFilename: formData.productImageFilename || undefined,
       };
       
       try {
         // remove productImageUrl if it is empty or undefined from newProduct 
-        const { productImageUrl, ...newProductWithoutImage } = newProduct;
-        await createInventory(shopId, productImageUrl ? newProduct : newProductWithoutImage);
+        const { productImageFilename, ...newProductWithoutImage } = newProduct;
+        await createInventory(shopId, productImageFilename ? newProduct : newProductWithoutImage);
       Alert.alert('Success', 'Product added successfully');
       } catch (error) {
         console.error('Error adding product:', error);
@@ -752,6 +755,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       basePrice: typeof product.basePrice === 'string' ? parseFloat(product.basePrice) : product.basePrice,
       sellingPrice: typeof product.sellingPrice === 'string' ? parseFloat(product.sellingPrice) : product.sellingPrice,
       stockQuantity: typeof product.stockQuantity === 'string' ? parseInt(product.stockQuantity) : product.stockQuantity,
+      productImageFilename: product.productImageFilename || '',
       productImageUrl: product.productImageUrl || '',
     });
     setEditMode(true);
@@ -765,6 +769,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       basePrice: 0,
       sellingPrice: 0,
       stockQuantity: 0,
+      productImageFilename: '',
       productImageUrl: '',
     });
     setEditMode(false);
@@ -782,7 +787,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setFormData({ ...formData, productImageUrl: result.assets[0].uri });
+        setFormData({ ...formData, productImageFilename: result.assets[0].uri });
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -826,13 +831,13 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
     return (
       <View style={styles.productCard}>
         <View style={styles.productImageContainer}>
-          {item.productImageUrl ? (
-            <Image source={{ uri: item.productImageUrl }} style={styles.productImage} />
-          ) : (
-            <View style={styles.imagePlaceholder}>
-              <MaterialCommunityIcons name="image-outline" size={40} color="#cccccc" />
-            </View>
-          )}
+          <ProductImage 
+            filename={item.productImageFilename}
+            fallbackUrl={item.productImageUrl}
+            width={100}
+            height={100}
+            borderRadius={8}
+          />
         </View>
         
         <View style={styles.productDetails}>
@@ -1014,15 +1019,18 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
               {/* Product image picker */}
               <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
                 {formData.productImageUrl ? (
-                  <Image
-                    source={{ uri: formData.productImageUrl }}
-                    style={styles.pickedImage}
+                  <ProductImage
+                    fallbackUrl={formData.productImageUrl}
+                    filename={formData.productImageFilename}
+                    width={200}
+                    height={200}
+                    borderRadius={8}
                   />
                 ) : (
                   <View style={styles.imagePickerPlaceholder}>
                     <MaterialCommunityIcons name="camera" size={40} color="#999" />
                     <Text style={styles.imagePickerText}>Add Product Image</Text>
-              </View>
+                  </View>
                 )}
               </TouchableOpacity>
               

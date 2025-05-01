@@ -17,6 +17,7 @@ import { useSales } from '../../src/contexts/SalesContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { Sale, SaleWithCommission } from '../../src/types/sales';
 import { useCommission } from '@/src/contexts/CommissionContext';
+import { ProductImage } from '../components/ui/ProductImage';
 
 // Filter options
 const FILTER_ALL = 'all';
@@ -150,17 +151,16 @@ export default function SalesHistoryScreen() {
       <View style={styles.saleItem}>
         <View style={styles.saleBody}>
           <View style={styles.productInfo}>
-            {firstProduct?.productImageUrl ? (
-              <Image
-                source={{ uri: firstProduct.productImageUrl }}
-                style={styles.productImage}
-                contentFit="cover"
-              />
-            ) : (
-              <View style={styles.productImagePlaceholder}>
-                <MaterialCommunityIcons name="package-variant" size={24} color="#9CA3AF" />
-              </View>
-            )}
+            <ProductImage
+              filename={firstProduct?.productImageFilename}
+              fallbackUrl={firstProduct?.productImageUrl}
+              width={48}
+              height={48}
+              borderRadius={8}
+              placeholderIconSize={24}
+              placeholderIconName="package-variant"
+              placeholderIconColor="#9CA3AF"
+            />
             <View style={styles.productDetails}>
               {/* List all products in the sale */}
               {item.items.map((saleItem, idx) => (
