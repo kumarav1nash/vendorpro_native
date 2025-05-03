@@ -1,5 +1,6 @@
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios/index';
+import axios, { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
+import NetInfo from '@react-native-community/netinfo';
 
 // Standard API base URL from env or fallback
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/';
@@ -14,18 +15,31 @@ const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Set a reasonable timeout
+  timeout: 10000,
 });
 
-// Request interceptor to add auth token to requests
+// Request interceptor to add auth token to requests and check for offline status
 apiClient.interceptors.request.use(
-  async (config) => {
+  async (config: InternalAxiosRequestConfig) => {
+    // Check network status before making request
+    const netState = await NetInfo.fetch();
+    
+    if (!netState.isConnected) {
+      // Create a custom offline error
+      const offlineError = new Error('You are offline. Please check your connection and try again.');
+      (offlineError as any).isOffline = true;
+      return Promise.reject(offlineError);
+    }
+    
+    // Add authorization token if available
     const token = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-    if (token) {
+    if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
+  (error: any) => {
     return Promise.reject(error);
   }
 );
@@ -57,6 +71,13 @@ const refreshAuthToken = async () => {
       throw new Error('No refresh token available');
     }
     
+    // Check network status before attempting token refresh
+    const netState = await NetInfo.fetch();
+    
+    if (!netState.isConnected) {
+      throw new Error('You are offline. Please check your connection and try again.');
+    }
+    
     // Call refresh token endpoint
     const response = await axios.post(`${API_BASE_URL}auth/refresh-token`, {
       refreshToken,
@@ -78,11 +99,18 @@ const refreshAuthToken = async () => {
   }
 };
 
-// Response interceptor to handle token refresh
+// Response interceptor to handle token refresh and network errors
 apiClient.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+  (response: AxiosResponse) => response,
+  async (error: AxiosError | any) => {
+    // Handle offline errors
+    if (error.isOffline || error.message === 'Network Error' || error.code === 'ECONNABORTED') {
+      const offlineError = new Error('You are offline. Please check your connection and try again.');
+      (offlineError as any).isOffline = true;
+      return Promise.reject(offlineError);
+    }
+    
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     
     // If we get a 401 and haven't already tried to refresh the token
     if (error.response?.status === 401 && !originalRequest._retry) {

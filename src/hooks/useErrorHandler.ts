@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios';
 
 type ErrorState = {
   message: string;
@@ -29,15 +29,14 @@ export function useErrorHandler() {
     // Reset to default first
     setError(defaultErrorState);
 
-    if (err instanceof Error) {
-      const axiosError = err as AxiosError;
-      const status = axiosError.response?.status;
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status;
       
       // Handle different types of errors
       if (status === 404) {
         // For 404, we don't necessarily want to show an error to the user
         // Often this just means "no data" rather than a true error
-        console.warn('Resource not found:', axiosError.config?.url);
+        console.warn('Resource not found:', err.config?.url);
         setError({
           message: customMessage || 'The requested data could not be found',
           status: 404,
@@ -57,11 +56,16 @@ export function useErrorHandler() {
         });
       } else {
         setError({
-          message: customMessage || axiosError.message || 'An unexpected error occurred',
+          message: customMessage || err.message || 'An unexpected error occurred',
           status,
           isError: true
         });
       }
+    } else if (err instanceof Error) {
+      setError({
+        message: customMessage || err.message || 'An unexpected error occurred',
+        isError: true
+      });
     } else {
       setError({
         message: customMessage || 'An unknown error occurred',

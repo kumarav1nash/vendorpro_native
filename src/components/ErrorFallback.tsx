@@ -1,24 +1,37 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import OfflineNotice from './OfflineNotice';
 
 type ErrorFallbackProps = {
   error?: {
     message: string;
     status?: number;
+    isOffline?: boolean;
   };
   onRetry?: () => void;
   isEmpty?: boolean;
 };
 
 /**
- * A reusable component for displaying error states or empty states
+ * A reusable component for displaying error states, empty states, or offline states
  */
 const ErrorFallback: React.FC<ErrorFallbackProps> = ({ 
   error, 
   onRetry, 
   isEmpty = false 
 }) => {
+  // Check if this is an offline error
+  const isOfflineError = error?.isOffline || 
+    error?.message?.includes('offline') || 
+    error?.message?.includes('network') ||
+    error?.message?.includes('connection');
+
+  // If it's an offline error, show the offline notice
+  if (isOfflineError) {
+    return <OfflineNotice onRetry={onRetry} message={error?.message} />;
+  }
+  
   // If it's a 404 or explicitly marked as empty, show empty state
   const isEmptyState = isEmpty || error?.status === 404;
   

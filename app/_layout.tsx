@@ -10,6 +10,7 @@ import { AuthProvider } from '../src/contexts/AuthContext';
 import { CommissionProvider } from '../src/contexts/CommissionContext';
 import { UserProfileProvider } from '../src/contexts/UserProfileContext';
 import { ImageProvider } from '@/src/contexts/ImageContext';
+import { NetworkProvider } from '@/src/contexts/NetworkContext';
 import ErrorBoundary from '@/src/components/ErrorBoundary';
 
 // Global layout component that wraps the entire app
@@ -23,45 +24,47 @@ export default function RootLayout() {
       {/* Global error boundary to prevent app crashes */}
       <ErrorBoundary>
         {/* Context providers for data sharing across the app */}
-        <AuthProvider>
-        <UserProvider>
-          <ImageProvider>
-          <UserProfileProvider>
-          <ShopProvider>
-              <InventoryProvider>
-                <SalesProvider>
-                  <CommissionProvider>
-                  {/* Root stack navigator */}
-                  <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(redirects)" options={{ headerShown: false }} />
-                    <Stack.Screen name="(salesman)" options={{ headerShown: false }} />
-                    <Stack.Screen 
-                      name="shop/[id]" 
-                      options={{ 
-                        headerShown: true,
-                        headerTitle: 'Shop Details',
-                        headerBackTitle: 'Back'
-                      }} 
-                    />
-                    <Stack.Screen 
-                      name="index" 
-                      options={{ 
-                        // Auth check & redirect screen, no header needed
-                        headerShown: false 
-                      }} 
-                    />
-                  </Stack>
-                  </CommissionProvider>
-                </SalesProvider>
-              </InventoryProvider>
-          </ShopProvider>
-          </UserProfileProvider>
-          </ImageProvider>
-        </UserProvider>
-        </AuthProvider>
+        <NetworkProvider>
+          <AuthProvider>
+            <UserProvider>
+              <ImageProvider>
+                <UserProfileProvider>
+                  <ShopProvider>
+                    <InventoryProvider>
+                      <SalesProvider>
+                        <CommissionProvider>
+                          {/* Root stack navigator */}
+                          <Stack screenOptions={{ headerShown: false }}>
+                            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                            <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+                            <Stack.Screen name="(redirects)" options={{ headerShown: false }} />
+                            <Stack.Screen name="(salesman)" options={{ headerShown: false }} />
+                            <Stack.Screen 
+                              name="shop/[id]" 
+                              options={{ 
+                                headerShown: true,
+                                headerTitle: 'Shop Details',
+                                headerBackTitle: 'Back'
+                              }} 
+                            />
+                            <Stack.Screen 
+                              name="index" 
+                              options={{ 
+                                // Auth check & redirect screen, no header needed
+                                headerShown: false 
+                              }} 
+                            />
+                          </Stack>
+                        </CommissionProvider>
+                      </SalesProvider>
+                    </InventoryProvider>
+                  </ShopProvider>
+                </UserProfileProvider>
+              </ImageProvider>
+            </UserProvider>
+          </AuthProvider>
+        </NetworkProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

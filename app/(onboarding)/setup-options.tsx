@@ -14,7 +14,7 @@ type SetupOption = {
   title: string;
   description: string;
   icon: string;
-  route: '/(tabs)/inventory' | '/(tabs)/salesmen' | '/(tabs)/dashboard';
+  route: string;
 };
 
 export default function SetupOptionsScreen() {
@@ -39,17 +39,17 @@ export default function SetupOptionsScreen() {
     },
   ];
 
-  const handleOptionSelect = async (route: SetupOption['route']) => {
+  const handleOptionSelect = async (route: string) => {
     try {
       // Mark onboarding as complete
       await AsyncStorage.setItem('onboardingComplete', 'true');
       
       // Navigate to the selected route
-      router.replace(route);
+      router.replace(route as any);
     } catch (error) {
       console.error('Error saving onboarding status:', error);
       // If error, still try to navigate
-      router.replace(route);
+      router.replace(route as any);
     }
   };
 
