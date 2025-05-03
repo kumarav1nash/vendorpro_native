@@ -674,7 +674,7 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.saveEditButton,
                 isEditButtonDisabled ? styles.disabledButton : null
@@ -693,8 +693,8 @@ export default function ProfileScreen() {
               ]}>Edit</Text>
             </TouchableOpacity>
           )}
-        </View>
-        
+      </View>
+
         {isEditing ? (
           // Edit mode - use the editValues state
           <>

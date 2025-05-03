@@ -122,6 +122,25 @@ apiClient.interceptors.response.use(
       }
     }
     
+    // Special handling for 404 errors to prevent application disruption
+    if (error.response?.status === 404) {
+      console.warn('Resource not found:', originalRequest.url);
+      
+      // For GET requests, return empty data instead of rejecting the promise
+      if (originalRequest.method?.toLowerCase() === 'get') {
+        // Determine the appropriate empty response based on the expected data type
+        const emptyResponse = Array.isArray(error.config?.data) ? [] : {};
+        
+        return Promise.resolve({
+          status: 200,
+          statusText: 'OK (Empty response for 404)',
+          headers: error.response?.headers,
+          config: error.config,
+          data: emptyResponse
+        } as AxiosResponse);
+      }
+    }
+    
     return Promise.reject(error);
   }
 );

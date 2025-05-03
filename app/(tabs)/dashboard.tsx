@@ -249,7 +249,7 @@ export default function DashboardScreen() {
             style={styles.currentShopButton}
             onPress={() => setShopDropdownVisible(true)}
           >
-            <Text style={styles.currentShopText} numberOfLines={1}>
+            <Text style={styles.currentShopText} numberOfLines={2}>
               {selectedShop.shopName}
             </Text>
             <MaterialCommunityIcons name="chevron-down" size={20} color="#007AFF" />
@@ -315,10 +315,12 @@ export default function DashboardScreen() {
         {kpiData.map((kpi, index) => (
           <View key={index} style={styles.kpiCard}>
             <View style={[styles.iconContainer, { backgroundColor: kpi.color }]}>
-              <MaterialCommunityIcons name={kpi.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={24} color="#fff" />
+              <MaterialCommunityIcons name={kpi.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={18} color="#fff" />
             </View>
-            <Text style={styles.kpiValue}>{kpi.value}</Text>
-            <Text style={styles.kpiTitle}>{kpi.title}</Text>
+            <View style={styles.kpiTextContainer}>
+              <Text style={styles.kpiValue} numberOfLines={1}>{kpi.value}</Text>
+              <Text style={styles.kpiTitle} numberOfLines={1}>{kpi.title}</Text>
+            </View>
           </View>
         ))}
       </View>
@@ -402,9 +404,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     maxWidth: 150,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   currentShopText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#007AFF',
     marginRight: 4,
   },
@@ -463,14 +470,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 10,
   },
   kpiCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 8,
+    padding: 10,
     width: '48%',
-    marginBottom: 16,
+    marginBottom: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -479,21 +487,23 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginRight: 8,
+  },
+  kpiTextContainer: {
+    flex: 1,
   },
   kpiValue: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
   },
   kpiTitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   sectionHeader: {
