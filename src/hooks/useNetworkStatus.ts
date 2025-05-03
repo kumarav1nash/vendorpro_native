@@ -12,7 +12,7 @@ interface NetworkStatus {
 // Default API endpoint to check
 const API_ENDPOINT = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/';
 
-export default function useNetworkStatus(checkEndpoint = `${API_ENDPOINT}health`) {
+export default function useNetworkStatus(checkEndpoint = `${API_ENDPOINT}`) {
   const [status, setStatus] = useState<NetworkStatus>({
     isConnected: null,
     isInternetReachable: null,
@@ -108,4 +108,4 @@ export default function useNetworkStatus(checkEndpoint = `${API_ENDPOINT}health`
     retryConnection,
     lastChecked: status.lastChecked
   };
-} 
+}
