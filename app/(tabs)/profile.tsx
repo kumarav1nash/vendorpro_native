@@ -582,31 +582,60 @@ export default function ProfileScreen() {
   // Check if edit button should be disabled - add this as a separate variable
   const isEditButtonDisabled = isLoading || !localProfile || userLoading || authLoading;
 
+  // Import API base URL from env
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
   // Replace the pickImage function with this implementation
   const pickProfileImage = async () => {
     try {
       // Use the context function to pick and upload an image
       const response = await uploadImageWithPicker('Profile picture');
       
-      if (response && response.filename) {
-        // Update the profile with the new image filename
-        const updatedProfile: Partial<UserProfile> = {
-          ...localProfile,
-          profilePicture: response.filename
-        };
+      if (response) {
+        console.log('Image upload response:', response);
         
-        // Call the API to update profile
-        if (localProfile?.id) {
-          await updateProfile(localProfile.id, updatedProfile);
-        } else {
-          console.error('Profile ID not available');
+        // Extract the image URL (could be in url or filename property)
+        let imageUrl = '';
+        
+        if (response.url) {
+          imageUrl = response.url;
+        } else if (response.filename) {
+          imageUrl = response.filename;
         }
         
-        // Update local state
-        setLocalProfile(prev => ({
-          ...prev!,
-          profilePicture: response.filename
-        }));
+        // If we have a URL/filename
+        if (imageUrl) {
+          // Add the base URL if it's a relative path
+          if (!imageUrl.startsWith('http')) {
+            // Make sure we handle path joining correctly without extra slashes
+            const baseUrl = API_BASE_URL?.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+            const imagePath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+            imageUrl = `${baseUrl}${imagePath}`;
+          }
+          
+          console.log('Final image URL to use:', imageUrl);
+          
+          // Update the profile with the new image URL
+          const updatedProfile: Partial<UserProfile> = {
+            ...localProfile,
+            profilePicture: imageUrl
+          };
+          
+          // Call the API to update profile
+          if (localProfile?.id) {
+            await updateProfile(localProfile.id, updatedProfile);
+            
+            // Update local state with the same URL
+            setLocalProfile(prev => ({
+              ...prev!,
+              profilePicture: imageUrl
+            }));
+            
+            console.log('Profile updated with new image:', imageUrl);
+          } else {
+            console.error('Profile ID not available');
+          }
+        }
       }
     } catch (error) {
       console.error('Error picking profile image:', error);
