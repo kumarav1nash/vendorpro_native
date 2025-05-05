@@ -223,10 +223,13 @@ export default function ProfileScreen() {
   
   // Update the saveChanges function to include preferences
   const saveChanges = async () => {
-    if (!localProfile) return;
+    if (!localProfile || !user?.id) return;
     
     try {
       setIsLoading(true);
+      
+      console.log("DEBUG - SaveChanges - isNewProfile:", isNewProfile);
+      console.log("DEBUG - SaveChanges - localProfile ID:", localProfile.id);
       
       // Create an updated profile with our edited values and local preferences
       const updatedProfile = {
@@ -249,17 +252,19 @@ export default function ProfileScreen() {
         }
       };
       
-      console.log("Saving profile with updated values:", JSON.stringify(updatedProfile, null, 2));
+      // Check if this looks like a temporary ID or if the ID is undefined
+      const isTemporaryId = localProfile.id ? localProfile.id.startsWith('temp-') : true;
+      console.log("DEBUG - SaveChanges - isTemporaryId:", isTemporaryId);
       
-      if (isNewProfile) {
-        // Create a new profile since this is the first time saving
-        if (!createProfile) {
-          throw new Error('Create profile function not available');
-        }
-        
-        // Extract only the fields needed for creation
+      // Force creation if we have a temporary ID even if isNewProfile flag wasn't set
+      const shouldCreateProfile = isNewProfile || isTemporaryId;
+      console.log("DEBUG - SaveChanges - shouldCreateProfile:", shouldCreateProfile);
+      
+      if (shouldCreateProfile) {
+        console.log("DEBUG - Creating new profile for user:", user.id);
+        // Create new profile - extract only the fields needed for creation
         const createProfileData: CreateUserProfileDto = {
-          userId: updatedProfile.userId,
+          userId: user.id,
           firstName: updatedProfile.firstName || '',
           lastName: updatedProfile.lastName || '',
           dateOfBirth: updatedProfile.dateOfBirth || '',
@@ -282,13 +287,15 @@ export default function ProfileScreen() {
         setIsNewProfile(false);
         Alert.alert('Success', 'Profile created successfully');
       } else {
+        console.log("DEBUG - Updating existing profile:", localProfile.id);
         // Update existing profile
-        await updateProfile(updatedProfile.id, updatedProfile as UpdateUserProfileDto); 
-        
-        // Also update the local profile state
-        setLocalProfile(updatedProfile as UserProfile);
-        
+        await updateProfile(updatedProfile.id, updatedProfile); 
         Alert.alert('Success', 'Profile updated successfully');
+      }
+      
+      // Update local state with profile from context
+      if (profile) {
+        setLocalProfile(profile);
       }
       
       setIsEditing(false);
@@ -338,42 +345,17 @@ export default function ProfileScreen() {
       try {
         setIsLoading(true);
         
-        // First try to load existing profile
+        // Try to load existing profile
         try {
           await fetchProfileByUserId(user.id);
           setIsNewProfile(false);
         } catch (profileErr: any) {
-          // If 404 error (profile doesn't exist), just mark as new profile
-          // We'll create it only when the user saves for the first time
+          // If 404 error (profile doesn't exist), mark as new profile
           if (profileErr?.response?.status === 404) {
-            console.log("Profile not found, using empty profile for user:", user.id);
+            console.log("Profile not found, creating new profile for user:", user.id);
             setIsNewProfile(true);
-            
-            // Create empty local profile
-            const emptyProfile: UserProfile = {
-              id: 'temp-' + user.id,
-              userId: user.id,
-              firstName: '',
-              lastName: '',
-              dateOfBirth: '',
-              gender: 'male',
-              address: '',
-              city: '',
-              state: '',
-              country: '',
-              postalCode: '',
-              bio: '',
-              profilePicture: '',
-              preferences: {
-                language: 'en',
-                notifications: true,
-                theme: 'light',
-              },
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            
-            setLocalProfile(emptyProfile);
+            // Create empty local profile for editing
+            createFallbackProfile();
           } else {
             // Rethrow other errors
             throw profileErr;
@@ -614,10 +596,10 @@ export default function ProfileScreen() {
         };
         
         // Call the API to update profile
-        if (user?.id) {
-          await updateProfile(user.id, updatedProfile);
+        if (localProfile?.id) {
+          await updateProfile(localProfile.id, updatedProfile);
         } else {
-          console.error('User ID not available');
+          console.error('Profile ID not available');
         }
         
         // Update local state
