@@ -22,7 +22,7 @@ import { useUser } from '../../../src/contexts/UserContext';
 import { useShop } from '../../../src/contexts/ShopContext';
 import { useImages } from '../../../src/contexts/ImageContext';
 import { ProductImage } from '../ui/ProductImage';
-import { Shop } from '@/src/types/shop';
+import { Shop } from '../../../src/types/shop';
 import { ImagePickerResult } from '../../../src/utils/imageHelpers';
 
 type InventoryTabProps = {

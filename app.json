@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "VendorPro",
-    "slug": "VendorPro",
+    "name": "KhataFlow",
+    "slug": "khataflow",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "vendorpro",
+    "scheme": "khataflow",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.VendorPro"
+      "bundleIdentifier": "com.khataflow"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.VendorPro",
+      "package": "com.khataflow",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
@@ -47,6 +47,10 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "env": "prod",
+      "apiUrl": "https://api.khataflow.com/"
     }
   }
 }

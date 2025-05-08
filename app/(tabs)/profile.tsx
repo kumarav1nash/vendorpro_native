@@ -20,7 +20,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useUserProfile } from '../../src/contexts/UserProfileContext';
 import { useShop } from '../../src/contexts/ShopContext';
 import { useImages } from '../../src/contexts/ImageContext';
-import { UserProfile, UserProfilePreferences, UpdateUserProfileDto } from '@/src/types/user';
+import { UserProfile, UserProfilePreferences, UpdateUserProfileDto } from '../../src/types/user';
 import { shopService } from '../../src/services/shop.service';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ProfileImage } from '../components/ui/ProfileImage';

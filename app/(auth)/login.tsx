@@ -82,7 +82,7 @@ export default function LoginScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <Text style={styles.logoText}>VendorPro</Text>
+        <Text style={styles.logoText}>KhataFlow</Text>
         <Text style={styles.tagline}>Manage your business efficiently</Text>
       </View>
 
@@ -152,7 +152,7 @@ export default function LoginScreen() {
       )}
 
       {/* <View style={styles.footer}>
-        <Text style={styles.footerText}>New to VendorPro? </Text>
+        <Text style={styles.footerText}>New to KhataFlow? </Text>
         <Link href="/register" asChild>
           <TouchableOpacity>
             <Text style={styles.registerLink}>Register here</Text>

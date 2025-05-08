@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import axios from 'axios';
+import Constants from 'expo-constants';
 
 interface NetworkStatus {
   isConnected: boolean | null;
@@ -10,7 +11,7 @@ interface NetworkStatus {
 }
 
 // Default API endpoint to check
-const API_ENDPOINT = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/';
+const API_ENDPOINT = Constants.expoConfig?.extra?.apiUrl;
 
 export default function useNetworkStatus(checkEndpoint = `${API_ENDPOINT}`) {
   const [status, setStatus] = useState<NetworkStatus>({

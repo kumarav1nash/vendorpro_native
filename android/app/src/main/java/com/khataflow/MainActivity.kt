@@ -1,4 +1,4 @@
-package com.anonymous.VendorPro
+package com.khataflow
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

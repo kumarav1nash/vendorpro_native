@@ -5,6 +5,7 @@ import { View, ActivityIndicator, Text } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../src/contexts/AuthContext';
 import { UserRole } from '../src/types/user';
+import Constants from 'expo-constants';
 
 // Define valid redirect paths for proper typing
 type ValidRedirectPath = 
@@ -22,6 +23,7 @@ export default function Index() {
     async function checkAuthStatus() {
       try {
         // Check if user is authenticated
+        console.log('apiUrl picked up', Constants.expoConfig?.extra?.apiUrl);
         if (!isAuthenticated || !user) {
           setRedirectPath('/(auth)/login');
           return;
