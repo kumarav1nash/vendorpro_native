@@ -24,6 +24,7 @@ import { useImages } from '../../../src/contexts/ImageContext';
 import { ProductImage } from '../ui/ProductImage';
 import { Shop } from '../../../src/types/shop';
 import { ImagePickerResult } from '../../../src/utils/imageHelpers';
+import Constants from 'expo-constants';
 
 type InventoryTabProps = {
   shopId: string;
@@ -514,7 +515,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
   const [editId, setEditId] = useState<string | null>(null);
 
   //import API_BASE_URL from env
-  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+  const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl;
   // KPI metrics state
   const [metrics, setMetrics] = useState({
     totalProducts: 0,

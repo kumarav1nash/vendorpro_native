@@ -24,6 +24,7 @@ import { UserProfile, UserProfilePreferences, UpdateUserProfileDto } from '../..
 import { shopService } from '../../src/services/shop.service';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ProfileImage } from '../components/ui/ProfileImage';
+import Constants from 'expo-constants';
 
 // Define an interface for creating a user profile
 interface CreateUserProfileDto {
@@ -583,7 +584,7 @@ export default function ProfileScreen() {
   const isEditButtonDisabled = isLoading || !localProfile || userLoading || authLoading;
 
   // Import API base URL from env
-  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+  const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl;
 
   // Replace the pickImage function with this implementation
   const pickProfileImage = async () => {
