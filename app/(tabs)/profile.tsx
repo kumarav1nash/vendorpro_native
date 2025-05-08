@@ -223,10 +223,13 @@ export default function ProfileScreen() {
   
   // Update the saveChanges function to include preferences
   const saveChanges = async () => {
-    if (!localProfile) return;
+    if (!localProfile || !user?.id) return;
     
     try {
       setIsLoading(true);
+      
+      console.log("DEBUG - SaveChanges - isNewProfile:", isNewProfile);
+      console.log("DEBUG - SaveChanges - localProfile ID:", localProfile.id);
       
       // Create an updated profile with our edited values and local preferences
       const updatedProfile = {
@@ -249,17 +252,19 @@ export default function ProfileScreen() {
         }
       };
       
-      console.log("Saving profile with updated values:", JSON.stringify(updatedProfile, null, 2));
+      // Check if this looks like a temporary ID or if the ID is undefined
+      const isTemporaryId = localProfile.id ? localProfile.id.startsWith('temp-') : true;
+      console.log("DEBUG - SaveChanges - isTemporaryId:", isTemporaryId);
       
-      if (isNewProfile) {
-        // Create a new profile since this is the first time saving
-        if (!createProfile) {
-          throw new Error('Create profile function not available');
-        }
-        
-        // Extract only the fields needed for creation
+      // Force creation if we have a temporary ID even if isNewProfile flag wasn't set
+      const shouldCreateProfile = isNewProfile || isTemporaryId;
+      console.log("DEBUG - SaveChanges - shouldCreateProfile:", shouldCreateProfile);
+      
+      if (shouldCreateProfile) {
+        console.log("DEBUG - Creating new profile for user:", user.id);
+        // Create new profile - extract only the fields needed for creation
         const createProfileData: CreateUserProfileDto = {
-          userId: updatedProfile.userId,
+          userId: user.id,
           firstName: updatedProfile.firstName || '',
           lastName: updatedProfile.lastName || '',
           dateOfBirth: updatedProfile.dateOfBirth || '',
@@ -282,13 +287,15 @@ export default function ProfileScreen() {
         setIsNewProfile(false);
         Alert.alert('Success', 'Profile created successfully');
       } else {
+        console.log("DEBUG - Updating existing profile:", localProfile.id);
         // Update existing profile
-        await updateProfile(updatedProfile.id, updatedProfile as UpdateUserProfileDto); 
-        
-        // Also update the local profile state
-        setLocalProfile(updatedProfile as UserProfile);
-        
+        await updateProfile(updatedProfile.id, updatedProfile); 
         Alert.alert('Success', 'Profile updated successfully');
+      }
+      
+      // Update local state with profile from context
+      if (profile) {
+        setLocalProfile(profile);
       }
       
       setIsEditing(false);
@@ -338,42 +345,17 @@ export default function ProfileScreen() {
       try {
         setIsLoading(true);
         
-        // First try to load existing profile
+        // Try to load existing profile
         try {
           await fetchProfileByUserId(user.id);
           setIsNewProfile(false);
         } catch (profileErr: any) {
-          // If 404 error (profile doesn't exist), just mark as new profile
-          // We'll create it only when the user saves for the first time
+          // If 404 error (profile doesn't exist), mark as new profile
           if (profileErr?.response?.status === 404) {
-            console.log("Profile not found, using empty profile for user:", user.id);
+            console.log("Profile not found, creating new profile for user:", user.id);
             setIsNewProfile(true);
-            
-            // Create empty local profile
-            const emptyProfile: UserProfile = {
-              id: 'temp-' + user.id,
-              userId: user.id,
-              firstName: '',
-              lastName: '',
-              dateOfBirth: '',
-              gender: 'male',
-              address: '',
-              city: '',
-              state: '',
-              country: '',
-              postalCode: '',
-              bio: '',
-              profilePicture: '',
-              preferences: {
-                language: 'en',
-                notifications: true,
-                theme: 'light',
-              },
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            
-            setLocalProfile(emptyProfile);
+            // Create empty local profile for editing
+            createFallbackProfile();
           } else {
             // Rethrow other errors
             throw profileErr;
@@ -600,31 +582,60 @@ export default function ProfileScreen() {
   // Check if edit button should be disabled - add this as a separate variable
   const isEditButtonDisabled = isLoading || !localProfile || userLoading || authLoading;
 
+  // Import API base URL from env
+  const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
+
   // Replace the pickImage function with this implementation
   const pickProfileImage = async () => {
     try {
       // Use the context function to pick and upload an image
       const response = await uploadImageWithPicker('Profile picture');
       
-      if (response && response.filename) {
-        // Update the profile with the new image filename
-        const updatedProfile: Partial<UserProfile> = {
-          ...localProfile,
-          profilePicture: response.filename
-        };
+      if (response) {
+        console.log('Image upload response:', response);
         
-        // Call the API to update profile
-        if (user?.id) {
-          await updateProfile(user.id, updatedProfile);
-        } else {
-          console.error('User ID not available');
+        // Extract the image URL (could be in url or filename property)
+        let imageUrl = '';
+        
+        if (response.url) {
+          imageUrl = response.url;
+        } else if (response.filename) {
+          imageUrl = response.filename;
         }
         
-        // Update local state
-        setLocalProfile(prev => ({
-          ...prev!,
-          profilePicture: response.filename
-        }));
+        // If we have a URL/filename
+        if (imageUrl) {
+          // Add the base URL if it's a relative path
+          if (!imageUrl.startsWith('http')) {
+            // Make sure we handle path joining correctly without extra slashes
+            const baseUrl = API_BASE_URL?.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+            const imagePath = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+            imageUrl = `${baseUrl}${imagePath}`;
+          }
+          
+          console.log('Final image URL to use:', imageUrl);
+          
+          // Update the profile with the new image URL
+          const updatedProfile: Partial<UserProfile> = {
+            ...localProfile,
+            profilePicture: imageUrl
+          };
+          
+          // Call the API to update profile
+          if (localProfile?.id) {
+            await updateProfile(localProfile.id, updatedProfile);
+            
+            // Update local state with the same URL
+            setLocalProfile(prev => ({
+              ...prev!,
+              profilePicture: imageUrl
+            }));
+            
+            console.log('Profile updated with new image:', imageUrl);
+          } else {
+            console.error('Profile ID not available');
+          }
+        }
       }
     } catch (error) {
       console.error('Error picking profile image:', error);
@@ -674,7 +685,7 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
                 styles.saveEditButton,
                 isEditButtonDisabled ? styles.disabledButton : null
@@ -693,8 +704,8 @@ export default function ProfileScreen() {
               ]}>Edit</Text>
             </TouchableOpacity>
           )}
-        </View>
-        
+      </View>
+
         {isEditing ? (
           // Edit mode - use the editValues state
           <>

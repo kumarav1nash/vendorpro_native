@@ -765,7 +765,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
           // Detailed logging to understand the response structure
           console.log('Upload result type:', typeof uploadResult);
           console.log('Upload result complete:', JSON.stringify(uploadResult, null, 2));
-          
+    
           if (uploadResult) {
             // Check for URL in different possible response formats
             if (typeof uploadResult === 'object') {
@@ -1141,7 +1141,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
             resetForm();
             setShowAddModal(true);
           }}
-        >
+          >
           <MaterialCommunityIcons name="plus" size={24} color="#fff" />
           </TouchableOpacity>
       </View>
@@ -1256,7 +1256,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                   onChangeText={(value) => handleInputChange('productName', value)}
                   placeholderTextColor="#999"
                   returnKeyType="next"
-                />
+                  />
               </View>
               
               <View style={styles.rowInputs}>
@@ -1308,7 +1308,7 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
                   resetForm();
                 }}
                 disabled={formSubmitting}
-              >
+                      >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
                       </TouchableOpacity>
               

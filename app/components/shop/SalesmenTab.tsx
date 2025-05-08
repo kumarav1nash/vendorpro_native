@@ -19,25 +19,20 @@ import { useUser } from '../../../src/contexts/UserContext';
 import { useShop } from '../../../src/contexts/ShopContext';
 import { useSales } from '../../../src/contexts/SalesContext';
 import { useCommission } from '../../../src/contexts/CommissionContext';
+import { useUserProfile } from '../../../src/contexts/UserProfileContext';
 import { User, UserRole, UserProfile } from '../../../src/types/user';
 import { CreateSalesmanDto, Shop } from '../../../src/types/shop';
 import { Sale } from '../../../src/types/sales';
 import { Commission, CommissionRule, CommissionSummary, SalesCommissionResponse } from '../../../src/types/commission';
+import { getCommissionsBySalesman } from '../../../src/services/commission.service';
+import { getUserProfileByUserId } from '../../../src/services/user-profile.service';
 
 type SalesmenTabProps = {
   shopId: string;
   shop: Shop;
 };
 
-// Extend the User type to include profile info
-interface UserWithProfile extends User {
-  profile?: UserProfile;
-}
 
-// Extend the Sale type to include calculated fields
-interface ExtendedSale extends Sale {
-  totalAmount?: number;
-}
 
 type PerformanceMetrics = {
   totalSales: number;
@@ -53,22 +48,27 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   const { fetchAllSales, sales } = useSales();
   const { 
     commissions, 
+    commissionResponse,
+    commissionSummary,
     rules: commissionRules,
     fetchCommissionsBySalesman,
     fetchAllCommissionRules
   } = useCommission();
+  const { fetchProfileByUserId } = useUserProfile();
   
-  const [shopSalesmen, setShopSalesmen] = useState<UserWithProfile[]>([]);
+  const [shopSalesmen, setShopSalesmen] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredSalesmen, setFilteredSalesmen] = useState<UserWithProfile[]>([]);
+  const [filteredSalesmen, setFilteredSalesmen] = useState<User[]>([]);
   const [salesmanCommissions, setSalesmanCommissions] = useState<Commission[]>([]);
   const [salesmanCommissionSummary, setSalesmanCommissionSummary] = useState<CommissionSummary[]>([]);
+  const [allSalesmenCommissionData, setAllSalesmenCommissionData] = useState<Map<string, CommissionSummary | null>>(new Map());
+  const [totalCommissionSum, setTotalCommissionSum] = useState(0);
   
   // Form state
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [currentSalesman, setCurrentSalesman] = useState<UserWithProfile | null>(null);
+  const [currentSalesman, setCurrentSalesman] = useState<User | null>(null);
   const [salesmanForm, setSalesmanForm] = useState({
     firstName: '',
     lastName: '',
@@ -80,7 +80,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   });
   
   // Performance metrics state
-  const [selectedSalesman, setSelectedSalesman] = useState<UserWithProfile | null>(null);
+  const [selectedSalesman, setSelectedSalesman] = useState<User | null>(null);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [salesmanPerformance, setSalesmanPerformance] = useState<PerformanceMetrics>({
     totalSales: 0,
@@ -110,6 +110,34 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   
   useEffect(() => {
     if (shopSalesmen.length > 0) {
+      loadAllSalesmenCommissions();
+    }
+  }, [shopSalesmen]);
+  
+  useEffect(() => {
+    if (commissionResponse && selectedSalesman) {
+      // This is for the individual salesman view
+      if (commissionSummary) {
+        setSalesmanPerformance(prev => ({
+          ...prev,
+          totalCommission: commissionSummary.totalCommission
+        }));
+      }
+    }
+  }, [commissionResponse, commissionSummary]);
+  
+  useEffect(() => {
+    let total = 0;
+    allSalesmenCommissionData.forEach((summary) => {
+      if (summary) {
+        total += summary.totalCommission;
+      }
+    });
+    setTotalCommissionSum(total);
+  }, [allSalesmenCommissionData]);
+  
+  useEffect(() => {
+    if (shopSalesmen.length > 0) {
       if (searchQuery.trim() === '') {
         setFilteredSalesmen(shopSalesmen);
       } else {
@@ -128,7 +156,22 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   const loadSalesmen = async () => {
     setIsLoading(true);
     try {
-      const salesmenData = await getShopSalesmen(shopId) as UserWithProfile[];
+      const salesmenData = await getShopSalesmen(shopId) as User[];
+      
+      // Fetch profile data for each salesman
+      for (let i = 0; i < salesmenData.length; i++) {
+        try {
+          // Use the user-profile service directly
+          const profileData = await getUserProfileByUserId(salesmenData[i].id);
+          salesmenData[i] = {
+            ...salesmenData[i],
+            profile: profileData
+          };
+        } catch (error) {
+          console.error(`Error fetching profile for salesman ${salesmenData[i].id}:`, error);
+        }
+      }
+      
       setShopSalesmen(salesmenData);
       setFilteredSalesmen(salesmenData);
     } catch (error) {
@@ -155,6 +198,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     }
   };
 
+  // Function to load commissions for a specific salesman
   const loadSalesmanCommissions = async (salesmanId: string) => {
     try {
       await fetchCommissionsBySalesman(salesmanId);
@@ -163,12 +207,34 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     }
   };
   
+  // Function to load commissions for all salesmen
+  const loadAllSalesmenCommissions = async () => {
+    const commissionMap = new Map<string, CommissionSummary | null>();
+    
+    // Process salesmen one by one to avoid context state overwrite issues
+    for (const salesman of shopSalesmen) {
+      try {
+        // Call API directly instead of through context to avoid state issues
+        const response = await getCommissionsBySalesman(salesman.id);
+        
+        if (response && response.totalCommission) {
+          // Store this salesman's specific commission data
+          commissionMap.set(salesman.id, response.totalCommission);
+        }
+      } catch (error) {
+        console.error(`Error loading commissions for salesman ${salesman.id}:`, error);
+      }
+    }
+    
+    setAllSalesmenCommissionData(commissionMap);
+  };
+  
   const handleInputChange = (field: string, value: string | number | boolean) => {
     setSalesmanForm({ ...salesmanForm, [field]: value });
   };
   
   const validateForm = () => {
-    const requiredFields = ['firstName', 'lastName', 'phoneNumber'];
+    const requiredFields = ['firstName', 'lastName', 'phoneNumber', 'password', 'commissionRuleId'];
     
     for (const field of requiredFields) {
       if (!salesmanForm[field as keyof typeof salesmanForm]) {
@@ -199,7 +265,21 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     };
     
     try {
-      await createSalesman(shopId, newSalesmanData);
+
+      //add country code to the phone number if it is not already there
+      if (!salesmanForm.phoneNumber.startsWith('+91')) {
+        newSalesmanData.phoneNumber = '+91' + salesmanForm.phoneNumber;
+      }
+
+      // exclude email field if it is not provided or empty
+      const { email, ...salesmanDataWithoutEmail } = newSalesmanData;
+
+      if(email){
+        await createSalesman(shopId, newSalesmanData);
+      }else{
+        await createSalesman(shopId, salesmanDataWithoutEmail);
+      }
+
       setIsModalVisible(false);
       resetForm();
       Alert.alert('Success', 'Salesman added successfully');
@@ -234,7 +314,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   
   const handleDeleteSalesman = (salesmanId: string) => {
     // Check if salesman has any sales
-    const salesmanSales = sales.filter(sale => sale.salesmanId === salesmanId);
+    const salesmanSales = sales.filter(sale => sale.salesman.id === salesmanId);
     
     if (salesmanSales.length > 0) {
       Alert.alert(
@@ -274,7 +354,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     setIsModalVisible(true);
   };
   
-  const openEditModal = (salesman: UserWithProfile) => {
+  const openEditModal = (salesman: User) => {
     setIsEditMode(true);
     setCurrentSalesman(salesman);
     setSalesmanForm({
@@ -302,23 +382,20 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     setCurrentSalesman(null);
   };
   
-  const viewPerformance = async (salesman: UserWithProfile) => {
+  const viewPerformance = async (salesman: User) => {
     setSelectedSalesman(salesman);
     
-    // Load commissions first
-    await loadSalesmanCommissions(salesman.id);
-    
     // Calculate performance metrics
-    const salesmanSales = sales.filter(sale => sale.salesmanId === salesman.id) as ExtendedSale[];
+    const salesmanSales = sales.filter(sale => sale.salesman.id === salesman.id);
     
     // Calculate totals
     const totalSales = salesmanSales.length;
     const totalAmount = salesmanSales.reduce((sum, sale) => 
-      sum + (sale.soldAt * sale.quantity), 0);
+      sum + (typeof sale.totalAmount === 'string' ? parseFloat(sale.totalAmount) : sale.totalAmount || 0), 0);
     
-    // Get commission from actual commissions
-    const totalCommission = salesmanCommissionSummary.reduce((sum, commission) => 
-      sum + commission.totalCommission, 0);
+    // Get commission from the individual salesman's commission data we already loaded
+    const salesmanCommission = allSalesmenCommissionData.get(salesman.id);
+    const totalCommission = salesmanCommission ? salesmanCommission.totalCommission : 0;
     
     // Count approved sales as "completed"
     const completedSales = salesmanSales.filter(sale => sale.status === 'approved').length;
@@ -365,11 +442,11 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     handleInputChange('email', `${username}@example.com`);
   };
   
-  const getFullName = (user: UserWithProfile) => {
+  const getFullName = (user: User) => {
     return `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() || 'Unknown';
   };
   
-  const renderSalesmanItem = ({ item }: { item: UserWithProfile }) => (
+  const renderSalesmanItem = ({ item }: { item: User }) => (
     <View style={[styles.salesmanItem, !item.isActive && styles.inactiveSalesman]}>
       <View style={styles.salesmanHeader}>
         <View>
@@ -430,8 +507,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       const totalSalesmen = shopSalesmen.length;
       const activeSalesmen = shopSalesmen.filter(s => s.isActive).length;
       
-      // Calculate total commission and find top performer
-      let totalCommission = 0;
+      // Calculate sales metrics and find top performer
       let topPerformerSales = 0;
       let topPerformer = '';
       
@@ -444,7 +520,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
         // Skip if not approved
         if (sale.status !== 'approved') return;
         
-        const salesmanId = sale.salesmanId || '';
+        const salesmanId = sale.salesman.id || '';
         if (!salesmanId) return;
         
         // Count sales by salesman
@@ -452,9 +528,9 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
         salesBySalesman.set(salesmanId, currentCount + 1);
         
         // Sum amount by salesman
-        const saleAmount = typeof sale.soldAt === 'string' 
-          ? parseFloat(sale.soldAt) 
-          : (sale.soldAt || 0);
+        const saleAmount = typeof sale.totalAmount === 'string' 
+          ? parseFloat(sale.totalAmount) 
+          : (sale.totalAmount || 0);
         
         const currentAmount = amountBySalesman.get(salesmanId) || 0;
         amountBySalesman.set(salesmanId, currentAmount + saleAmount);
@@ -469,26 +545,16 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
         }
       });
       
-      // Calculate total commission 
-      salesmanCommissionSummary?.forEach(commission => {
-          const amount = typeof commission.totalCommission === 'string'
-            ? parseFloat(commission.totalCommission)
-            : commission.totalCommission;
-          
-          totalCommission += amount;
-        
-      });
-      
       // Update metrics
       setMetrics({
         totalSalesmen,
         activeSalesmen,
-        totalCommission,
+        totalCommission: totalCommissionSum,
         topPerformer,
         topPerformerSales
       });
     }
-  }, [shopSalesmen, sales, commissions]);
+  }, [shopSalesmen, sales, totalCommissionSum]);
   
   // Render KPI metrics
   const renderMetricsCards = () => {
@@ -672,14 +738,14 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
                 {!isEditMode && (
                   <View style={styles.formField}>
                     <View style={styles.usernameContainer}>
-                      <Text style={styles.label}>Password</Text>
+                      <Text style={styles.label}>Password *</Text>
                       <TouchableOpacity onPress={generatePassword}>
                         <Text style={styles.generateText}>Generate</Text>
                       </TouchableOpacity>
                     </View>
                     <TextInput
                       style={styles.input}
-                      placeholder="Enter password (optional)"
+                      placeholder="Enter password"
                       value={salesmanForm.password}
                       onChangeText={(value) => handleInputChange('password', value)}
                       secureTextEntry={true}
@@ -689,7 +755,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
                 )}
                 
                 <View style={styles.formField}>
-                  <Text style={styles.label}>Commission Rule</Text>
+                  <Text style={styles.label}>Commission Rule *</Text>
                   <TouchableOpacity 
                     style={styles.dropdownButton}
                     onPress={() => {

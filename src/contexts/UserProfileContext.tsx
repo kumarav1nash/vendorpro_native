@@ -13,19 +13,25 @@ import {
   getMyUserProfile,
   getUserProfileByUserId
 } from '../services/user-profile.service';
+import useErrorHandler from '../hooks/useErrorHandler';
 
 interface UserProfileContextType {
   profile: UserProfile | null;
   profiles: UserProfile[];
   loading: boolean;
-  error: string | null;
+  error: {
+    message: string;
+    status?: number;
+    isError: boolean;
+  } | null;
   fetchMyProfile: () => Promise<void>;
   fetchProfileById: (id: string) => Promise<void>;
-  fetchProfileByUserId: (userId: string) => Promise<void>;
+  fetchProfileByUserId: (userId: string) => Promise<UserProfile | null>;
   fetchAllProfiles: () => Promise<void>;
   createProfile: (data: CreateUserProfileDto) => Promise<void>;
   updateProfile: (id: string, data: UpdateUserProfileDto) => Promise<void>;
   deleteProfile: (id: string) => Promise<void>;
+  clearError: () => void;
 }
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
@@ -42,16 +48,17 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { error, handleError, clearError } = useErrorHandler();
 
   const fetchMyProfile = async () => {
     setLoading(true);
-    setError(null);
+    clearError();
     try {
       const data = await getMyUserProfile();
       setProfile(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch my profile');
+    } catch (err) {
+      handleError(err, 'Failed to fetch your profile');
+      // Still keep previous profile data if it exists
     } finally {
       setLoading(false);
     }
@@ -59,25 +66,30 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchProfileById = async (id: string) => {
     setLoading(true);
-    setError(null);
+    clearError();
     try {
       const data = await getUserProfileById(id);
       setProfile(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch profile by id');
+    } catch (err) {
+      handleError(err, 'Failed to fetch profile');
+      // Keep previous profile data if this fails
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchProfileByUserId = async (userId: string) => {
+  const fetchProfileByUserId = async (userId: string): Promise<UserProfile | null> => {
     setLoading(true);
-    setError(null);
+    clearError();
     try {
       const data = await getUserProfileByUserId(userId);
-      setProfile(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch profile by user id');
+      return data;
+    } catch (err) {
+      // For 404 errors, don't disrupt the UI
+      handleError(err, 'Profile not found');
+      
+      // Return null for 404 errors so the UI can handle gracefully
+      return null;
     } finally {
       setLoading(false);
     }
@@ -85,12 +97,13 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchAllProfiles = async () => {
     setLoading(true);
-    setError(null);
+    clearError();
     try {
       const data = await getAllUserProfiles();
       setProfiles(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch all profiles');
+    } catch (err) {
+      handleError(err, 'Failed to fetch profiles');
+      // Keep previous profiles data if this fails
     } finally {
       setLoading(false);
     }
@@ -98,12 +111,12 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
 
   const createProfile = async (data: CreateUserProfileDto) => {
     setLoading(true);
-    setError(null);
+    clearError();
     try {
       const created = await createUserProfile(data);
       setProfile(created);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create profile');
+    } catch (err) {
+      handleError(err, 'Failed to create profile');
     } finally {
       setLoading(false);
     }
@@ -111,12 +124,12 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
 
   const updateProfile = async (id: string, data: UpdateUserProfileDto) => {
     setLoading(true);
-    setError(null);
+    clearError();
     try {
       const updated = await updateUserProfile(id, data);
       setProfile(updated);
-    } catch (err: any) {
-      setError(err.message || 'Failed to update profile');
+    } catch (err) {
+      handleError(err, 'Failed to update profile');
     } finally {
       setLoading(false);
     }
@@ -124,12 +137,12 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
 
   const deleteProfile = async (id: string) => {
     setLoading(true);
-    setError(null);
+    clearError();
     try {
       await deleteUserProfile(id);
       setProfile(null);
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete profile');
+    } catch (err) {
+      handleError(err, 'Failed to delete profile');
     } finally {
       setLoading(false);
     }
@@ -147,7 +160,8 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     createProfile,
     updateProfile,
     deleteProfile,
-  }), [profile, profiles, loading, error]);
+    clearError
+  }), [profile, profiles, loading, error, clearError]);
 
   return (
     <UserProfileContext.Provider value={value}>
