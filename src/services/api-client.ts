@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import NetInfo from '@react-native-community/netinfo';
 
 // Standard API base URL from env or fallback
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.khataflow.com/';
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'accessToken';
