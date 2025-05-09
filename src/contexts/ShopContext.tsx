@@ -9,7 +9,7 @@ interface ShopContextType {
   isLoading: boolean;
   error: string | null;
   fetchAllShops: () => Promise<void>;
-  fetchMyShops: () => Promise<void>;
+  fetchMyShops: () => Promise<Shop[]>;
   getShopBySalesmanId: (salesmanId: string) => Promise<Shop>;
   createShop: (data: CreateShopDto) => Promise<Shop>;
   updateShop: (shopId: string, data: Partial<CreateShopDto>) => Promise<Shop>;
@@ -55,6 +55,7 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const data = await shopService.getMyShops();
       setShops(data);
+      return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch my shops');
     } finally {
