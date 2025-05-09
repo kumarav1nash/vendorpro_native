@@ -1,4 +1,4 @@
-package com.anonymous.VendorPro
+package com.khataflow
 
 import android.app.Application
 import android.content.res.Configuration

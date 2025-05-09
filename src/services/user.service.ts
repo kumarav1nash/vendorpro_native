@@ -1,8 +1,9 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { User, UserRole } from '../types/user';
+import Constants from 'expo-constants';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+const API_BASE = Constants.expoConfig?.extra?.apiUrl;
 
 async function getAuthHeaders() {
   const token = await SecureStore.getItemAsync('accessToken');

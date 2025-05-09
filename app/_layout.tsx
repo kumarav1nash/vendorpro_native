@@ -9,9 +9,9 @@ import { UserProvider } from '../src/contexts/UserContext';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { CommissionProvider } from '../src/contexts/CommissionContext';
 import { UserProfileProvider } from '../src/contexts/UserProfileContext';
-import { ImageProvider } from '@/src/contexts/ImageContext';
-import { NetworkProvider } from '@/src/contexts/NetworkContext';
-import ErrorBoundary from '@/src/components/ErrorBoundary';
+import { ImageProvider } from '../src/contexts/ImageContext';
+import { NetworkProvider } from '../src/contexts/NetworkContext';
+import ErrorBoundary from '../src/components/ErrorBoundary';
 
 // Global layout component that wraps the entire app
 export default function RootLayout() {

@@ -1,9 +1,10 @@
 import axios, { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import NetInfo from '@react-native-community/netinfo';
+import Constants from 'expo-constants';
 
 // Standard API base URL from env or fallback
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.khataflow.com/';
+const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl;
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'accessToken';

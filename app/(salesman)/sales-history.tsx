@@ -16,7 +16,7 @@ import { format, set } from 'date-fns';
 import { useSales } from '../../src/contexts/SalesContext';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { Sale, SaleWithCommission } from '../../src/types/sales';
-import { useCommission } from '@/src/contexts/CommissionContext';
+import { useCommission } from '../../src/contexts/CommissionContext';
 import { ProductImage } from '../components/ui/ProductImage';
 
 // Filter options
