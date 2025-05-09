@@ -42,35 +42,87 @@ export default function DashboardScreen() {
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [shopDropdownVisible, setShopDropdownVisible] = useState(false);
   
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-  
-  useEffect(() => {
-    if (selectedShop) {
-      loadShopData(selectedShop.id);
+ // 1️⃣ On mount: fetch shops & profile
+ useEffect(() => {
+  (async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const fetchedShops = await fetchMyShops();        // returns Shop[]
+      await fetchMyProfile();
+      if (fetchedShops.length > 0) {
+        setSelectedShop(fetchedShops[0]);           // kick off shop-data load
+      }
+    } catch (e: any) {
+      setError(e.message || 'Error loading dashboard');
+    } finally {
+      setIsLoading(false);
     }
-  }, [selectedShop]);
-  
-  useEffect(() => {
-    if (!isLoading) {
-      updateKPIData();
+  })();
+}, []);
+ // 2️⃣ When selectedShop changes: load its inventory, sales & salesmen
+ useEffect(() => {
+  if (!selectedShop) return;
+  (async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [_, __, salesmenList] = await Promise.all([
+        fetchInventoryByShopId(selectedShop.id),
+        fetchAllSales({ shopId: selectedShop.id }),
+        getShopSalesmen(selectedShop.id),
+      ]);
+      setSalesmen(salesmenList || []);
+    } catch (e: any) {
+      setError(e.message || 'Error loading shop data');
+    } finally {
+      setIsLoading(false);
     }
-  }, [isLoading, sales, inventories, salesmen, selectedShop]);
-  
+  })();
+}, [selectedShop]);
+
+// 3. When selectedShop changes, fetch its details
+useEffect(() => {
+  if (!selectedShop) return;
+  (async () => {
+    setIsLoading(true);
+    try {
+      await loadShopData(selectedShop.id);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  })();
+}, [selectedShop]);
+
+  // 3️⃣ Compute KPIs once everything is loaded
+  useEffect(() => {
+    if (isLoading || !selectedShop) return;
+    updateKPIData();
+  }, [isLoading, inventories, sales, salesmen, selectedShop]);
+
+
   const loadInitialData = async () => {
     setIsLoading(true);
     setError(null);
     try {
       await fetchMyShops();
-      
-      if (shops.length > 0) {
-        setSelectedShop(shops[0]);
-      }
-      
       await fetchMyProfile();
-      setIsLoading(false);
+      
+      // Select the first shop and then immediately load its data
+      if (shops.length > 0) {
+        const firstShop = shops[0];
+        setSelectedShop(firstShop);
+        
+        // Load shop data immediately to avoid race condition
+        await loadShopData(firstShop.id);
+      } else {
+        // If no shops exist, we can stop loading
+        setIsLoading(false);
+      }
     } catch (err: any) {
+      console.error("Error loading initial data:", err);
       setError(err.message || 'Failed to load dashboard data');
       setIsLoading(false);
     }
@@ -80,18 +132,31 @@ export default function DashboardScreen() {
     setIsLoading(true);
     setError(null);
     try {
+      console.log(`Loading data for shop: ${shopId}`);
+      
       // Reset salesmen to avoid showing stale data
       setSalesmen([]);
       
       // Fetch new data for the selected shop
-      const [_, __, salesmenData] = await Promise.all([
+      const loadPromises = [
         fetchInventoryByShopId(shopId),
         fetchAllSales({shopId}),
         getShopSalesmen(shopId)
-      ]);
+      ];
+      
+      const [inventoryResult, salesResult, salesmenData] = await Promise.all(loadPromises);
+      
+      console.log(`Loaded shop data: 
+        - Inventory items: ${inventories?.length || 0}
+        - Sales: ${sales?.length || 0}
+        - Salesmen: ${salesmenData?.length || 0}`);
       
       setSalesmen(salesmenData || []);
+      
+      // Force KPI update in case dependencies don't trigger the useEffect
+      updateKPIData();
     } catch (err: any) {
+      console.error("Error loading shop data:", err);
       setError(err.message || 'Failed to load shop data');
     } finally {
       setIsLoading(false);
@@ -100,21 +165,35 @@ export default function DashboardScreen() {
   
   const onRefresh = async () => {
     setRefreshing(true);
-    if (selectedShop) {
-      await loadShopData(selectedShop.id);
-    } else {
-    await loadInitialData();
+    try {
+      if (selectedShop) {
+        await loadShopData(selectedShop.id);
+      } else {
+        await loadInitialData();
+      }
+    } catch (err) {
+      console.error("Error refreshing data:", err);
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
   };
   
   const updateKPIData = () => {
-    if (!selectedShop) return;
+    if (!selectedShop) {
+      console.log("Cannot update KPIs: No shop selected");
+      return;
+    }
+    
+    console.log("Updating KPI data with:", {
+      inventoryCount: inventories?.length || 0,
+      salesCount: sales?.length || 0,
+      salesmenCount: salesmen?.length || 0
+    });
     
     // Calculate metrics directly from current state
-    const totalProducts = inventories.length;
-    const totalSales = sales.length;
-    const totalSalesmen = salesmen.length;
+    const totalProducts = inventories?.length || 0;
+    const totalSales = sales?.length || 0;
+    const totalSalesmen = salesmen?.length || 0;
     
     // Calculate pending sales
     const pendingSales = sales.filter(sale => sale.status === 'pending').length;

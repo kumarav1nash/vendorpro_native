@@ -533,53 +533,36 @@ export default function InventoryTab({ shopId }: InventoryTabProps) {
     loadInventory();
   }, [shopId]);
 
-  // Calculate metrics
   useEffect(() => {
-    if (inventories && inventories.length > 0) {
-      // Filter products for this shop
-      
-      // Count products
-      const totalProducts = inventories.length;
-      
-      // Count low stock products
-      const lowStockProducts = inventories.filter(
-        item => item.stockQuantity <= LOW_STOCK_THRESHOLD && item.stockQuantity > 0
-      ).length;
-      
-      // Count out of stock products
-      const outOfStockProducts = inventories.filter(
-        item => item.stockQuantity === 0
-      ).length;
-      
-      // Calculate total inventory value and average price
-      let totalValue = 0;
-      inventories.forEach(item => {
-        const price = typeof item.sellingPrice === 'string' 
-          ? parseFloat(item.sellingPrice) 
-          : item.sellingPrice;
-        
-        totalValue += price * item.stockQuantity;
-      });
-      
-      const averagePrice = totalProducts > 0 
-        ? inventories.reduce((sum, item) => {
-            const price = typeof item.sellingPrice === 'string' 
-              ? parseFloat(item.sellingPrice) 
-              : item.sellingPrice;
-            return sum + price;
-          }, 0) / totalProducts
-        : 0;
-      
-      // Update metrics
-      setMetrics({
-        totalProducts,
-        lowStockProducts,
-        outOfStockProducts,
-        totalValue,
-        averagePrice
-      });
-    }
-  }, [inventories, shopId]);
+    if (!inventories) return;
+  
+    const totalProducts     = inventories.length;
+    const lowStockProducts  = inventories.filter(i => i.stockQuantity > 0 && i.stockQuantity <= LOW_STOCK_THRESHOLD).length;
+    const outOfStock        = inventories.filter(i => i.stockQuantity === 0).length;
+    let totalValue          = 0;
+    let totalPriceSum       = 0;
+  
+    inventories.forEach(item => {
+      const price = typeof item.sellingPrice === 'string'
+        ? parseFloat(item.sellingPrice)
+        : item.sellingPrice;
+      totalValue    += price * item.stockQuantity;
+      totalPriceSum += price;
+    });
+  
+    const averagePrice = totalProducts > 0
+      ? totalPriceSum / totalProducts
+      : 0;
+  
+    setMetrics({
+      totalProducts,
+      lowStockProducts,
+      outOfStockProducts: outOfStock,
+      totalValue,
+      averagePrice,
+    });
+  }, [shopId, inventories]);
+  
 
   // Filter and sort inventory when data changes
   useEffect(() => {
