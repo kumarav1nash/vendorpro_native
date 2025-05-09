@@ -116,25 +116,26 @@ export default function DashboardScreen() {
   useEffect(() => {
     console.log("Updating dashboard metrics");
     
-    // Initialize with default values
- 
+    // Initialize metrics based on sales data, which should be available regardless of commission rules
+    const updatedMetrics = {
+      totalSales: sales ? sales.length : 0,
+      pendingSales: sales ? sales.filter(sale => sale.status === 'pending').length : 0,
+      totalCommission: 0,
+      pendingCommission: 0
+    };
     
-    // If commission summary is available, use it directly
+    // If commission summary is available, add commission data
     if (commissionSummary) {
       console.log("Using commission summary for metrics:", commissionSummary);
-      setMetrics({
-        ...metrics,
-        totalSales: safeNumberConversion(sales.length),
-        pendingSales:  safeNumberConversion(sales.filter(sale => sale.status === 'pending').length),
-        totalCommission: safeNumberConversion(commissionSummary.approvedSalesCommission),
-        pendingCommission: safeNumberConversion(commissionSummary.pendingSalesCommission)
-      });
+      updatedMetrics.totalCommission = safeNumberConversion(commissionSummary.approvedSalesCommission);
+      updatedMetrics.pendingCommission = safeNumberConversion(commissionSummary.pendingSalesCommission);
+    } else {
+      console.log("No commission summary available, showing zero commissions");
     }
     
-    
-    
-    console.log("Setting new metrics:", metrics);
-  }, [ sales, commissionSummary]);
+    console.log("Setting new metrics:", updatedMetrics);
+    setMetrics(updatedMetrics);
+  }, [sales, commissionSummary]);
 
   const loadData = async () => {
     if (!user?.id) {
@@ -164,44 +165,53 @@ export default function DashboardScreen() {
         return;
       }
       
-      // Load all data in parallel
+      // Load all data in parallel, with separate error handling for each request
       try {
         // Fetch sales with specific salesmanId parameter
         await fetchAllSales({ salesmanId: user.id });
+        console.log("Sales fetched successfully");
+      } catch (salesError) {
+        console.error("Error fetching sales:", salesError);
+      }
+      
+      try {
         // Fetch inventory for the shop
         await fetchInventoryByShopId(currentShop.id);
-        
-        // Fetch commissions with specific salesmanId
-        // This will now return SalesCommissionResponse with totalCommission, sales, and commissionRule
-        await fetchCommissionsBySalesman(user.id);
-        
-        // Process the fetched data
-        if (sales && Array.isArray(sales)) {
-          // Ensure we're getting the latest data from context          //set sales count
-          setMetrics({
-            ...metrics,
-            totalSales: safeNumberConversion(sales.length),
-            pendingSales: safeNumberConversion(sales.filter(sale => sale.status === 'pending').length)
-          });
-          console.log(`Filtered ${sales.length} sales for user`);
-        } else {
-          console.log('No sales data available');
-        }
-        
-        // We don't need to set userCommissions manually anymore since we're using commissionSummary directly
-        // But keeping it for backward compatibility
-        if (commissions && Array.isArray(commissions)) {
-          setUserCommissions(commissions);
-          console.log(`Set ${commissions.length} derived commissions for user`);
-        } else {
-          console.log('No commission data available');
-          setUserCommissions([]);
-        }
-        
-        console.log("Dashboard data loaded successfully");
-      } catch (error: any) {
-        console.error('Error loading dashboard data:', error?.message || error);
+        console.log("Inventory fetched successfully");
+      } catch (inventoryError) {
+        console.error("Error fetching inventory:", inventoryError);
       }
+      
+      try {
+        // Fetch commissions with specific salesmanId
+        await fetchCommissionsBySalesman(user.id);
+        console.log("Commissions fetched successfully");
+      } catch (commissionError: any) {
+        // Handle the case where there's no commission rule
+        if (commissionError?.response?.status === 404) {
+          console.log("No commission rule found for this salesman");
+        } else {
+          console.error("Error fetching commissions:", commissionError);
+        }
+      }
+      
+      // Process the fetched data
+      if (sales && Array.isArray(sales)) {
+        console.log(`Loaded ${sales.length} sales for user`);
+      } else {
+        console.log('No sales data available');
+      }
+      
+      // Set commission data if available
+      if (commissions && Array.isArray(commissions)) {
+        setUserCommissions(commissions);
+        console.log(`Set ${commissions.length} derived commissions for user`);
+      } else {
+        console.log('No commission data available');
+        setUserCommissions([]);
+      }
+      
+      console.log("Dashboard data loaded successfully");
     } catch (error: any) {
       console.error('Failed to load dashboard data:', error?.message || error);
     } finally {

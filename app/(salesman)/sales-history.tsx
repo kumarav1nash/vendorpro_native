@@ -27,7 +27,7 @@ const FILTER_REJECTED = 'rejected';
 
 
 export default function SalesHistoryScreen() {
-  const { salesWithCommission, fetchAllSalesWithCommission, loading } = useSales();
+  const { salesWithCommission, fetchAllSalesWithCommission, loading, error } = useSales();
   const { activeCommissionRule,fetchActiveCommissionRule } = useCommission();
   const { user } = useAuth();
   const [filteredSales, setFilteredSales] = useState<SaleWithCommission[]>([]);
@@ -40,8 +40,7 @@ export default function SalesHistoryScreen() {
 
   useEffect(() => {
     if (user?.id && salesWithCommission) {
-
-      // Filter sales for current user with strong type checking
+      console.log(`Filtering ${salesWithCommission.length} sales with filter: ${activeFilter}`);
       
       // Apply status filter
       let statusFilteredSales = salesWithCommission;
@@ -53,11 +52,15 @@ export default function SalesHistoryScreen() {
       // Sort by most recent first
       statusFilteredSales.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+      );
       
+      console.log(`Setting filtered sales: ${statusFilteredSales.length} items`);
       setFilteredSales(statusFilteredSales);
-        } else {
-      console.log('No user ID or sales available');
+    } else {
+      console.log('No user ID or sales available', { 
+        userId: user?.id,  
+        salesCount: salesWithCommission?.length || 0
+      });
       setFilteredSales([]);
     }
   }, [salesWithCommission, activeFilter, user?.id]);
@@ -69,14 +72,22 @@ export default function SalesHistoryScreen() {
     }
     
     try {
-      await fetchActiveCommissionRule(user.id);
       console.log('Fetching sales for salesman ID:', user.id);
-      // Explicitly pass salesmanId parameter to fetch only user's sales
-      if(activeCommissionRule){
-        await fetchAllSalesWithCommission(activeCommissionRule, { salesmanId: user.id });
+      
+      // First try to fetch the active commission rule
+      try {
+        await fetchActiveCommissionRule(user.id);
+        console.log('Active commission rule fetched:', activeCommissionRule);
+      } catch (commissionError: any) {
+        // Log but continue - we still want to fetch sales even if this fails
+        console.warn('Could not fetch commission rule:', commissionError?.message);
       }
-      setFilteredSales(salesWithCommission)
-      console.log('Sales fetched successfully');
+      
+      // Fetch sales regardless of whether we have a commission rule or not
+      await fetchAllSalesWithCommission(activeCommissionRule, { salesmanId: user.id });
+      console.log('Sales fetched successfully:', salesWithCommission?.length || 0, 'sales found');
+      
+      // Don't need to manually set filtered sales here, the useEffect will handle it
     } catch (error: any) {
       if (error?.response?.status === 404) {
         console.log('No sales found (404 response)');
@@ -194,26 +205,69 @@ export default function SalesHistoryScreen() {
     );
   };
 
-  const renderEmptyList = () => (
-    <View style={styles.emptyState}>
-      <MaterialCommunityIcons name="receipt" size={60} color="#CBD5E1" />
-      <Text style={styles.emptyStateTitle}>No sales found</Text>
-      <Text style={styles.emptyStateDescription}>
-        {activeFilter === FILTER_ALL
-          ? "You haven't made any sales yet."
-          : `No ${activeFilter} sales found.`}
+  const renderEmptyList = () => {
+    // Check if we're still loading
+    if (loading) {
+      return (
+        <View style={styles.emptyState}>
+          <ActivityIndicator size="large" color="#007bff" />
+          <Text style={styles.emptyStateTitle}>Loading sales...</Text>
+        </View>
+      );
+    }
+    
+    // If there was an error, show it
+    if (error) {
+      return (
+        <View style={styles.emptyState}>
+          <MaterialCommunityIcons name="alert-circle" size={60} color="#EF4444" />
+          <Text style={styles.emptyStateTitle}>Something went wrong</Text>
+          <Text style={styles.emptyStateDescription}>{error}</Text>
+          <TouchableOpacity style={styles.createSaleButton} onPress={onRefresh}>
+            <Text style={styles.createSaleButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    
+    // If no commission rule is set up
+    if (!activeCommissionRule && !loading) {
+      return (
+        <View style={styles.emptyState}>
+          <MaterialCommunityIcons name="percent" size={60} color="#F59E0B" />
+          <Text style={styles.emptyStateTitle}>Commission rule not found</Text>
+          <Text style={styles.emptyStateDescription}>
+            No commission rule is set up for your account. Please contact your shop owner.
+          </Text>
+          <TouchableOpacity style={styles.createSaleButton} onPress={onRefresh}>
+            <Text style={styles.createSaleButtonText}>Refresh</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    
+    // If no sales found
+    return (
+      <View style={styles.emptyState}>
+        <MaterialCommunityIcons name="receipt" size={60} color="#CBD5E1" />
+        <Text style={styles.emptyStateTitle}>No sales found</Text>
+        <Text style={styles.emptyStateDescription}>
+          {activeFilter === FILTER_ALL
+            ? "You haven't made any sales yet."
+            : `No ${activeFilter} sales found.`}
         </Text>
-      {activeFilter !== FILTER_ALL ? (
-        <TouchableOpacity style={styles.createSaleButton} onPress={() => setActiveFilter(FILTER_ALL)}>
-          <Text style={styles.createSaleButtonText}>Show All Sales</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity style={styles.createSaleButton} onPress={() => router.push('/(salesman)/dashboard')}>
-          <Text style={styles.createSaleButtonText}>Go to Dashboard</Text>
+        {activeFilter !== FILTER_ALL ? (
+          <TouchableOpacity style={styles.createSaleButton} onPress={() => setActiveFilter(FILTER_ALL)}>
+            <Text style={styles.createSaleButtonText}>Show All Sales</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.createSaleButton} onPress={() => router.push('/(salesman)/dashboard')}>
+            <Text style={styles.createSaleButtonText}>Go to Dashboard</Text>
           </TouchableOpacity>
         )}
       </View>
     );
+  };
 
   if (loading && !refreshing && !filteredSales.length) {
     return (

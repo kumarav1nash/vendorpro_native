@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type SetupOption = {
   title: string;
@@ -39,18 +38,9 @@ export default function SetupOptionsScreen() {
     },
   ];
 
-  const handleOptionSelect = async (route: string) => {
-    try {
-      // Mark onboarding as complete
-      await AsyncStorage.setItem('onboardingComplete', 'true');
-      
-      // Navigate to the selected route
-      router.replace(route as any);
-    } catch (error) {
-      console.error('Error saving onboarding status:', error);
-      // If error, still try to navigate
-      router.replace(route as any);
-    }
+  const handleOptionSelect = (route: string) => {
+    // Navigate to the selected route
+    router.replace(route as any);
   };
 
   return (

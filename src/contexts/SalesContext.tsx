@@ -24,7 +24,7 @@ interface SalesContextType {
   loading: boolean;
   error: string | null;
   fetchAllSales: (params?: { shopId?: string; salesmanId?: string }) => Promise<void>;
-  fetchAllSalesWithCommission: (activeCommissionRule: CommissionRule,params?: { shopId?: string; salesmanId?: string }) => Promise<void>;
+  fetchAllSalesWithCommission: (activeCommissionRule: CommissionRule | null, params?: { shopId?: string; salesmanId?: string }) => Promise<void>;
   fetchSaleById: (id: string) => Promise<void>;
   createSale: (data: CreateSaleDto) => Promise<void>;
   updateSale: (id: string, data: UpdateSaleDto) => Promise<void>;
@@ -63,23 +63,49 @@ export const SalesProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const fetchAllSalesWithCommission = async (activeCommissionRule: CommissionRule,params?: { shopId?: string; salesmanId?: string }) => {
+  const fetchAllSalesWithCommission = async (activeCommissionRule: CommissionRule | null, params?: { shopId?: string; salesmanId?: string }) => {
     setLoading(true);
     setError(null);
     try {
       const data = await getAllSales(params);
-      const salesWithCommission = await Promise.all(data.map(async (sale) => {
-        const commissionAmount = await calculateCommission(sale, activeCommissionRule);
-
-        const saleWithCommission = {
+      console.log(`Fetched ${data.length} sales from API`);
+      
+      // If no active commission rule, just set the sales without commission calculation
+      if (!activeCommissionRule) {
+        console.log('No active commission rule found, setting sales without commission');
+        const salesWithZeroCommission = data.map(sale => ({
           ...sale,
-          commissionAmount
+          commissionAmount: 0
+        }));
+        setSalesWithCommission(salesWithZeroCommission);
+        return;
+      }
+      
+      console.log('Calculating commission for sales with rule:', activeCommissionRule.type);
+      
+      const salesWithCommission = await Promise.all(data.map(async (sale) => {
+        try {
+          const commissionAmount = await calculateCommission(sale, activeCommissionRule);
+          return {
+            ...sale,
+            commissionAmount
+          };
+        } catch (calcError) {
+          console.error('Error calculating commission for sale', sale.id, calcError);
+          return {
+            ...sale,
+            commissionAmount: 0
+          };
         }
-        return saleWithCommission; 
       }));
+      
+      console.log(`Processed ${salesWithCommission.length} sales with commission`);
       setSalesWithCommission(salesWithCommission);
     } catch (err: any) {
+      console.error('Failed to fetch sales with commission:', err);
       setError(err.message || 'Failed to fetch sales with commission');
+      // Still set empty array to clear any previous data
+      setSalesWithCommission([]);
     } finally {
       setLoading(false);
     }

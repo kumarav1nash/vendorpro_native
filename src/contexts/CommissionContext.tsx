@@ -6,7 +6,8 @@ import {
   CreateCommissionRuleDto,
   AssignCommissionRuleDto,
   CommissionDateRangeResult,
-  SalesCommissionResponse
+  SalesCommissionResponse,
+  SalesmanCommissionRule
 } from '../types/commission';
 import {
   createCommission,
@@ -38,7 +39,7 @@ interface CommissionContextType {
   createCommission: (data: CreateCommissionDto) => Promise<void>;
   createCommissionRule: (data: CreateCommissionRuleDto) => Promise<void>;
   fetchAllCommissionRules: () => Promise<void>;
-  fetchActiveCommissionRule: (salesmanId: string) => Promise<void>;
+  fetchActiveCommissionRule: (salesmanId: string) => Promise<SalesmanCommissionRule | undefined>;
   assignCommissionRule: (data: AssignCommissionRuleDto) => Promise<void>;
   fetchCommissionsBySalesman: (salesmanId: string) => Promise<void>;
   fetchCommissionsByShop: (shopId: string) => Promise<void>;
@@ -139,6 +140,7 @@ export const CommissionProvider = ({ children }: { children: ReactNode }) => {
     try {
       const data = await getActiveCommissionRule(salesmanId);
       setActiveCommissionRule(data.commissionRule);
+      return data;
     } catch (err: any) {
       setError(err.message || 'Failed to fetch active commission rule');
     } finally {
