@@ -18,8 +18,6 @@ import { useInventory } from '../../../src/contexts/InventoryContext';
 import { useSales } from '../../../src/contexts/SalesContext';
 import { useShop } from '../../../src/contexts/ShopContext';
 import { Inventory } from '../../../src/types/inventory';
-import { getUserById } from '../../../src/services/user.service';
-import { User } from '../../../src/types/user';
 import { Shop } from '../../../src/types/shop';
 import { createSale } from '../../../src/services/sales.service';
 
