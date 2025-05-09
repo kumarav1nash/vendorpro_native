@@ -682,7 +682,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
               <View style={styles.detailsContainer}>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Invoice:</Text>
-                  <Text style={styles.detailValue}>#{selectedSale.id || 'N/A'}</Text>
+                  <Text style={styles.detailValue}>#{selectedSale.id.slice(0, 8) || 'N/A'}</Text>
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Status:</Text>
@@ -700,12 +700,23 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
                 {/* List all products in the sale */}
                 {selectedSale.items.map((saleItem, idx) => (
                   <View key={idx} style={{ marginBottom: 4 }}>
+                    <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Product:</Text>
                     <Text style={styles.detailValue}>{saleItem.product?.productName || 'Unknown Product'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Quantity:</Text>
                     <Text style={styles.detailValue}>{saleItem.quantity}</Text>
-                    <Text style={styles.detailLabel}>Unit Price:</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>MRP:</Text>
+                    <Text style={styles.detailValue}>{formatCurrency(saleItem.product?.sellingPrice*saleItem.quantity)}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Sold At:</Text>
                     <Text style={styles.detailValue}>{formatCurrency(saleItem.soldAt)}</Text>
+                    </View>
+                    <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 4 }} />
                   </View>
                 ))}
                 <View style={styles.detailRow}>
