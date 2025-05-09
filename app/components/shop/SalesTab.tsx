@@ -18,8 +18,6 @@ import { useInventory } from '../../../src/contexts/InventoryContext';
 import { useSales } from '../../../src/contexts/SalesContext';
 import { useShop } from '../../../src/contexts/ShopContext';
 import { Inventory } from '../../../src/types/inventory';
-import { getUserById } from '../../../src/services/user.service';
-import { User } from '../../../src/types/user';
 import { Shop } from '../../../src/types/shop';
 import { createSale } from '../../../src/services/sales.service';
 
@@ -306,6 +304,25 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
 
   // Render individual sale item
   const renderSaleItem = ({ item }: { item: Sale }) => {
+    // Calculate total items and quantities
+    const totalItems = item.items.length;
+    const totalQuantity = item.items.reduce((sum, saleItem) => sum + saleItem.quantity, 0);
+    
+    // Get the first product to show as primary product
+    const primaryProduct = item.items[0]?.product?.productName || 'Unknown Product';
+    
+    // Format the date more clearly
+    const saleDate = new Date(item.createdAt);
+    const formattedDate = saleDate.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+    const formattedTime = saleDate.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
     return (
       <TouchableOpacity
         style={styles.saleItem}
@@ -314,31 +331,72 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
           setShowDetailsModal(true);
         }}
       >
+        {/* Status Badge - Top Right */}
+        <View style={[styles.statusBadgeTop, getStatusStyle(item.status)]}>
+          <MaterialCommunityIcons 
+            name={
+              item.status === 'approved' ? "check-circle" : 
+              item.status === 'pending' ? "clock-outline" : "close-circle"
+            } 
+            size={14} 
+            color="#fff" 
+          />
+          <Text style={styles.statusTextTop}>{item.status?.toUpperCase() || 'UNKNOWN'}</Text>
+        </View>
+        
+        {/* Invoice and Date Section */}
         <View style={styles.saleHeader}>
-          <Text style={styles.invoiceNumber}>#{item.id?.slice(0, 8) ?? 'N/A'}</Text>
-          <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
-            <Text style={styles.statusText}>{item.status?.toUpperCase() || 'UNKNOWN'}</Text>
+          <View style={styles.invoiceContainer}>
+            <MaterialCommunityIcons name="receipt" size={16} color="#666" />
+            <Text style={styles.invoiceNumber}>#{item.id?.slice(0, 8) ?? 'N/A'}</Text>
+          </View>
+          <View style={styles.dateTimeContainer}>
+            <Text style={styles.dateText}>{formattedDate}</Text>
+            <Text style={styles.timeText}>{formattedTime}</Text>
           </View>
         </View>
-        <View style={styles.saleDetails}>
-          {/* List all products in the sale */}
-          {item.items.map((saleItem, idx) => (
-            <View key={idx} style={{ marginBottom: 4 }}>
-              <Text style={styles.productName}>{saleItem.product?.productName || 'Unknown Product'}</Text>
-              <Text style={styles.quantity}>Qty: {saleItem.quantity || 0}</Text>
-              <Text style={styles.amount}>₹{saleItem.soldAt}</Text>
-            </View>
-          ))}
-          <View style={styles.priceInfo}>
-            <Text style={styles.amount}>Total: {formatCurrency(item.totalAmount)}</Text>
-            <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
+        
+        {/* Product Summary Section */}
+        <View style={styles.productSummaryContainer}>
+          <View style={styles.primaryProductContainer}>
+            <Text style={styles.primaryProductName} numberOfLines={1}>
+              {primaryProduct}
+              {totalItems > 1 && <Text style={styles.additionalItemsText}> +{totalItems - 1} more</Text>}
+            </Text>
+            <Text style={styles.quantityText}>{totalQuantity} {totalQuantity === 1 ? 'unit' : 'units'} total</Text>
+          </View>
+          <View style={styles.amountContainer}>
+            <Text style={styles.totalAmountValue}>{formatCurrency(item.totalAmount)}</Text>
+            {/* Show savings if available */}
+            {(() => {
+              // Calculate MRP total vs actual total to show savings
+              const mrpTotal = item.items.reduce((sum, saleItem) => 
+                sum + (saleItem.product?.sellingPrice || 0) * saleItem.quantity, 0);
+              const actualTotal = parseFloat(item.totalAmount.toString());
+              const savings = mrpTotal - actualTotal;
+              
+              if (savings > 0) {
+                return (
+                  <Text style={styles.savingsText}>Save {formatCurrency(savings)}</Text>
+                );
+              }
+              return null;
+            })()}
           </View>
         </View>
+        
+        {/* Salesman Info */}
         <View style={styles.saleFooter}>
-          <Text style={styles.salesmanName}>
+          <View style={styles.salesmanContainer}>
             <MaterialCommunityIcons name="account" size={14} color="#666" />
-            {' '}{item.salesman?.phoneNumber || item.salesman?.email || 'Direct Sale'}
-          </Text>
+            <Text style={styles.salesmanName} numberOfLines={1}>
+              {item.salesman?.profile?.firstName || item.salesman?.phoneNumber || item.salesman?.email || 'Direct Sale'}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.viewDetailsButton}>
+            <Text style={styles.viewDetailsText}>View Details</Text>
+            <MaterialCommunityIcons name="chevron-right" size={14} color="#007AFF" />
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -387,7 +445,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
             <View style={styles.metricTextContainer}>
               <Text style={styles.metricValue}>{formatCurrency(metrics.totalRevenue)}</Text>
               <Text style={styles.metricLabel}>Total Revenue</Text>
-          </View>
+            </View>
           </View>
           </View>
           
@@ -669,78 +727,218 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Sale Details</Text>
-      <TouchableOpacity 
+                <TouchableOpacity 
                   style={styles.closeButton}
                   onPress={() => {
                     setShowDetailsModal(false);
                     setSelectedSale(null);
                   }}
-      >
+                >
                   <MaterialCommunityIcons name="close" size={24} color="#333" />
-      </TouchableOpacity>
+                </TouchableOpacity>
               </View>
-              <View style={styles.detailsContainer}>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Invoice:</Text>
-                  <Text style={styles.detailValue}>#{selectedSale.id || 'N/A'}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Status:</Text>
-                  <View style={[
-                    styles.statusBadge, 
-                    getStatusStyle(selectedSale.status)
-                  ]}>
-                    <Text style={styles.statusText}>{selectedSale.status?.toUpperCase() || 'UNKNOWN'}</Text>
+              
+              <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+                {/* Invoice Header Section */}
+                <View style={styles.invoiceHeaderSection}>
+                  <View style={styles.invoiceNumberContainer}>
+                    <Text style={styles.invoiceNumber}>Invoice #{selectedSale.id.slice(0, 8) || 'N/A'}</Text>
+                    <View style={[
+                      styles.statusBadge, 
+                      getStatusStyle(selectedSale.status)
+                    ]}>
+                      <Text style={styles.statusText}>{selectedSale.status?.toUpperCase() || 'UNKNOWN'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.dateContainer}>
+                    <MaterialCommunityIcons name="calendar" size={16} color="#666" />
+                    <Text style={styles.dateText}>{formatDate(selectedSale.createdAt)}</Text>
+                    
+                    <MaterialCommunityIcons name="account" size={16} color="#666" style={{marginLeft: 12}} />
+                    <Text style={styles.salesmanText}>
+                      { selectedSale.salesman?.profile?.firstName || selectedSale.salesman?.phoneNumber || selectedSale.salesman?.email || 'Direct Sale'}
+                    </Text>
                   </View>
                 </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Date:</Text>
-                  <Text style={styles.detailValue}>{formatDate(selectedSale.createdAt)}</Text>
-                </View>
-                {/* List all products in the sale */}
-                {selectedSale.items.map((saleItem, idx) => (
-                  <View key={idx} style={{ marginBottom: 4 }}>
-                    <Text style={styles.detailLabel}>Product:</Text>
-                    <Text style={styles.detailValue}>{saleItem.product?.productName || 'Unknown Product'}</Text>
-                    <Text style={styles.detailLabel}>Quantity:</Text>
-                    <Text style={styles.detailValue}>{saleItem.quantity}</Text>
-                    <Text style={styles.detailLabel}>Unit Price:</Text>
-                    <Text style={styles.detailValue}>{formatCurrency(saleItem.soldAt)}</Text>
+                
+                {/* Sale Items Section */}
+                <View style={styles.saleItemsSection}>
+                  <Text style={styles.sectionTitle}>Purchased Items</Text>
+                  <View style={styles.itemsHeaderRow}>
+                    <Text style={[styles.itemHeaderCell, { flex: 2 }]}>Product</Text>
+                    <Text style={[styles.itemHeaderCell, { flex: 1, textAlign: 'center' }]}>Qty</Text>
+                    <Text style={[styles.itemHeaderCell, { flex: 2, textAlign: 'right' }]}>MRP</Text>
+                    <Text style={[styles.itemHeaderCell, { flex: 3, textAlign: 'right' }]}>Sold At</Text>
                   </View>
-                ))}
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Total Amount:</Text>
-                  <Text style={[styles.detailValue, styles.totalAmount]}>
-                    {formatCurrency(selectedSale.totalAmount)}
-                  </Text>
+                  
+                  {selectedSale.items.map((saleItem, idx) => (
+                    <View key={idx} style={styles.itemRow}>
+                      <Text style={[styles.itemCell, { flex: 2 }]} numberOfLines={2}>{saleItem.product?.productName || 'Unknown'}</Text>
+                      <Text style={[styles.itemCell, { flex: 1, textAlign: 'center' }]}>{saleItem.quantity}</Text>
+                      <Text style={[styles.itemCell, { flex: 2, textAlign: 'right' }]}>{formatCurrency(saleItem.product?.sellingPrice*saleItem.quantity)}</Text>
+                      <Text style={[styles.itemCell, { flex: 3, textAlign: 'right' }]}>{formatCurrency(saleItem.soldAt/saleItem.quantity)}</Text>
+                    </View>
+                  ))}
                 </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Salesman:</Text>
-                  <Text style={styles.detailValue}>
-                    {selectedSale.salesman?.phoneNumber || selectedSale.salesman?.email || 'Direct Sale'}
-                  </Text>
-                </View>
-                {selectedSale.status === 'pending' && (
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.approveButton]}
-                      onPress={() => handleApproveSale(selectedSale.id)}
-                      disabled={isLoading}
-                    >
-                      <MaterialCommunityIcons name="check" size={18} color="#fff" />
-                      <Text style={styles.actionButtonText}>Approve</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.rejectButton]}
-                      onPress={() => handleRejectSale(selectedSale.id)}
-                      disabled={isLoading}
-                    >
-                      <MaterialCommunityIcons name="close" size={18} color="#fff" />
-                      <Text style={styles.actionButtonText}>Reject</Text>
-                    </TouchableOpacity>
+                
+                {/* Calculation Summary Section */}
+                <View style={styles.calculationSection}>
+                  <View style={styles.summaryHeaderContainer}>
+                    <MaterialCommunityIcons name="calculator-variant" size={20} color="#007AFF" />
+                    <Text style={styles.summaryHeaderText}>Sale Summary</Text>
                   </View>
-                )}
-              </View>
+                  
+                  {/* Item Count Summary */}
+                  <View style={styles.summaryInfoRow}>
+                    <Text style={styles.summaryInfoText}>
+                      <Text style={styles.summaryInfoHighlight}>{selectedSale.items.length}</Text> items • 
+                      <Text style={styles.summaryInfoHighlight}> {selectedSale.items.reduce((total, item) => total + item.quantity, 0)}</Text> units
+                    </Text>
+                  </View>
+                  
+                  {/* Item-wise Subtotals in Card Format */}
+                  <View style={styles.summaryItemsContainer}>
+                    {selectedSale.items.map((saleItem, idx) => (
+                      <View key={idx} style={styles.summaryItemCard}>
+                        <View style={styles.summaryItemHeader}>
+                          <Text style={styles.summaryItemName} numberOfLines={1}>
+                            {saleItem.product?.productName || 'Unknown Product'}
+                          </Text>
+                          <Text style={styles.summaryItemTotal}>
+                            {formatCurrency(saleItem.soldAt)}
+                          </Text>
+                        </View>
+                        
+                        <View style={styles.summaryItemDetails}>
+                          <Text style={styles.summaryItemDetailText}>
+                            {saleItem.quantity} × {formatCurrency(saleItem.soldAt/saleItem.quantity)}
+                          </Text>
+                          
+                          {/* Show discount if sold below MRP */}
+                          {(saleItem.product?.sellingPrice && 
+                            saleItem.soldAt/saleItem.quantity < saleItem.product.sellingPrice) ? (
+                            <View style={styles.discountBadge}>
+                              <Text style={styles.discountText}>
+                                {Math.round(100 - (saleItem.soldAt/saleItem.quantity) / saleItem.product.sellingPrice * 100)}% off
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                  
+                  {/* Totals Card */}
+                  <View style={styles.summaryTotalsCard}>
+                    {/* Subtotal */}
+                    <View style={styles.summaryRow}>
+                      <Text style={styles.summaryLabel}>Subtotal</Text>
+                      <Text style={styles.summaryValue}>
+                        {formatCurrency(selectedSale.items.reduce((sum, item) => sum + parseFloat(item.soldAt.toString()), 0))}
+                      </Text>
+                    </View>
+                    
+                    {/* Savings calculation if applicable */}
+                    {(() => {
+                      const mrpTotal = selectedSale.items.reduce((sum, item) => 
+                        sum + (item.product?.sellingPrice || 0) * item.quantity, 0);
+                      const saleTotal = selectedSale.items.reduce((sum, item) => 
+                        sum + parseFloat(item.soldAt.toString()), 0);
+                      const savings = mrpTotal - saleTotal;
+                      
+                      if (savings > 0) {
+                        const savingsPercentage = Math.round((savings / mrpTotal) * 100);
+                        return (
+                          <>
+                            <View style={styles.summaryRow}>
+                              <Text style={styles.summaryLabel}>MRP Total</Text>
+                              <Text style={styles.summaryValue}>
+                                {formatCurrency(mrpTotal)}
+                              </Text>
+                            </View>
+                            <View style={styles.summaryRow}>
+                              <View style={styles.savingsContainer}>
+                                <MaterialCommunityIcons name="tag-outline" size={16} color="#4CAF50" />
+                                <Text style={styles.savingsLabel}>Savings ({savingsPercentage}%)</Text>
+                              </View>
+                              <Text style={styles.savingsAmount}>
+                                - {formatCurrency(savings)}
+                              </Text>
+                            </View>
+                          </>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* Divider */}
+                    <View style={styles.summaryDivider} />
+                    
+                    {/* Grand Total */}
+                    <View style={styles.grandTotalRow}>
+                      <Text style={styles.grandTotalLabel}>Grand Total</Text>
+                      <Text style={styles.grandTotalAmount}>
+                        {formatCurrency(selectedSale.totalAmount)}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {/* Payment Status */}
+                  <View style={styles.paymentStatusContainer}>
+                    <View style={[styles.paymentStatusBadge, 
+                      selectedSale.status === 'approved' ? styles.paidStatusBadge : 
+                      selectedSale.status === 'pending' ? styles.pendingStatusBadge : 
+                      styles.rejectedStatusBadge
+                    ]}>
+                      <MaterialCommunityIcons 
+                        name={selectedSale.status === 'approved' ? "check-circle" : 
+                              selectedSale.status === 'pending' ? "clock-outline" : 
+                              "close-circle"} 
+                        size={16} 
+                        color="#FFF" 
+                      />
+                      <Text style={styles.paymentStatusText}>
+                        {selectedSale.status === 'approved' ? "Payment Completed" : 
+                         selectedSale.status === 'pending' ? "Payment Pending" : 
+                         "Payment Rejected"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                
+                {/* Invoice Footer Section */}
+                <View style={styles.invoiceFooterSection}>
+                  <View style={styles.totalContainer}>
+                    <Text style={styles.totalLabel}>Total Amount:</Text>
+                    <Text style={styles.totalValue}>
+                      {formatCurrency(selectedSale.totalAmount)}
+                    </Text>
+                  </View>
+                  
+                  {selectedSale.status === 'pending' && (
+                    <View style={styles.actionButtons}>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.approveButton]}
+                        onPress={() => handleApproveSale(selectedSale.id)}
+                        disabled={isLoading}
+                      >
+                        <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                        <Text style={styles.actionButtonText}>Approve</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.rejectButton]}
+                        onPress={() => handleRejectSale(selectedSale.id)}
+                        disabled={isLoading}
+                      >
+                        <MaterialCommunityIcons name="close" size={18} color="#fff" />
+                        <Text style={styles.actionButtonText}>Reject</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.modalPadding} />
+              </ScrollView>
             </View>
           </View>
         )}
@@ -1108,7 +1306,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
-    padding: 20,
+  },
+  modalScrollView: {
+    maxHeight: '100%',
+  },
+  modalPadding: {
+    height: 20, // Add extra padding at the bottom of the scroll content
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1189,73 +1392,94 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 12,
   },
+  invoiceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   invoiceNumber: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginLeft: 4,
+  },
+  dateTimeContainer: {
+    alignItems: 'flex-end',
+  },
+  dateText: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  statusPending: {
-    backgroundColor: '#FFC107',
-  },
-  statusApproved: {
-    backgroundColor: '#4CAF50',
-  },
-  statusRejected: {
-    backgroundColor: '#F44336',
-  },
-  statusText: {
-    fontSize: 12,
     fontWeight: '500',
-    color: '#fff',
-    textTransform: 'capitalize',
   },
-  saleDetails: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 12,
+  timeText: {
+    fontSize: 11,
+    color: '#999',
   },
-  productInfo: {
+  productSummaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginVertical: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
   },
-  productName: {
-    fontSize: 16,
+  primaryProductContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  primaryProductName: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 4,
   },
-  quantity: {
-    fontSize: 14,
+  additionalItemsText: {
+    fontSize: 13,
+    fontWeight: '400',
     color: '#666',
   },
-  priceInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  quantityText: {
+    fontSize: 13,
+    color: '#666',
   },
-  amount: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  amountContainer: {
+    alignItems: 'flex-end',
+  },
+  totalAmountValue: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#333',
   },
-  date: {
-    fontSize: 14,
-    color: '#666',
+  savingsText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '500',
+    marginTop: 2,
   },
-  saleFooter: {
+  salesmanContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    flex: 1,
   },
   salesmanName: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
+    marginLeft: 4,
+    flex: 1,
+  },
+  viewDetailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f7ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  viewDetailsText: {
+    fontSize: 12,
+    color: '#007AFF',
+    marginRight: 2,
   },
   debugContainer: {
     padding: 8,
@@ -1488,5 +1712,292 @@ const styles = StyleSheet.create({
   },
   outOfStock: {
     color: '#F44336',
+  },
+  invoiceHeaderSection: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  invoiceNumberContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  salesmanText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 4,
+  },
+  saleItemsSection: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#333',
+  },
+  itemsHeaderRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  itemHeaderCell: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+  },
+  itemRow: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  itemCell: {
+    fontSize: 14,
+    color: '#333',
+    paddingHorizontal: 2,
+  },
+  invoiceFooterSection: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 16,
+  },
+  totalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    marginBottom: 16,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#007AFF',
+  },
+  calculationSection: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  summaryHeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  summaryHeaderText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginLeft: 8,
+  },
+  summaryInfoRow: {
+    marginBottom: 16,
+  },
+  summaryInfoText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  summaryInfoHighlight: {
+    fontWeight: '600',
+    color: '#333',
+  },
+  summaryItemsContainer: {
+    marginBottom: 16,
+  },
+  summaryItemCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  summaryItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  summaryItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    flex: 1,
+    marginRight: 8,
+  },
+  summaryItemTotal: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#333',
+  },
+  summaryItemDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  summaryItemDetailText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  discountBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  discountText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  summaryTotalsCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  savingsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  savingsLabel: {
+    fontSize: 14,
+    color: '#4CAF50',
+    marginLeft: 4,
+  },
+  savingsAmount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 10,
+  },
+  grandTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  grandTotalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  grandTotalAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#007AFF',
+  },
+  paymentStatusContainer: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  paymentStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  paidStatusBadge: {
+    backgroundColor: '#4CAF50',
+  },
+  pendingStatusBadge: {
+    backgroundColor: '#FFC107',
+  },
+  rejectedStatusBadge: {
+    backgroundColor: '#F44336',
+  },
+  paymentStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
+    marginLeft: 4,
+  },
+  statusBadgeTop: {
+    position: 'absolute',
+    top:60,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 1,
+  },
+  statusTextTop: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 4,
+  },
+  statusPending: {
+    backgroundColor: '#FFC107',
+  },
+  statusApproved: {
+    backgroundColor: '#4CAF50',
+  },
+  statusRejected: {
+    backgroundColor: '#F44336',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#fff',
+    textTransform: 'capitalize',
+  },
+  saleFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 }); 

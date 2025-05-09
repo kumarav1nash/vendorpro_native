@@ -23,16 +23,25 @@ import { useUserProfile } from '../../../src/contexts/UserProfileContext';
 import { User, UserRole, UserProfile } from '../../../src/types/user';
 import { CreateSalesmanDto, Shop } from '../../../src/types/shop';
 import { Sale } from '../../../src/types/sales';
-import { Commission, CommissionRule, CommissionSummary, SalesCommissionResponse } from '../../../src/types/commission';
+import { Commission, CommissionRule, CommissionSummary, SalesCommissionResponse, CreateCommissionRuleDto } from '../../../src/types/commission';
 import { getCommissionsBySalesman } from '../../../src/services/commission.service';
 import { getUserProfileByUserId } from '../../../src/services/user-profile.service';
+
+// Add a type extension for User to include commissionRuleId
+interface ExtendedUser extends User {
+  activeCommissionRule?: CommissionRule | null;
+  hasCommissionRule?: boolean;
+}
+
+// Extend the CreateSalesmanDto type to include commissionRuleId
+interface ExtendedCreateSalesmanDto extends CreateSalesmanDto {
+  commissionRuleId?: string;
+}
 
 type SalesmenTabProps = {
   shopId: string;
   shop: Shop;
 };
-
-
 
 type PerformanceMetrics = {
   totalSales: number;
@@ -52,14 +61,17 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     commissionSummary,
     rules: commissionRules,
     fetchCommissionsBySalesman,
-    fetchAllCommissionRules
+    fetchAllCommissionRules,
+    createCommissionRule,
+    assignCommissionRule,
+    fetchActiveCommissionRule
   } = useCommission();
   const { fetchProfileByUserId } = useUserProfile();
   
-  const [shopSalesmen, setShopSalesmen] = useState<User[]>([]);
+  const [shopSalesmen, setShopSalesmen] = useState<ExtendedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredSalesmen, setFilteredSalesmen] = useState<User[]>([]);
+  const [filteredSalesmen, setFilteredSalesmen] = useState<ExtendedUser[]>([]);
   const [salesmanCommissions, setSalesmanCommissions] = useState<Commission[]>([]);
   const [salesmanCommissionSummary, setSalesmanCommissionSummary] = useState<CommissionSummary[]>([]);
   const [allSalesmenCommissionData, setAllSalesmenCommissionData] = useState<Map<string, CommissionSummary | null>>(new Map());
@@ -68,7 +80,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   // Form state
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [currentSalesman, setCurrentSalesman] = useState<User | null>(null);
+  const [currentSalesman, setCurrentSalesman] = useState<ExtendedUser | null>(null);
   const [salesmanForm, setSalesmanForm] = useState({
     firstName: '',
     lastName: '',
@@ -80,7 +92,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   });
   
   // Performance metrics state
-  const [selectedSalesman, setSelectedSalesman] = useState<User | null>(null);
+  const [selectedSalesman, setSelectedSalesman] = useState<ExtendedUser | null>(null);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [salesmanPerformance, setSalesmanPerformance] = useState<PerformanceMetrics>({
     totalSales: 0,
@@ -99,7 +111,17 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     activeSalesmen: 0,
     totalCommission: 0,
     topPerformer: '',
-    topPerformerSales: 0
+    topPerformerSales: 0,
+    salesmenWithoutRules: 0
+  });
+  
+  // Add state for commission rule modal
+  const [isCommissionRuleModalVisible, setIsCommissionRuleModalVisible] = useState(false);
+  const [commissionRuleForm, setCommissionRuleForm] = useState<CreateCommissionRuleDto>({
+    type: 'PERCENTAGE_OF_SALES',
+    value: 0,
+    description: '',
+    isActive: true
   });
   
   useEffect(() => {
@@ -156,7 +178,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   const loadSalesmen = async () => {
     setIsLoading(true);
     try {
-      const salesmenData = await getShopSalesmen(shopId) as User[];
+      const salesmenData = await getShopSalesmen(shopId) as ExtendedUser[];
       
       // Fetch profile data for each salesman
       for (let i = 0; i < salesmenData.length; i++) {
@@ -167,6 +189,26 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
             ...salesmenData[i],
             profile: profileData
           };
+          
+          // Now fetch the active commission rule for this salesman
+          try {
+            const ruleData = await fetchActiveCommissionRule(salesmenData[i].id);
+            if (ruleData && ruleData.commissionRule) {
+              salesmenData[i].activeCommissionRule = ruleData.commissionRule;
+              salesmenData[i].hasCommissionRule = true;
+            } else {
+              salesmenData[i].hasCommissionRule = false;
+              salesmenData[i].activeCommissionRule = null;
+            }
+          } catch (ruleError: any) {
+            // If we get a 404, it means no rule is assigned
+            if (ruleError?.response?.status === 404) {
+              salesmenData[i].hasCommissionRule = false;
+              salesmenData[i].activeCommissionRule = null;
+            } else {
+              console.error(`Error fetching commission rule for salesman ${salesmenData[i].id}:`, ruleError);
+            }
+          }
         } catch (error) {
           console.error(`Error fetching profile for salesman ${salesmenData[i].id}:`, error);
         }
@@ -234,7 +276,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   };
   
   const validateForm = () => {
-    const requiredFields = ['firstName', 'lastName', 'phoneNumber', 'password', 'commissionRuleId'];
+    const requiredFields = isEditMode ? ['firstName', 'lastName', 'phoneNumber'] : ['firstName', 'lastName', 'phoneNumber', 'password'];
     
     for (const field of requiredFields) {
       if (!salesmanForm[field as keyof typeof salesmanForm]) {
@@ -255,7 +297,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
   const handleAddSalesman = async () => {
     if (!validateForm()) return;
     
-    const newSalesmanData: CreateSalesmanDto = {
+    const newSalesmanData: ExtendedCreateSalesmanDto = {
       firstName: salesmanForm.firstName,
       lastName: salesmanForm.lastName,
       phoneNumber: salesmanForm.phoneNumber,
@@ -264,20 +306,44 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       username: `${salesmanForm.firstName.toLowerCase()}${Math.floor(Math.random() * 100)}`
     };
     
+    // Store the commission rule ID separately since it's not part of the CreateSalesmanDto
+    const selectedCommissionRuleId = salesmanForm.commissionRuleId;
+    
     try {
-
-      //add country code to the phone number if it is not already there
+      // Add country code to the phone number if it is not already there
       if (!salesmanForm.phoneNumber.startsWith('+91')) {
         newSalesmanData.phoneNumber = '+91' + salesmanForm.phoneNumber;
       }
 
-      // exclude email field if it is not provided or empty
+      // Exclude email field if it is not provided or empty
       const { email, ...salesmanDataWithoutEmail } = newSalesmanData;
 
-      if(email){
-        await createSalesman(shopId, newSalesmanData);
-      }else{
-        await createSalesman(shopId, salesmanDataWithoutEmail);
+      // Create the salesman first
+      let createdSalesman;
+      if(email) {
+        createdSalesman = await createSalesman(shopId, newSalesmanData);
+      } else {
+        createdSalesman = await createSalesman(shopId, salesmanDataWithoutEmail);
+      }
+      
+      console.log('Salesman created successfully:', createdSalesman?.id);
+
+      // If a commission rule was selected, assign it to the newly created salesman
+      if (selectedCommissionRuleId && createdSalesman?.id) {
+        try {
+          await assignCommissionRule({
+            salesmanId: createdSalesman.id,
+            commissionRuleId: selectedCommissionRuleId
+          });
+          console.log('Commission rule assigned successfully');
+        } catch (commissionError) {
+          console.error('Error assigning commission rule:', commissionError);
+          Alert.alert(
+            'Commission Rule Not Assigned',
+            'Salesman was created but the commission rule could not be assigned. You can assign it later by editing the salesman.',
+            [{ text: 'OK' }]
+          );
+        }
       }
 
       setIsModalVisible(false);
@@ -295,12 +361,27 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     
     try {
       // Note: This is simplified and may need adjustment based on your API
-      const userData: Partial<User> = {
+      const userData: Partial<ExtendedUser> = {
         isActive: salesmanForm.isActive
       };
       
       // Update user data
       await updateUser(currentSalesman.id, userData);
+      
+      // Update commission rule if selected and different from current
+      if (salesmanForm.commissionRuleId && currentSalesman.activeCommissionRule?.id !== salesmanForm.commissionRuleId) {
+        try {
+          // Call the assignCommissionRule function from context
+          await assignCommissionRule({
+            salesmanId: currentSalesman.id,
+            commissionRuleId: salesmanForm.commissionRuleId
+          });
+        } catch (commissionError) {
+          console.error('Error updating commission rule:', commissionError);
+          Alert.alert('Warning', 'Salesman status updated but failed to update commission rule');
+          // Continue execution even if commission update fails
+        }
+      }
       
       setIsModalVisible(false);
       resetForm();
@@ -354,16 +435,16 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     setIsModalVisible(true);
   };
   
-  const openEditModal = (salesman: User) => {
+  const openEditModal = (salesman: ExtendedUser) => {
     setIsEditMode(true);
     setCurrentSalesman(salesman);
     setSalesmanForm({
       firstName: salesman.profile?.firstName || '',
       lastName: salesman.profile?.lastName || '',
-      phoneNumber: salesman.phoneNumber,
+      phoneNumber: salesman.phoneNumber.replace('+91', ''),
       email: salesman.email || '',
       password: '',
-      commissionRuleId: '', // This would need to be fetched if stored elsewhere
+      commissionRuleId: salesman.activeCommissionRule?.id || '', // Get the active commission rule ID
       isActive: salesman.isActive,
     });
     setIsModalVisible(true);
@@ -382,7 +463,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     setCurrentSalesman(null);
   };
   
-  const viewPerformance = async (salesman: User) => {
+  const viewPerformance = async (salesman: ExtendedUser) => {
     setSelectedSalesman(salesman);
     
     // Calculate performance metrics
@@ -442,63 +523,102 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
     handleInputChange('email', `${username}@example.com`);
   };
   
-  const getFullName = (user: User) => {
+  const getFullName = (user: ExtendedUser) => {
     return `${user.profile?.firstName || ''} ${user.profile?.lastName || ''}`.trim() || 'Unknown';
   };
   
-  const renderSalesmanItem = ({ item }: { item: User }) => (
-    <View style={[styles.salesmanItem, !item.isActive && styles.inactiveSalesman]}>
-      <View style={styles.salesmanHeader}>
-        <View>
-          <Text style={styles.salesmanName}>{getFullName(item)}</Text>
-          <Text style={styles.salesmanContact}>{item.phoneNumber}</Text>
+  const renderSalesmanItem = ({ item }: { item: ExtendedUser }) => {
+    // Check if this salesman has a commission rule
+    const hasCommissionRule = item.hasCommissionRule;
+    
+    return (
+      <View style={[
+        styles.salesmanItem, 
+        !item.isActive && styles.inactiveSalesman,
+        item.isActive && !hasCommissionRule && styles.noRuleSalesman
+      ]}>
+        <View style={styles.salesmanHeader}>
+          <View>
+            <Text style={styles.salesmanName}>{getFullName(item)}</Text>
+            <Text style={styles.salesmanContact}>{item.phoneNumber}</Text>
+          </View>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => viewPerformance(item)}
+            >
+              <MaterialCommunityIcons name="chart-bar" size={18} color="#007AFF" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => openEditModal(item)}
+            >
+              <MaterialCommunityIcons name="pencil" size={18} color="#007AFF" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => handleDeleteSalesman(item.id)}
+            >
+              <MaterialCommunityIcons name="delete" size={18} color="#FF3B30" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => viewPerformance(item)}
-          >
-            <MaterialCommunityIcons name="chart-bar" size={18} color="#007AFF" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => openEditModal(item)}
-          >
-            <MaterialCommunityIcons name="pencil" size={18} color="#007AFF" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => handleDeleteSalesman(item.id)}
-          >
-            <MaterialCommunityIcons name="delete" size={18} color="#FF3B30" />
-          </TouchableOpacity>
-        </View>
-      </View>
-      
-      <View style={styles.salesmanDetails}>
-        {item.email && (
+        
+        <View style={styles.salesmanDetails}>
+          {item.email && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Email:</Text>
+              <Text style={styles.detailValue}>{item.email}</Text>
+            </View>
+          )}
+          
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Email:</Text>
-            <Text style={styles.detailValue}>{item.email}</Text>
+            <Text style={styles.detailLabel}>Status:</Text>
+            <View style={[styles.statusBadge, item.isActive ? styles.activeBadge : styles.inactiveBadge]}>
+              <Text style={styles.statusText}>{item.isActive ? 'Active' : 'Inactive'}</Text>
+            </View>
+          </View>
+          
+          {/* Add commission rule indicator */}
+          {item.isActive && (
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Commission Rule:</Text>
+              {hasCommissionRule ? (
+                <View style={[styles.statusBadge, styles.ruleAssignedBadge]}>
+                  <Text style={styles.statusText}>{item.activeCommissionRule?.description || 'Assigned'}</Text>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  onPress={() => openEditModal(item)}
+                  style={[styles.statusBadge, styles.noRuleBadge]}
+                >
+                  <MaterialCommunityIcons name="alert" size={12} color="#FF9500" style={{marginRight: 4}} />
+                  <Text style={[styles.statusText, {color: '#FF9500'}]}>Assign Rule</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Joined:</Text>
+            <Text style={styles.detailValue}>
+              {new Date(item.createdAt).toLocaleDateString('en-IN')}
+            </Text>
+          </View>
+        </View>
+        
+        {/* Warning banner for salesmen without commission rules */}
+        {item.isActive && !hasCommissionRule && (
+          <View style={styles.warningBanner}>
+            <MaterialCommunityIcons name="alert-circle" size={16} color="#FFF" />
+            <Text style={styles.warningText}>
+              No commission rule assigned. Sales can be recorded but commissions won't be calculated.
+            </Text>
           </View>
         )}
-        
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Status:</Text>
-          <View style={[styles.statusBadge, item.isActive ? styles.activeBadge : styles.inactiveBadge]}>
-            <Text style={styles.statusText}>{item.isActive ? 'Active' : 'Inactive'}</Text>
-          </View>
-        </View>
-        
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Joined:</Text>
-          <Text style={styles.detailValue}>
-            {new Date(item.createdAt).toLocaleDateString('en-IN')}
-          </Text>
-        </View>
       </View>
-    </View>
-  );
+    );
+  };
   
   // Calculate metrics when data changes
   useEffect(() => {
@@ -506,6 +626,11 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
       // Calculate basic metrics
       const totalSalesmen = shopSalesmen.length;
       const activeSalesmen = shopSalesmen.filter(s => s.isActive).length;
+      
+      // Count salesmen without commission rules
+      const salesmenWithoutRules = shopSalesmen.filter(s => 
+        !s.hasCommissionRule && s.isActive
+      ).length;
       
       // Calculate sales metrics and find top performer
       let topPerformerSales = 0;
@@ -551,7 +676,8 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
         activeSalesmen,
         totalCommission: totalCommissionSum,
         topPerformer,
-        topPerformerSales
+        topPerformerSales,
+        salesmenWithoutRules
       });
     }
   }, [shopSalesmen, sales, totalCommissionSum]);
@@ -583,15 +709,27 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
         </View>
         
         <View style={styles.metricsRow}>
-          <View style={styles.metricCard}>
-            <View style={[styles.metricIconContainer, { backgroundColor: '#FFF8E1' }]}>
-              <MaterialCommunityIcons name="trophy" size={24} color="#FFC107" />
+          {metrics.salesmenWithoutRules > 0 ? (
+            <View style={[styles.metricCard, styles.warningMetricCard]}>
+              <View style={[styles.metricIconContainer, { backgroundColor: '#FFF3E0' }]}>
+                <MaterialCommunityIcons name="alert" size={24} color="#FF9500" />
+              </View>
+              <View style={styles.metricTextContainer}>
+                <Text style={[styles.metricValue, {color: '#FF9500'}]}>{metrics.salesmenWithoutRules}</Text>
+                <Text style={styles.metricLabel}>Need Rules</Text>
+              </View>
             </View>
-            <View style={styles.metricTextContainer}>
-              <Text style={styles.metricValue} numberOfLines={1}>{metrics.topPerformer || 'N/A'}</Text>
-              <Text style={styles.metricLabel}>Top Performer ({metrics.topPerformerSales} sales)</Text>
+          ) : (
+            <View style={styles.metricCard}>
+              <View style={[styles.metricIconContainer, { backgroundColor: '#FFF8E1' }]}>
+                <MaterialCommunityIcons name="trophy" size={24} color="#FFC107" />
+              </View>
+              <View style={styles.metricTextContainer}>
+                <Text style={styles.metricValue} numberOfLines={1}>{metrics.topPerformer || 'N/A'}</Text>
+                <Text style={styles.metricLabel}>Top Performer ({metrics.topPerformerSales} sales)</Text>
+              </View>
             </View>
-          </View>
+          )}
           
           <View style={styles.metricCard}>
             <View style={[styles.metricIconContainer, { backgroundColor: '#E3F2FD' }]}>
@@ -603,8 +741,66 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
             </View>
           </View>
         </View>
+        
+        {/* Add warning message if there are salesmen without rules */}
+        {metrics.salesmenWithoutRules > 0 && (
+          <View style={styles.warningCard}>
+            <MaterialCommunityIcons name="information" size={20} color="#FF9500" />
+            <Text style={styles.warningCardText}>
+              {metrics.salesmenWithoutRules} {metrics.salesmenWithoutRules === 1 ? 'salesman' : 'salesmen'} {metrics.salesmenWithoutRules === 1 ? 'has' : 'have'} no commission rule assigned. They can record sales but won't earn commissions.
+            </Text>
+          </View>
+        )}
       </View>
     );
+  };
+  
+  // Add new functions for commission rule management
+  const openCommissionRuleModal = () => {
+    setCommissionRuleForm({
+      type: 'PERCENTAGE_OF_SALES',
+      value: 0,
+      description: '',
+      isActive: true
+    });
+    setIsCommissionRuleModalVisible(true);
+  };
+
+  const handleCommissionRuleChange = (field: keyof CreateCommissionRuleDto, value: any) => {
+    setCommissionRuleForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const validateCommissionRuleForm = () => {
+    if (!commissionRuleForm.description.trim()) {
+      Alert.alert('Error', 'Description is required');
+      return false;
+    }
+    
+    if (commissionRuleForm.value <= 0) {
+      Alert.alert('Error', 'Value must be greater than 0');
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleCreateCommissionRule = async () => {
+    if (!validateCommissionRuleForm()) return;
+    
+    try {
+      await createCommissionRule(commissionRuleForm);
+      setIsCommissionRuleModalVisible(false);
+      Alert.alert('Success', 'Commission rule created successfully');
+      
+      // Refresh commission rules list
+      loadCommissionRules();
+    } catch (error) {
+      console.error('Error creating commission rule:', error);
+      Alert.alert('Error', 'Failed to create commission rule');
+    }
   };
   
   if (isLoading) {
@@ -636,10 +832,16 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-          <Text style={styles.addButtonText}>Add</Text>
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.ruleButton} onPress={openCommissionRuleModal}>
+            <MaterialCommunityIcons name="percent" size={18} color="#fff" />
+            <Text style={styles.buttonText}>Add Rule</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
+            <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+            <Text style={styles.buttonText}>Add</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       
       {filteredSalesmen.length === 0 ? (
@@ -755,7 +957,7 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
                 )}
                 
                 <View style={styles.formField}>
-                  <Text style={styles.label}>Commission Rule *</Text>
+                  <Text style={styles.label}>Commission Rule</Text>
                   <TouchableOpacity 
                     style={styles.dropdownButton}
                     onPress={() => {
@@ -962,6 +1164,130 @@ export default function SalesmenTab({ shopId }: SalesmenTabProps) {
           </View>
         </View>
       </Modal>
+      
+      {/* Add Commission Rule Modal */}
+      <Modal
+        visible={isCommissionRuleModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsCommissionRuleModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Create Commission Rule</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setIsCommissionRuleModalVisible(false)}
+              >
+                <MaterialCommunityIcons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView>
+              <View>
+                <View style={styles.formField}>
+                  <Text style={styles.label}>Description *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="E.g., 'Basic 10% Commission'"
+                    value={commissionRuleForm.description}
+                    onChangeText={(value) => handleCommissionRuleChange('description', value)}
+                  />
+                </View>
+                
+                <View style={styles.formField}>
+                  <Text style={styles.label}>Commission Type *</Text>
+                  <View style={styles.radioGroup}>
+                    <TouchableOpacity
+                      style={[
+                        styles.radioButton,
+                        commissionRuleForm.type === 'PERCENTAGE_OF_SALES' && styles.radioButtonSelected
+                      ]}
+                      onPress={() => handleCommissionRuleChange('type', 'PERCENTAGE_OF_SALES')}
+                    >
+                      <Text style={[
+                        styles.radioButtonText,
+                        commissionRuleForm.type === 'PERCENTAGE_OF_SALES' && styles.radioButtonTextSelected
+                      ]}>
+                        % of Sales
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={[
+                        styles.radioButton,
+                        commissionRuleForm.type === 'FIXED_AMOUNT' && styles.radioButtonSelected
+                      ]}
+                      onPress={() => handleCommissionRuleChange('type', 'FIXED_AMOUNT')}
+                    >
+                      <Text style={[
+                        styles.radioButtonText,
+                        commissionRuleForm.type === 'FIXED_AMOUNT' && styles.radioButtonTextSelected
+                      ]}>
+                        Fixed Amount
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      style={[
+                        styles.radioButton,
+                        commissionRuleForm.type === 'PERCENTAGE_ON_DIFFERENCE' && styles.radioButtonSelected
+                      ]}
+                      onPress={() => handleCommissionRuleChange('type', 'PERCENTAGE_ON_DIFFERENCE')}
+                    >
+                      <Text style={[
+                        styles.radioButtonText,
+                        commissionRuleForm.type === 'PERCENTAGE_ON_DIFFERENCE' && styles.radioButtonTextSelected
+                      ]}>
+                        % on Price Diff.
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                
+                <View style={styles.formField}>
+                  <Text style={styles.label}>
+                    {commissionRuleForm.type === 'FIXED_AMOUNT' 
+                      ? 'Amount (₹) *' 
+                      : 'Percentage (%) *'}
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={commissionRuleForm.type === 'FIXED_AMOUNT' ? "100" : "10"}
+                    value={commissionRuleForm.value.toString()}
+                    onChangeText={(value) => {
+                      const numValue = parseFloat(value) || 0;
+                      handleCommissionRuleChange('value', numValue);
+                    }}
+                    keyboardType="numeric"
+                  />
+                </View>
+                
+                <View style={styles.formField}>
+                  <View style={styles.switchContainer}>
+                    <Text style={styles.label}>Active Status</Text>
+                    <Switch
+                      trackColor={{ false: "#ccc", true: "#007AFF" }}
+                      thumbColor="#fff"
+                      ios_backgroundColor="#ccc"
+                      onValueChange={(value) => handleCommissionRuleChange('isActive', value)}
+                      value={commissionRuleForm.isActive}
+                    />
+                  </View>
+                </View>
+                
+                <TouchableOpacity
+                  style={styles.submitButton}
+                  onPress={handleCreateCommissionRule}
+                >
+                  <Text style={styles.submitButtonText}>Create Commission Rule</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -998,6 +1324,24 @@ const styles = StyleSheet.create({
   },
   clearSearch: {
     padding: 4,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+  },
+  ruleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   addButton: {
     flexDirection: 'row',
@@ -1461,5 +1805,80 @@ const styles = StyleSheet.create({
   metricLabel: {
     fontSize: 12,
     color: '#666',
+  },
+  radioGroup: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  radioButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+  },
+  radioButtonSelected: {
+    borderColor: '#007AFF',
+    backgroundColor: '#e6f2ff',
+  },
+  radioButtonText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  radioButtonTextSelected: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  noRuleSalesman: {
+    borderLeftColor: '#FF9500',
+  },
+  warningBanner: {
+    backgroundColor: '#FF9500',
+    padding: 8,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  warningText: {
+    color: '#FFF',
+    fontSize: 12,
+    marginLeft: 6,
+    flex: 1,
+  },
+  ruleAssignedBadge: {
+    backgroundColor: '#E5F5E8',
+    borderColor: '#4CAF50',
+  },
+  noRuleBadge: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FF9500',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  warningMetricCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9500',
+  },
+  warningCard: {
+    backgroundColor: '#FFF3E0',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9500',
+  },
+  warningCardText: {
+    color: '#744210',
+    fontSize: 14,
+    marginLeft: 8,
+    flex: 1,
   },
 }); 
