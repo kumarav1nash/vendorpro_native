@@ -107,36 +107,33 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
   
   // Calculate metrics when sales data changes
   useEffect(() => {
-    if (sales && sales.length > 0) {
-      // Calculate metrics
-      const totalSales = sales.length;
-      let pendingSales = 0;
-      let approvedSales = 0;
-      let rejectedSales = 0;
-      let totalRevenue = 0;
-      let approvedSalesCount = 0;
-      sales.forEach(sale => {
-        if (sale.status === 'pending') pendingSales++;
-        if (sale.status === 'approved') approvedSales++;
-        if (sale.status === 'rejected') rejectedSales++;
-        if (sale.status === 'approved') {
-          sale.items.forEach(item => {
-            totalRevenue += typeof item.soldAt === 'string' ? parseFloat(item.soldAt) : item.soldAt;
-          });
-          approvedSalesCount++;
-        }
-      });
-      const averageSaleAmount = approvedSalesCount > 0 ? totalRevenue / approvedSalesCount : 0;
-      setMetrics({
-        totalSales,
-        pendingSales,
-        approvedSales,
-        rejectedSales,
-        totalRevenue,
-        averageSaleAmount
-      });
-    }
+    if (!sales) return;
+  
+    const totalSales       = sales.length;
+    const pendingSales     = sales.filter(s => s.status === 'pending').length;
+    const approvedSales    = sales.filter(s => s.status === 'approved').length;
+    const rejectedSales    = sales.filter(s => s.status === 'rejected').length;
+  
+    let totalRevenue      = 0;
+    let approvedCount     = 0;
+    sales.forEach(s => {
+      if (s.status === 'approved') {
+        s.items.forEach(item => totalRevenue += Number(item.soldAt));
+        approvedCount++;
+      }
+    });
+    const averageSaleAmount = approvedCount ? totalRevenue / approvedCount : 0;
+  
+    setMetrics({
+      totalSales,
+      pendingSales,
+      approvedSales,
+      rejectedSales,
+      totalRevenue,
+      averageSaleAmount,
+    });
   }, [sales, shopId]);
+  
   
   // Filter and sort sales when data changes
   useEffect(() => {
@@ -206,7 +203,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
       
       setFilteredSales(filtered);
     console.log(`Final: Displaying ${filtered.length} sales after filtering and sorting`);
-  }, [sales, activeTab, sortBy, sortDirection, searchQuery, shopId, inventories]);
+  }, [sales, activeTab, sortBy, sortDirection, searchQuery, shopId]);
   
   // Load sales data from the API
   const loadSalesData = async () => {

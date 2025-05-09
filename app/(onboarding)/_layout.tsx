@@ -10,6 +10,12 @@ export default function OnboardingLayout() {
       }}
     >
       <Stack.Screen
+        name="profile-setup"
+        options={{
+          gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen
         name="shop-details"
         options={{
           gestureEnabled: false,
@@ -17,6 +23,12 @@ export default function OnboardingLayout() {
       />
       <Stack.Screen
         name="setup-options"
+        options={{
+          gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen
+        name="index"
         options={{
           gestureEnabled: false,
         }}
