@@ -306,6 +306,25 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
 
   // Render individual sale item
   const renderSaleItem = ({ item }: { item: Sale }) => {
+    // Calculate total items and quantities
+    const totalItems = item.items.length;
+    const totalQuantity = item.items.reduce((sum, saleItem) => sum + saleItem.quantity, 0);
+    
+    // Get the first product to show as primary product
+    const primaryProduct = item.items[0]?.product?.productName || 'Unknown Product';
+    
+    // Format the date more clearly
+    const saleDate = new Date(item.createdAt);
+    const formattedDate = saleDate.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+    const formattedTime = saleDate.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    
     return (
       <TouchableOpacity
         style={styles.saleItem}
@@ -314,31 +333,72 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
           setShowDetailsModal(true);
         }}
       >
+        {/* Status Badge - Top Right */}
+        <View style={[styles.statusBadgeTop, getStatusStyle(item.status)]}>
+          <MaterialCommunityIcons 
+            name={
+              item.status === 'approved' ? "check-circle" : 
+              item.status === 'pending' ? "clock-outline" : "close-circle"
+            } 
+            size={14} 
+            color="#fff" 
+          />
+          <Text style={styles.statusTextTop}>{item.status?.toUpperCase() || 'UNKNOWN'}</Text>
+        </View>
+        
+        {/* Invoice and Date Section */}
         <View style={styles.saleHeader}>
-          <Text style={styles.invoiceNumber}>#{item.id?.slice(0, 8) ?? 'N/A'}</Text>
-          <View style={[styles.statusBadge, getStatusStyle(item.status)]}>
-            <Text style={styles.statusText}>{item.status?.toUpperCase() || 'UNKNOWN'}</Text>
+          <View style={styles.invoiceContainer}>
+            <MaterialCommunityIcons name="receipt" size={16} color="#666" />
+            <Text style={styles.invoiceNumber}>#{item.id?.slice(0, 8) ?? 'N/A'}</Text>
+          </View>
+          <View style={styles.dateTimeContainer}>
+            <Text style={styles.dateText}>{formattedDate}</Text>
+            <Text style={styles.timeText}>{formattedTime}</Text>
           </View>
         </View>
-        <View style={styles.saleDetails}>
-          {/* List all products in the sale */}
-          {item.items.map((saleItem, idx) => (
-            <View key={idx} style={{ marginBottom: 4 }}>
-              <Text style={styles.productName}>{saleItem.product?.productName || 'Unknown Product'}</Text>
-              <Text style={styles.quantity}>Qty: {saleItem.quantity || 0}</Text>
-              <Text style={styles.amount}>₹{saleItem.soldAt}</Text>
-            </View>
-          ))}
-          <View style={styles.priceInfo}>
-            <Text style={styles.amount}>Total: {formatCurrency(item.totalAmount)}</Text>
-            <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
+        
+        {/* Product Summary Section */}
+        <View style={styles.productSummaryContainer}>
+          <View style={styles.primaryProductContainer}>
+            <Text style={styles.primaryProductName} numberOfLines={1}>
+              {primaryProduct}
+              {totalItems > 1 && <Text style={styles.additionalItemsText}> +{totalItems - 1} more</Text>}
+            </Text>
+            <Text style={styles.quantityText}>{totalQuantity} {totalQuantity === 1 ? 'unit' : 'units'} total</Text>
+          </View>
+          <View style={styles.amountContainer}>
+            <Text style={styles.totalAmountValue}>{formatCurrency(item.totalAmount)}</Text>
+            {/* Show savings if available */}
+            {(() => {
+              // Calculate MRP total vs actual total to show savings
+              const mrpTotal = item.items.reduce((sum, saleItem) => 
+                sum + (saleItem.product?.sellingPrice || 0) * saleItem.quantity, 0);
+              const actualTotal = parseFloat(item.totalAmount.toString());
+              const savings = mrpTotal - actualTotal;
+              
+              if (savings > 0) {
+                return (
+                  <Text style={styles.savingsText}>Save {formatCurrency(savings)}</Text>
+                );
+              }
+              return null;
+            })()}
           </View>
         </View>
+        
+        {/* Salesman Info */}
         <View style={styles.saleFooter}>
-          <Text style={styles.salesmanName}>
+          <View style={styles.salesmanContainer}>
             <MaterialCommunityIcons name="account" size={14} color="#666" />
-            {' '}{item.salesman?.phoneNumber || item.salesman?.email || 'Direct Sale'}
-          </Text>
+            <Text style={styles.salesmanName} numberOfLines={1}>
+              {item.salesman?.profile?.firstName || item.salesman?.phoneNumber || item.salesman?.email || 'Direct Sale'}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.viewDetailsButton}>
+            <Text style={styles.viewDetailsText}>View Details</Text>
+            <MaterialCommunityIcons name="chevron-right" size={14} color="#007AFF" />
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -387,7 +447,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
             <View style={styles.metricTextContainer}>
               <Text style={styles.metricValue}>{formatCurrency(metrics.totalRevenue)}</Text>
               <Text style={styles.metricLabel}>Total Revenue</Text>
-          </View>
+            </View>
           </View>
           </View>
           
@@ -1334,73 +1394,94 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 12,
   },
+  invoiceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   invoiceNumber: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginLeft: 4,
+  },
+  dateTimeContainer: {
+    alignItems: 'flex-end',
+  },
+  dateText: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  statusPending: {
-    backgroundColor: '#FFC107',
-  },
-  statusApproved: {
-    backgroundColor: '#4CAF50',
-  },
-  statusRejected: {
-    backgroundColor: '#F44336',
-  },
-  statusText: {
-    fontSize: 12,
     fontWeight: '500',
-    color: '#fff',
-    textTransform: 'capitalize',
   },
-  saleDetails: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 12,
+  timeText: {
+    fontSize: 11,
+    color: '#999',
   },
-  productInfo: {
+  productSummaryContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginVertical: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
   },
-  productName: {
-    fontSize: 16,
+  primaryProductContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  primaryProductName: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 4,
   },
-  quantity: {
-    fontSize: 14,
+  additionalItemsText: {
+    fontSize: 13,
+    fontWeight: '400',
     color: '#666',
   },
-  priceInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  quantityText: {
+    fontSize: 13,
+    color: '#666',
   },
-  amount: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  amountContainer: {
+    alignItems: 'flex-end',
+  },
+  totalAmountValue: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#333',
   },
-  date: {
-    fontSize: 14,
-    color: '#666',
+  savingsText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '500',
+    marginTop: 2,
   },
-  saleFooter: {
+  salesmanContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    flex: 1,
   },
   salesmanName: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
+    marginLeft: 4,
+    flex: 1,
+  },
+  viewDetailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f7ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  viewDetailsText: {
+    fontSize: 12,
+    color: '#007AFF',
+    marginRight: 2,
   },
   debugContainer: {
     padding: 8,
@@ -1651,11 +1732,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexWrap: 'wrap',
   },
-  dateText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
   salesmanText: {
     fontSize: 14,
     color: '#666',
@@ -1883,5 +1959,47 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFF',
     marginLeft: 4,
+  },
+  statusBadgeTop: {
+    position: 'absolute',
+    top:60,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    zIndex: 1,
+  },
+  statusTextTop: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 4,
+  },
+  statusPending: {
+    backgroundColor: '#FFC107',
+  },
+  statusApproved: {
+    backgroundColor: '#4CAF50',
+  },
+  statusRejected: {
+    backgroundColor: '#F44336',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#fff',
+    textTransform: 'capitalize',
+  },
+  saleFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 }); 
