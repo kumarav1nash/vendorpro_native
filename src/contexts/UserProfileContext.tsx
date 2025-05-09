@@ -24,7 +24,7 @@ interface UserProfileContextType {
     status?: number;
     isError: boolean;
   } | null;
-  fetchMyProfile: () => Promise<void>;
+  fetchMyProfile: () => Promise<UserProfile | undefined>;
   fetchProfileById: (id: string) => Promise<void>;
   fetchProfileByUserId: (userId: string) => Promise<UserProfile | null>;
   fetchAllProfiles: () => Promise<void>;
@@ -56,6 +56,7 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     try {
       const data = await getMyUserProfile();
       setProfile(data);
+      return data;
     } catch (err) {
       handleError(err, 'Failed to fetch your profile');
       // Still keep previous profile data if it exists

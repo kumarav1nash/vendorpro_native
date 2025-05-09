@@ -10,26 +10,20 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
-type ShopDetails = {
-  shopName: string;
-  ownerName: string;
-  email: string;
-  gstin: string;
-};
+import { useShop } from '../../src/contexts/ShopContext';
+import { CreateShopDto } from '../../src/types/shop';
 
 export default function ShopDetailsScreen() {
-  const [loading, setLoading] = useState(false);
-  const [shopDetails, setShopDetails] = useState<ShopDetails>({
+  const { createShop, isLoading } = useShop();
+  const [shopDetails, setShopDetails] = useState<CreateShopDto>({
     shopName: '',
     ownerName: '',
     email: '',
-    gstin: '',
+    gstinNumber: '',
   });
 
-  const handleChange = (key: keyof ShopDetails, value: string) => {
+  const handleChange = (key: keyof CreateShopDto, value: string) => {
     setShopDetails(prev => ({ ...prev, [key]: value }));
   };
 
@@ -57,7 +51,7 @@ export default function ShopDetailsScreen() {
       Alert.alert('Error', 'Please enter a valid email address');
       return false;
     }
-    if (!validateGSTIN(shopDetails.gstin)) {
+    if (!validateGSTIN(shopDetails.gstinNumber || '')) {
       Alert.alert('Error', 'Please enter a valid GSTIN number or leave it empty');
       return false;
     }
@@ -67,21 +61,15 @@ export default function ShopDetailsScreen() {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
-    setLoading(true);
     try {
-      // Save shop details
-      await AsyncStorage.setItem('shopDetails', JSON.stringify(shopDetails));
-      
-      // Ensure onboarding is not marked as complete yet
-      await AsyncStorage.removeItem('onboardingComplete');
+      // Create shop using the API
+      const newShop = await createShop(shopDetails);
       
       // Navigate to setup options
-      setLoading(false);
       router.push('/(onboarding)/setup-options');
     } catch (error) {
-      console.error('Error saving shop details:', error);
-      Alert.alert('Error', 'Failed to save shop details');
-      setLoading(false);
+      console.error('Error creating shop:', error);
+      Alert.alert('Error', 'Failed to create shop. Please try again.');
     }
   };
 
@@ -130,8 +118,8 @@ export default function ShopDetailsScreen() {
           <Text style={styles.label}>GSTIN (Optional)</Text>
           <TextInput
             style={styles.input}
-            value={shopDetails.gstin}
-            onChangeText={(value) => handleChange('gstin', value.toUpperCase())}
+            value={shopDetails.gstinNumber}
+            onChangeText={(value) => handleChange('gstinNumber', value.toUpperCase())}
             placeholder="Enter GSTIN number"
             autoCapitalize="characters"
           />
@@ -140,9 +128,9 @@ export default function ShopDetailsScreen() {
         <TouchableOpacity
           style={styles.button}
           onPress={handleSubmit}
-          disabled={loading}
+          disabled={isLoading}
         >
-          {loading ? (
+          {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={styles.buttonText}>Register Shop</Text>
