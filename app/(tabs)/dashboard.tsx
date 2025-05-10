@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,7 @@ interface KPICard {
 export default function DashboardScreen() {
   const { user } = useUser();
   const { profile, fetchMyProfile } = useUserProfile();
-  const { shop, shops, fetchAllShops, getShopSalesmen, fetchMyShops } = useShop();
+  const { shops, fetchMyShops, getShopSalesmen } = useShop();
   const { inventories, fetchInventoryByShopId } = useInventory();
   const { sales, fetchAllSales } = useSales();
 
@@ -42,186 +42,94 @@ export default function DashboardScreen() {
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [shopDropdownVisible, setShopDropdownVisible] = useState(false);
   
- // 1️⃣ On mount: fetch shops & profile
- useEffect(() => {
-  (async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const fetchedShops = await fetchMyShops();        // returns Shop[]
-      await fetchMyProfile();
-      if (fetchedShops.length > 0) {
-        setSelectedShop(fetchedShops[0]);           // kick off shop-data load
+  // Track last loaded shop for shop data
+  const lastLoadedShopId = useRef<string | null>(null);
+  // Track if we've already fetched profile/shops
+  const hasFetchedInitial = useRef(false);
+  
+  // On mount: check onboarding and load initial data if needed
+  useEffect(() => {
+    if (hasFetchedInitial.current) return;
+    hasFetchedInitial.current = true;
+    (async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        let userProfile = profile;
+        if (!userProfile) userProfile = await fetchMyProfile();
+        if (!userProfile) {
+          router.replace('/(onboarding)/profile-setup');
+          return;
+        }
+        let myShops = shops;
+        if (!myShops || myShops.length === 0) myShops = await fetchMyShops();
+        if (!myShops || myShops.length === 0) {
+          router.replace('/(onboarding)/shop-details');
+          return;
+        }
+        setSelectedShop(myShops[0]);
+      } catch (e: any) {
+        setError(e.message || 'Error loading dashboard');
+      } finally {
+        setIsLoading(false);
       }
-    } catch (e: any) {
-      setError(e.message || 'Error loading dashboard');
-    } finally {
-      setIsLoading(false);
-    }
-  })();
-}, []);
- // 2️⃣ When selectedShop changes: load its inventory, sales & salesmen
- useEffect(() => {
-  if (!selectedShop) return;
-  (async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [_, __, salesmenList] = await Promise.all([
-        fetchInventoryByShopId(selectedShop.id),
-        fetchAllSales({ shopId: selectedShop.id }),
-        getShopSalesmen(selectedShop.id),
-      ]);
-      setSalesmen(salesmenList || []);
-    } catch (e: any) {
-      setError(e.message || 'Error loading shop data');
-    } finally {
-      setIsLoading(false);
-    }
-  })();
-}, [selectedShop]);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-// 3. When selectedShop changes, fetch its details
-useEffect(() => {
-  if (!selectedShop) return;
-  (async () => {
-    setIsLoading(true);
-    try {
-      await loadShopData(selectedShop.id);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  })();
-}, [selectedShop]);
+  // When selectedShop changes, load its data if not already loaded
+  useEffect(() => {
+    if (!selectedShop) return;
+    if (lastLoadedShopId.current === selectedShop.id) return;
+    lastLoadedShopId.current = selectedShop.id;
+    (async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [_, __, salesmenList] = await Promise.all([
+          fetchInventoryByShopId(selectedShop.id),
+          fetchAllSales({ shopId: selectedShop.id }),
+          getShopSalesmen(selectedShop.id),
+        ]);
+        setSalesmen(salesmenList || []);
+      } catch (e: any) {
+        setError(e.message || 'Error loading shop data');
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [selectedShop, fetchInventoryByShopId, fetchAllSales, getShopSalesmen]);
 
-  // 3️⃣ Compute KPIs once everything is loaded
+  // Update KPIs when data changes
   useEffect(() => {
     if (isLoading || !selectedShop) return;
     updateKPIData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, inventories, sales, salesmen, selectedShop]);
 
-
-  const loadInitialData = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await fetchMyShops();
-      await fetchMyProfile();
-      
-      // Select the first shop and then immediately load its data
-      if (shops.length > 0) {
-        const firstShop = shops[0];
-        setSelectedShop(firstShop);
-        
-        // Load shop data immediately to avoid race condition
-        await loadShopData(firstShop.id);
-      } else {
-        // If no shops exist, we can stop loading
-        setIsLoading(false);
-      }
-    } catch (err: any) {
-      console.error("Error loading initial data:", err);
-      setError(err.message || 'Failed to load dashboard data');
-      setIsLoading(false);
-    }
-  };
-
-  const loadShopData = async (shopId: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      console.log(`Loading data for shop: ${shopId}`);
-      
-      // Reset salesmen to avoid showing stale data
-      setSalesmen([]);
-      
-      // Fetch new data for the selected shop
-      const loadPromises = [
-        fetchInventoryByShopId(shopId),
-        fetchAllSales({shopId}),
-        getShopSalesmen(shopId)
-      ];
-      
-      const [inventoryResult, salesResult, salesmenData] = await Promise.all(loadPromises);
-      
-      console.log(`Loaded shop data: 
-        - Inventory items: ${inventories?.length || 0}
-        - Sales: ${sales?.length || 0}
-        - Salesmen: ${salesmenData?.length || 0}`);
-      
-      setSalesmen(salesmenData || []);
-      
-      // Force KPI update in case dependencies don't trigger the useEffect
-      updateKPIData();
-    } catch (err: any) {
-      console.error("Error loading shop data:", err);
-      setError(err.message || 'Failed to load shop data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      if (selectedShop) {
-        await loadShopData(selectedShop.id);
-      } else {
-        await loadInitialData();
-      }
-    } catch (err) {
-      console.error("Error refreshing data:", err);
-    } finally {
-      setRefreshing(false);
-    }
-  };
-  
   const updateKPIData = () => {
-    if (!selectedShop) {
-      console.log("Cannot update KPIs: No shop selected");
-      return;
-    }
-    
-    console.log("Updating KPI data with:", {
-      inventoryCount: inventories?.length || 0,
-      salesCount: sales?.length || 0,
-      salesmenCount: salesmen?.length || 0
-    });
-    
-    // Calculate metrics directly from current state
+    if (!selectedShop) return;
     const totalProducts = inventories?.length || 0;
     const totalSales = sales?.length || 0;
     const totalSalesmen = salesmen?.length || 0;
-    
-    // Calculate pending sales
     const pendingSales = sales.filter(sale => sale.status === 'pending').length;
-    
-    // Calculate low stock items
     const LOW_STOCK_THRESHOLD = 10;
     const lowStockItems = inventories.filter(item => 
       item.stockQuantity > 0 && item.stockQuantity <= LOW_STOCK_THRESHOLD
     ).length;
-    
-    // Calculate revenue
     let totalRevenue = 0;
     let todayRevenue = 0;
     const todayDate = new Date().toISOString().split('T')[0];
-    
     sales.forEach(sale => {
       const saleAmount = typeof sale.totalAmount === 'string' 
         ? parseFloat(sale.totalAmount) 
         : sale.totalAmount;
-      
       totalRevenue += saleAmount;
-      
       const saleDate = new Date(sale.createdAt).toISOString().split('T')[0];
       if (saleDate === todayDate) {
         todayRevenue += saleAmount;
       }
     });
-    
     const kpis: KPICard[] = [
       {
         title: 'Total Products',
@@ -269,6 +177,24 @@ useEffect(() => {
     setKpiData(kpis);
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if (selectedShop) {
+        lastLoadedShopId.current = null; // force reload
+        await Promise.all([
+          fetchInventoryByShopId(selectedShop.id),
+          fetchAllSales({ shopId: selectedShop.id }),
+          getShopSalesmen(selectedShop.id),
+        ]);
+      }
+    } catch (err) {
+      console.error('Error refreshing data:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const navigateToShop = (shopId?: string) => {
     if (shopId) {
       router.push(`/shop/${shopId}`);
@@ -278,13 +204,7 @@ useEffect(() => {
   };
 
   const handleShopSelect = (shop: Shop) => {
-    // Reset state before setting the new shop
-    setIsLoading(true);
-    
-    // Close dropdown
     setShopDropdownVisible(false);
-    
-    // Set selected shop which will trigger loadShopData via useEffect
     setSelectedShop(shop);
   };
   

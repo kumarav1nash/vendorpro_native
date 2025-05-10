@@ -24,7 +24,7 @@ interface UserProfileContextType {
     status?: number;
     isError: boolean;
   } | null;
-  fetchMyProfile: () => Promise<UserProfile | undefined>;
+  fetchMyProfile: () => Promise<UserProfile | null>;
   fetchProfileById: (id: string) => Promise<void>;
   fetchProfileByUserId: (userId: string) => Promise<UserProfile | null>;
   fetchAllProfiles: () => Promise<void>;
@@ -50,7 +50,7 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(false);
   const { error, handleError, clearError } = useErrorHandler();
 
-  const fetchMyProfile = async () => {
+  const fetchMyProfile = async () : Promise<UserProfile | null> => {
     setLoading(true);
     clearError();
     try {
@@ -59,7 +59,7 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
       return data;
     } catch (err) {
       handleError(err, 'Failed to fetch your profile');
-      // Still keep previous profile data if it exists
+      return null;
     } finally {
       setLoading(false);
     }

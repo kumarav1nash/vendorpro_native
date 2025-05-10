@@ -34,7 +34,15 @@ export default function RootLayout() {
                       <SalesProvider>
                         <CommissionProvider>
                           {/* Root stack navigator */}
-                          <Stack screenOptions={{ headerShown: false }}>
+                          <Stack>
+                            {/* Index route must be first */}
+                            <Stack.Screen 
+                              name="index" 
+                              options={{ 
+                                headerShown: false,
+                                animation: 'none'
+                              }} 
+                            />
                             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                             <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
@@ -46,13 +54,6 @@ export default function RootLayout() {
                                 headerShown: true,
                                 headerTitle: 'Shop Details',
                                 headerBackTitle: 'Back'
-                              }} 
-                            />
-                            <Stack.Screen 
-                              name="index" 
-                              options={{ 
-                                // Auth check & redirect screen, no header needed
-                                headerShown: false 
                               }} 
                             />
                           </Stack>

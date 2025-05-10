@@ -1,46 +1,55 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
-import { View, ActivityIndicator, Text } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { View, ActivityIndicator, Text, Platform } from 'react-native';
 import { useAuth } from '../src/contexts/AuthContext';
-import { useShop } from '../src/contexts/ShopContext';
-import { useUserProfile } from '../src/contexts/UserProfileContext';
-import { UserRole } from '../src/types/user';
 import Constants from 'expo-constants';
 
 // Define valid redirect paths for proper typing
 type ValidRedirectPath = 
   | '/(auth)/login' 
   | '/(salesman)/dashboard' 
-  | '/(tabs)/dashboard' 
-  | '/(onboarding)/profile-setup'
-  | '/(onboarding)/shop-details';
+  | '/(tabs)/dashboard';
 
 export default function Index() {
   const { isAuthenticated, user, isLoading: authLoading } = useAuth();
-  const { fetchMyShops, shops, isLoading: shopLoading } = useShop();
-  const { fetchMyProfile, profile, loading: profileLoading } = useUserProfile();
   const [isLoading, setIsLoading] = useState(true);
   const [redirectPath, setRedirectPath] = useState<ValidRedirectPath | null>(null);
-  
-  // Add a ref to track if we've already tried to fetch data
-  const hasLoadedData = useRef(false);
 
-  // This effect runs only when authentication status changes
+  // Log initial mount
   useEffect(() => {
-    // Skip if still loading auth or if we already handled this auth state
-    if (authLoading || hasLoadedData.current) return;
+    console.log('Index screen mounted');
+    console.log('Platform:', Platform.OS);
+    console.log('API URL:', Constants.expoConfig?.extra?.apiUrl);
+  }, []);
 
+  useEffect(() => {
     async function checkAuthStatus() {
-      // Set flag to prevent duplicate loading
-      hasLoadedData.current = true;
-      
       try {
         // Display API URL for debugging
-        console.log('apiUrl picked up', Constants.expoConfig?.extra?.apiUrl);
-        
-        // Check if user is authenticated
-        if (!isAuthenticated || !user) {
+        console.log('Checking auth status...');
+        console.log('Auth state:', { 
+          isAuthenticated, 
+          user: user ? { id: user.id, role: user.role } : null, 
+          authLoading 
+        });
+
+        // If still loading auth state, don't proceed
+        if (authLoading) {
+          console.log('Auth still loading, waiting...');
+          return;
+        }
+
+        // If not authenticated, redirect to login
+        if (!isAuthenticated) {
+          console.log('Not authenticated, redirecting to login');
+          setRedirectPath('/(auth)/login');
+          setIsLoading(false);
+          return;
+        }
+
+        // If authenticated but no user (shouldn't happen), redirect to login
+        if (!user) {
+          console.log('No user data, redirecting to login');
           setRedirectPath('/(auth)/login');
           setIsLoading(false);
           return;
@@ -48,40 +57,22 @@ export default function Index() {
 
         // Determine which dashboard to show based on user role
         if (user.role === 'SALESMAN') {
+          console.log('Redirecting to salesman dashboard');
           setRedirectPath('/(salesman)/dashboard');
           setIsLoading(false);
           return;
         }
 
         if (user.role === 'SHOP_OWNER') {
-          console.log('Loading profile and shops data...');
-          
-          // Load both profile and shops data in parallel
-          const [profileResult, shopsResult] = await Promise.all([
-            fetchMyProfile(),
-            fetchMyShops()
-          ]);
-          
-          console.log('Data loaded:', {
-            hasProfile: !!profileResult,
-            shopCount: shopsResult?.length || 0
-          });
-          
-          // Determine where to redirect based on loaded data
-          if (!profile) {
-            console.log('No profile found, redirecting to profile setup');
-            setRedirectPath('/(onboarding)/profile-setup');
-          } else if (!shops || shops.length === 0) {
-            console.log('No shops found, redirecting to shop setup');
-            setRedirectPath('/(onboarding)/shop-details');
-          } else {
-            console.log('Profile and shops found, redirecting to dashboard');
-            setRedirectPath('/(tabs)/dashboard');
-          }
-        } else {
-          // Fallback if role is not recognized
-          setRedirectPath('/(auth)/login');
+          console.log('Redirecting to shop owner dashboard');
+          setRedirectPath('/(tabs)/dashboard');
+          setIsLoading(false);
+          return;
         }
+
+        // Fallback if role is not recognized
+        console.log('Unknown role, redirecting to login');
+        setRedirectPath('/(auth)/login');
       } catch (error) {
         console.error('Error checking auth status:', error);
         setRedirectPath('/(auth)/login');
@@ -90,21 +81,11 @@ export default function Index() {
       }
     }
 
-    if (isAuthenticated !== null) {
-      checkAuthStatus();
-    }
-  }, [isAuthenticated, authLoading, user?.role]);
+    checkAuthStatus();
+  }, [isAuthenticated, authLoading, user]);
 
-  // Effect to detect final loading state
-  useEffect(() => {
-    // All loading has finished
-    if (!isLoading && !authLoading && !profileLoading && !shopLoading && !redirectPath) {
-      // As a fallback, if we somehow got here without a redirect path
-      setRedirectPath('/(auth)/login');
-    }
-  }, [isLoading, authLoading, profileLoading, shopLoading, redirectPath]);
-
-  if (isLoading || authLoading || profileLoading || shopLoading) {
+  // Show loading state while checking authentication
+  if (isLoading || authLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -115,9 +96,11 @@ export default function Index() {
 
   // Redirect to the determined path
   if (redirectPath) {
+    console.log('Redirecting to:', redirectPath);
     return <Redirect href={redirectPath} />;
   }
 
   // Fallback redirect if something goes wrong
+  console.log('Fallback redirect to login');
   return <Redirect href="/(auth)/login" />;
 }
