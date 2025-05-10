@@ -776,7 +776,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
                     <View key={idx} style={styles.itemRow}>
                       <Text style={[styles.itemCell, { flex: 2 }]} numberOfLines={2}>{saleItem.product?.productName || 'Unknown'}</Text>
                       <Text style={[styles.itemCell, { flex: 1, textAlign: 'center' }]}>{saleItem.quantity}</Text>
-                      <Text style={[styles.itemCell, { flex: 2, textAlign: 'right' }]}>{formatCurrency(saleItem.product?.sellingPrice*saleItem.quantity)}</Text>
+                      <Text style={[styles.itemCell, { flex: 2, textAlign: 'right' }]}>{formatCurrency(saleItem.product?.sellingPrice)}</Text>
                       <Text style={[styles.itemCell, { flex: 3, textAlign: 'right' }]}>{formatCurrency(saleItem.soldAt/saleItem.quantity)}</Text>
                     </View>
                   ))}
