@@ -135,7 +135,7 @@ export default function ShopsScreen() {
   const handleDeleteShop = (shop: Shop) => {
     Alert.alert(
       'Delete Shop',
-      `Are you sure you want to delete ${shop.shopName}?`,
+      `Are you sure you want to delete ${shop.shopName}? This action cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -143,7 +143,16 @@ export default function ShopsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
+
+              //if there's only one shop, don't delete it
+              if (shops.length === 1) {
+                Alert.alert('Error', 'You cannot delete your last shop, please add a new shop first');
+                return;
+              }
+
               await deleteShop(shop.id);
+              // Refresh the shops list after deletion
+              await fetchMyShops();
               Alert.alert('Success', 'Shop deleted successfully');
             } catch (error) {
               console.error('Error deleting shop:', error);
