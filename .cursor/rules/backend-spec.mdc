@@ -3,16 +3,16 @@ description:
 globs: 
 alwaysApply: true
 ---
-# VendorPro Backend API Technical Specification
+# Khataflow Backend API Technical Specification
 
 
 ## Introduction
 
-This document provides detailed technical specifications for integrating with the VendorPro Backend API. The API follows RESTful principles and uses JSON for request and response payloads.
+This document provides detailed technical specifications for integrating with the Khataflow Backend API. The API follows RESTful principles and uses JSON for request and response payloads.
 
 ### Base URL
 ```
-https://api.vendorpro.com/v1 - prod, not active
+https://api.Khataflow.com/v1 - prod, not active
 http:localhost:3000 - localhost base url, use this
 http://localhost:3000/api/docs-json - swagger json endpoint for api related detail,
 ```
@@ -24,4 +24,4 @@ Content-Type: application/json
 Authorization: Bearer <access_token>
 ```
 
-IMPORTANT : refer [VendorPro.postman_collection.json](mdc:/Users/kumarav1nash/Documents/VendorPro.postman_collection.json) for all the api specification and api related information
+IMPORTANT : refer  for all the api specification and api related information
