@@ -12,7 +12,7 @@ This document provides detailed technical specifications for integrating with th
 
 ### Base URL
 ```
-https://api.Khataflow.com/v1 - prod, not active
+https://api.Khataflow.com/v1 - prod
 http:localhost:3000 - localhost base url, use this
 http://localhost:3000/api/docs-json - swagger json endpoint for api related detail,
 ```
