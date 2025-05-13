@@ -12,10 +12,13 @@ import {
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useShop } from '../../src/contexts/ShopContext';
+import { useUserProfile } from '../../src/contexts/UserProfileContext';
 import { CreateShopDto } from '../../src/types/shop';
+import { CreateUserProfileDto } from '../../src/types/user';
 
 export default function ShopDetailsScreen() {
   const { createShop, isLoading } = useShop();
+  const { createProfile } = useUserProfile();
   const [shopDetails, setShopDetails] = useState<CreateShopDto>({
     shopName: '',
     ownerName: '',
@@ -64,6 +67,27 @@ export default function ShopDetailsScreen() {
     try {
       // Create shop using the API
       const newShop = await createShop(shopDetails);
+      
+      // Create profile from the owner name
+      if (shopDetails.ownerName) {
+        try {
+          // Split owner name into first and last name
+          const nameParts = shopDetails.ownerName.trim().split(' ');
+          const firstName = nameParts[0] || '';
+          const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+          
+          // Create profile with the extracted first and last name
+          await createProfile({
+            firstName,
+            lastName
+          } as CreateUserProfileDto);
+          
+          console.log('Created user profile from shop owner name');
+        } catch (profileError) {
+          // Don't block the flow if profile creation fails
+          console.error('Failed to create profile:', profileError);
+        }
+      }
       
       // Navigate to setup options
       router.push('/(onboarding)/setup-options');
