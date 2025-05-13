@@ -29,84 +29,120 @@ interface KPICard {
 
 export default function DashboardScreen() {
   const { user } = useUser();
-  const { profile, fetchMyProfile } = useUserProfile();
-  const { shops, fetchMyShops, getShopSalesmen } = useShop();
+  const { shops, isLoading: shopsLoading, fetchMyShops, getShopSalesmen } = useShop();
   const { inventories, fetchInventoryByShopId } = useInventory();
   const { sales, fetchAllSales } = useSales();
+  const { profile, fetchMyProfile } = useUserProfile();
 
-  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [kpiData, setKpiData] = useState<KPICard[]>([]);
   const [salesmen, setSalesmen] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [shopDropdownVisible, setShopDropdownVisible] = useState(false);
+  const [shopDataLoading, setShopDataLoading] = useState(false);
   
+  // Track if data has been fetched at least once
+  const initialDataFetched = useRef(false);
   // Track last loaded shop for shop data
   const lastLoadedShopId = useRef<string | null>(null);
-  // Track if we've already fetched profile/shops
-  const hasFetchedInitial = useRef(false);
   
-  // On mount: check onboarding and load initial data if needed
+  // Trigger initial data fetching on mount
   useEffect(() => {
-    if (hasFetchedInitial.current) return;
-    hasFetchedInitial.current = true;
-    (async () => {
-      setIsLoading(true);
-      setError(null);
+    if (initialDataFetched.current) return;
+    
+    const loadInitialData = async () => {
+      console.log('Initial data loading started');
+      
       try {
-        let userProfile = profile;
-        if (!userProfile) userProfile = await fetchMyProfile();
-        if (!userProfile) {
-          router.replace('/(onboarding)/profile-setup');
-          return;
-        }
-        let myShops = shops;
-        if (!myShops || myShops.length === 0) myShops = await fetchMyShops();
-        if (!myShops || myShops.length === 0) {
-          router.replace('/(onboarding)/shop-details');
-          return;
-        }
-        setSelectedShop(myShops[0]);
-      } catch (e: any) {
-        setError(e.message || 'Error loading dashboard');
-      } finally {
-        setIsLoading(false);
+        // Always fetch fresh data on first load
+        const shopsData = await fetchMyShops();
+        // Also fetch user profile
+        await fetchMyProfile();
+        
+        console.log('Initial data loaded:', {
+          shopsCount: shopsData?.length || 0
+        });
+        
+        initialDataFetched.current = true;
+      } catch (err) {
+        console.error('Error during initial data loading:', err);
       }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    };
+    
+    loadInitialData();
+  }, [fetchMyShops, fetchMyProfile]);
+  
+  // Handle redirections when profile or shops data changes
+  useEffect(() => {
+    // Skip if still loading from contexts
+    if (shopsLoading) return;
+    
+    // Skip if we haven't attempted to fetch data yet
+    if (!initialDataFetched.current) return;
+    
+    console.log('Checking onboarding requirements:', {
+      shopsCount: shops?.length || 0
+    });
+    
+    
+    if (!shops || shops.length === 0) {
+      console.log('No shops found, redirecting to shop setup');
+      router.replace('/(onboarding)/shop-details');
+      return;
+    }
+    
+    // If we have both profile and shops, select the first shop
+    if (!selectedShop && shops.length > 0) {
+      setSelectedShop(shops[0]);
+    }
+  }, [shops, shopsLoading, selectedShop]);
 
   // When selectedShop changes, load its data if not already loaded
   useEffect(() => {
     if (!selectedShop) return;
+    if (shopsLoading) return;
     if (lastLoadedShopId.current === selectedShop.id) return;
+    
     lastLoadedShopId.current = selectedShop.id;
-    (async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const [_, __, salesmenList] = await Promise.all([
-          fetchInventoryByShopId(selectedShop.id),
-          fetchAllSales({ shopId: selectedShop.id }),
-          getShopSalesmen(selectedShop.id),
-        ]);
-        setSalesmen(salesmenList || []);
-      } catch (e: any) {
-        setError(e.message || 'Error loading shop data');
-      } finally {
-        setIsLoading(false);
-      }
-    })();
-  }, [selectedShop, fetchInventoryByShopId, fetchAllSales, getShopSalesmen]);
+    setShopDataLoading(true);
+    setError(null);
+    
+    Promise.all([
+      fetchInventoryByShopId(selectedShop.id),
+      fetchAllSales({ shopId: selectedShop.id }),
+      getShopSalesmen(selectedShop.id)
+    ])
+    .then(([_, __, salesmenList]) => {
+      setSalesmen(salesmenList || []);
+    })
+    .catch(e => {
+      setError(e.message || 'Error loading shop data');
+      console.error('Error loading shop data:', e);
+    })
+    .finally(() => {
+      setShopDataLoading(false);
+    });
+  }, [selectedShop, fetchInventoryByShopId, fetchAllSales, getShopSalesmen, shopsLoading]);
 
   // Update KPIs when data changes
   useEffect(() => {
-    if (isLoading || !selectedShop) return;
+    if (shopDataLoading || !selectedShop) return;
     updateKPIData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, inventories, sales, salesmen, selectedShop]);
+  }, [shopDataLoading, inventories, sales, salesmen, selectedShop]);
 
+  // Debug log of current state
+  useEffect(() => {
+    console.log('Dashboard state:', {
+      shops: shops?.length,
+      shopsLoading,
+      shopDataLoading,
+      initialDataFetched: initialDataFetched.current,
+      selectedShopId: selectedShop?.id
+    });
+  }, [shops, shopsLoading, shopDataLoading, selectedShop]);
+  
   const updateKPIData = () => {
     if (!selectedShop) return;
     const totalProducts = inventories?.length || 0;
@@ -180,6 +216,9 @@ export default function DashboardScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
+      // Force reload contexts
+      await fetchMyShops();
+      
       if (selectedShop) {
         lastLoadedShopId.current = null; // force reload
         await Promise.all([
@@ -208,6 +247,9 @@ export default function DashboardScreen() {
     setSelectedShop(shop);
   };
   
+  // Show loading when any context is loading or we're loading shop data
+  const isLoading = shopsLoading || shopDataLoading;
+  
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -226,9 +268,8 @@ export default function DashboardScreen() {
   }
 
   // Greeting logic: prefer profile, then user, then fallback
-  const greetingName = profile
-    ? `${profile.firstName} ${profile.lastName}`
-    : user?.email || 'Shop Owner';
+  console.log('Profile:', profile);
+  const greetingName = profile?.firstName || profile?.lastName || user?.email || 'Shop Owner';
   
   return (
     <ScrollView

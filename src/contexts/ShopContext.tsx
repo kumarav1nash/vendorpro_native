@@ -54,10 +54,12 @@ export const ShopProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     try {
       const data = await shopService.getMyShops();
+      console.log('Setting shops data in context:', data?.length);
       setShops(data);
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch my shops');
+      return [];
     } finally {
       setIsLoading(false);
     }

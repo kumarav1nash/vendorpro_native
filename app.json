@@ -49,8 +49,8 @@
       "typedRoutes": true
     },
     "extra": {
-      "env": "prod",
-      "apiUrl": "https://api.khataflow.com/"
+      "env": "dev",
+      "apiUrl": "https://qa.api.khataflow.com/"
     }
   }
 }

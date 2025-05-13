@@ -55,6 +55,7 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     clearError();
     try {
       const data = await getMyUserProfile();
+      console.log('Setting profile data in context:', !!data);
       setProfile(data);
       return data;
     } catch (err) {
