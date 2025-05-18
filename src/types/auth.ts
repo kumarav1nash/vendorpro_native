@@ -2,16 +2,19 @@ import { User } from "./user";
 
 export interface RequestOtpDto {
   phoneNumber: string;
+  countryCode?: string;
 }
 
 export interface VerifyOtpDto {
   phoneNumber: string;
   otp: string;
+  countryCode?: string;
 }
 
 export interface LoginDto {
   phoneNumber: string;
   password: string;
+  countryCode?: string;
 }
 
 export interface AuthResponse {

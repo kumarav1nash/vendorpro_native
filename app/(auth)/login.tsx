@@ -8,10 +8,14 @@ import {
   StyleSheet,
   Image,
   Alert,
+  Modal,
+  FlatList,
+  SafeAreaView,
 } from 'react-native';
 import { router, Link } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
+import countryCodes from '../../src/data/countryCodes.json';
 
 export default function LoginScreen() {
   const { requestOtp, verifyOtp, error: authError, isLoading } = useAuth();
@@ -20,6 +24,8 @@ export default function LoginScreen() {
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [timer, setTimer] = useState(0);
+  const [selectedCountry, setSelectedCountry] = useState(countryCodes.find(c => c.isoCode === 'IN') || countryCodes[0]);
+  const [isCountryPickerVisible, setCountryPickerVisible] = useState(false);
 
   useEffect(() => {
     if (timer > 0) {
@@ -42,7 +48,10 @@ export default function LoginScreen() {
       return;
     }
     try {
-      await requestOtp({ phoneNumber: mobile });
+      await requestOtp({ 
+        phoneNumber: mobile,
+        countryCode: selectedCountry.countryCode 
+      });
       setError('');
       setStep(2);
       setTimer(30); // Start 30-second timer for resend
@@ -54,7 +63,10 @@ export default function LoginScreen() {
   const handleResendOTP = async () => {
     if (timer > 0) return;
     try {
-      await requestOtp({ phoneNumber: mobile });
+      await requestOtp({ 
+        phoneNumber: mobile,
+        countryCode: selectedCountry.countryCode 
+      });
       setTimer(30); // Restart timer
       setError('');
     } catch (err) {
@@ -68,7 +80,11 @@ export default function LoginScreen() {
       return;
     }
     try {
-      await verifyOtp({ phoneNumber: mobile, otp });
+      await verifyOtp({ 
+        phoneNumber: mobile, 
+        otp,
+        countryCode: selectedCountry.countryCode
+      });
       router.replace('/');
     } catch (err) {
       setError(authError || 'Invalid OTP. Please try again.');
@@ -78,6 +94,25 @@ export default function LoginScreen() {
   const goToSalesmanLogin = () => {
     router.push('/(auth)/salesman-login');
   };
+
+  const toggleCountryPicker = () => {
+    setCountryPickerVisible(!isCountryPickerVisible);
+  };
+
+  const handleSelectCountry = (country: typeof countryCodes[0]) => {
+    setSelectedCountry(country);
+    setCountryPickerVisible(false);
+  };
+
+  const renderCountryItem = ({ item }: { item: typeof countryCodes[0] }) => (
+    <TouchableOpacity 
+      style={styles.countryItem} 
+      onPress={() => handleSelectCountry(item)}
+    >
+      <Text style={styles.countryName}>{item.country}</Text>
+      <Text style={styles.countryCode}>+{item.countryCode}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={styles.container}>
@@ -92,17 +127,21 @@ export default function LoginScreen() {
         <View style={styles.form}>
           <Text style={styles.label}>Enter your mobile number</Text>
           <View style={styles.inputRow}>
-            <View style={styles.countryCodeBox}>
-              <Text style={styles.countryCodeText}>+91</Text>
-            </View>
-          <TextInput
+            <TouchableOpacity 
+              style={styles.countryCodeBox}
+              onPress={toggleCountryPicker}
+            >
+              <Text style={styles.countryCodeText}>+{selectedCountry.countryCode}</Text>
+              <MaterialCommunityIcons name="chevron-down" size={16} color="#333" />
+            </TouchableOpacity>
+            <TextInput
               style={[styles.input, { flex: 1 }]}
-            placeholder="10-digit mobile number"
-            value={mobile}
-            onChangeText={setMobile}
-            keyboardType="numeric"
-            maxLength={10}
-          />
+              placeholder="10-digit mobile number"
+              value={mobile}
+              onChangeText={setMobile}
+              keyboardType="numeric"
+              maxLength={10}
+            />
           </View>
           <TouchableOpacity
             style={styles.button}
@@ -118,7 +157,7 @@ export default function LoginScreen() {
         </View>
       ) : (
         <View style={styles.form}>
-          <Text style={styles.subtitle}>Enter OTP sent to {mobile}</Text>
+          <Text style={styles.subtitle}>Enter OTP sent to +{selectedCountry.countryCode} {mobile}</Text>
           <TextInput
             style={styles.input}
             placeholder="Enter 6-digit OTP"
@@ -164,6 +203,31 @@ export default function LoginScreen() {
         <MaterialCommunityIcons name="account-tie" size={20} color="#fff" style={styles.salesmanIcon} />
         <Text style={styles.salesmanLoginText}>Salesman Login</Text>
       </TouchableOpacity>
+
+      <Modal
+        visible={isCountryPickerVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Country</Text>
+              <TouchableOpacity onPress={toggleCountryPicker}>
+                <MaterialCommunityIcons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={countryCodes}
+              renderItem={renderCountryItem}
+              keyExtractor={(item) => item.isoCode}
+              initialNumToRender={15}
+              maxToRenderPerBatch={20}
+              windowSize={10}
+            />
+          </View>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -214,6 +278,8 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   countryCodeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 15,
     paddingHorizontal: 12,
     backgroundColor: '#f0f0f0',
@@ -227,6 +293,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
+    marginRight: 4,
   },
   input: {
     borderWidth: 1,
@@ -236,8 +303,6 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     fontSize: 16,
     backgroundColor: '#f8f8f8',
-    borderTopLeftRadius: 0,
-    borderBottomLeftRadius: 0,
   },
   button: {
     backgroundColor: '#007AFF',
@@ -298,5 +363,42 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  countryName: {
+    fontSize: 16,
+  },
+  countryCode: {
+    fontSize: 16,
+    color: '#666',
   },
 }); 
