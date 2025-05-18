@@ -3,19 +3,19 @@ import apiClient from './api-client';
 import { AuthResponse, LoginDto, OtpResponse, RequestOtpDto, VerifyOtpDto, RefreshTokenDto, RefreshTokenResponse, LogoutDto } from '../types/auth';
 
 // Helper to ensure phone number has +91 country code
-function normalizePhoneNumber(phoneNumber: string): string {
-  return phoneNumber.startsWith('+91') ? phoneNumber : `+91${phoneNumber}`;
+function normalizePhoneNumber(data: RequestOtpDto): string {
+  return data.phoneNumber.startsWith('+') ? data.phoneNumber : `+${data.countryCode}${data.phoneNumber}`;
 }
 
 export const authService = {
   requestOtp: async (data: RequestOtpDto): Promise<OtpResponse> => {
-    data.phoneNumber = normalizePhoneNumber(data.phoneNumber);
+    data.phoneNumber = normalizePhoneNumber(data);
     const response = await apiClient.post<OtpResponse>('auth/request-otp', data);
     return response.data;
   },
 
   verifyOtp: async (data: VerifyOtpDto): Promise<AuthResponse> => {
-    data.phoneNumber = normalizePhoneNumber(data.phoneNumber);
+    data.phoneNumber = normalizePhoneNumber(data);
     const response = await apiClient.post<AuthResponse>('auth/verify-otp', data);
     
     // Store tokens in secure storage
@@ -30,7 +30,7 @@ export const authService = {
   },
 
   login: async (data: LoginDto): Promise<AuthResponse> => {
-    data.phoneNumber = normalizePhoneNumber(data.phoneNumber);
+    data.phoneNumber = normalizePhoneNumber(data);
     const response = await apiClient.post<AuthResponse>('auth/login', data);
     
     // Store tokens in secure storage

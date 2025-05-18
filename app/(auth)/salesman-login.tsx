@@ -10,11 +10,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Modal,
+  FlatList,
+  SafeAreaView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/AuthContext';
 import * as SecureStore from 'expo-secure-store';
+import countryCodes from '../../src/data/countryCodes.json';
 
 export default function SalesmanLoginScreen() {
   const { login, isLoading } = useAuth();
@@ -23,6 +27,8 @@ export default function SalesmanLoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState(countryCodes.find(c => c.isoCode === 'IN') || countryCodes[0]);
+  const [isCountryPickerVisible, setCountryPickerVisible] = useState(false);
 
   const handleLogin = async () => {
     if (!mobile.trim() || !password.trim()) {
@@ -32,7 +38,11 @@ export default function SalesmanLoginScreen() {
     setLoading(true);
     setError('');
     try {
-      await login({ phoneNumber: mobile, password });
+      await login({ 
+        phoneNumber: mobile, 
+        password,
+        countryCode: selectedCountry.countryCode
+      });
       await SecureStore.setItemAsync('salesmanAuthenticated', 'true');
       router.replace('/');
     } catch (err) {
@@ -41,6 +51,25 @@ export default function SalesmanLoginScreen() {
       setLoading(false);
     }
   };
+
+  const toggleCountryPicker = () => {
+    setCountryPickerVisible(!isCountryPickerVisible);
+  };
+
+  const handleSelectCountry = (country: typeof countryCodes[0]) => {
+    setSelectedCountry(country);
+    setCountryPickerVisible(false);
+  };
+
+  const renderCountryItem = ({ item }: { item: typeof countryCodes[0] }) => (
+    <TouchableOpacity 
+      style={styles.countryItem} 
+      onPress={() => handleSelectCountry(item)}
+    >
+      <Text style={styles.countryName}>{item.country}</Text>
+      <Text style={styles.countryCode}>+{item.countryCode}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <KeyboardAvoidingView 
@@ -57,9 +86,13 @@ export default function SalesmanLoginScreen() {
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         
         <View style={styles.inputRow}>
-          <View style={styles.countryCodeBox}>
-            <Text style={styles.countryCodeText}>+91</Text>
-          </View>
+          <TouchableOpacity 
+            style={styles.countryCodeBox}
+            onPress={toggleCountryPicker}
+          >
+            <Text style={styles.countryCodeText}>+{selectedCountry.countryCode}</Text>
+            <MaterialCommunityIcons name="chevron-down" size={16} color="#333" />
+          </TouchableOpacity>
           <TextInput
             style={[styles.input, { flex: 1 }]}
             placeholder="10-digit mobile number"
@@ -112,6 +145,31 @@ export default function SalesmanLoginScreen() {
           <Text style={styles.backButtonText}>Back to Owner Login</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={isCountryPickerVisible}
+        animationType="slide"
+        transparent={true}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Country</Text>
+              <TouchableOpacity onPress={toggleCountryPicker}>
+                <MaterialCommunityIcons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={countryCodes}
+              renderItem={renderCountryItem}
+              keyExtractor={(item) => item.isoCode}
+              initialNumToRender={15}
+              maxToRenderPerBatch={20}
+              windowSize={10}
+            />
+          </View>
+        </SafeAreaView>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -158,6 +216,8 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   countryCodeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 15,
     paddingHorizontal: 12,
     backgroundColor: '#f0f0f0',
@@ -171,6 +231,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     fontWeight: '500',
+    marginRight: 4,
   },
   input: {
     flex: 1,
@@ -179,8 +240,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     borderRadius: 8,
     backgroundColor: '#f8f8f8',
-    borderTopLeftRadius: 0,
-    borderBottomLeftRadius: 0,
     padding: 15,
   },
   inputContainer: {
@@ -218,5 +277,42 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: '#007AFF',
     fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  countryName: {
+    fontSize: 16,
+  },
+  countryCode: {
+    fontSize: 16,
+    color: '#666',
   },
 });
