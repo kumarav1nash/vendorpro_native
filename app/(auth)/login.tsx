@@ -43,8 +43,8 @@ export default function LoginScreen() {
   };
 
   const handleSendOTP = async () => {
-    if (!mobile.trim() || mobile.length !== 10) {
-      setError('Please enter a valid 10-digit mobile number');
+    if (!mobile.trim()) {
+      setError('Please enter a valid mobile number');
       return;
     }
     try {
@@ -136,11 +136,11 @@ export default function LoginScreen() {
             </TouchableOpacity>
             <TextInput
               style={[styles.input, { flex: 1 }]}
-              placeholder="10-digit mobile number"
+              placeholder="Mobile number"
               value={mobile}
               onChangeText={setMobile}
               keyboardType="numeric"
-              maxLength={10}
+              maxLength={15}
             />
           </View>
           <TouchableOpacity
