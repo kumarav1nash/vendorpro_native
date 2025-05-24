@@ -12,13 +12,16 @@ import {
   FlatList,
   SafeAreaView,
 } from 'react-native';
-import { router, Link } from 'expo-router';
+import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useAuth } from '../../src/contexts/AuthContext';
+import { useSignIn, useAuth } from '@clerk/clerk-expo';
+import { makeRedirectUri } from 'expo-auth-session';
 import countryCodes from '../../src/data/countryCodes.json';
+import { authService } from '../../src/services/auth.service';
 
 export default function LoginScreen() {
-  const { requestOtp, verifyOtp, error: authError, isLoading } = useAuth();
+  const { getToken } = useAuth();
+  const signInObj = useSignIn();
   const [step, setStep] = useState(1);
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
@@ -26,7 +29,10 @@ export default function LoginScreen() {
   const [timer, setTimer] = useState(0);
   const [selectedCountry, setSelectedCountry] = useState(countryCodes.find(c => c.isoCode === 'IN') || countryCodes[0]);
   const [isCountryPickerVisible, setCountryPickerVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
+
+console.log('OAuth Redirect URI:', makeRedirectUri());
   useEffect(() => {
     if (timer > 0) {
       const interval = setInterval(() => {
@@ -42,52 +48,105 @@ export default function LoginScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Clerk OTP: Send OTP
   const handleSendOTP = async () => {
     if (!mobile.trim()) {
       setError('Please enter a valid mobile number');
       return;
     }
+    if (!signInObj.isLoaded) return;
+    setIsLoading(true);
+    setError('');
     try {
-      await requestOtp({ 
-        phoneNumber: mobile,
-        countryCode: selectedCountry.countryCode 
-      });
+      // Always use E.164 format for Clerk
+      const fullPhone = `+${selectedCountry.countryCode}${mobile}`;
+      await signInObj.signIn.create({ identifier: fullPhone, strategy: 'phone_code' });
+      await signInObj.signIn.prepareFirstFactor({ strategy: 'phone_code', phoneNumberId: fullPhone });
       setError('');
       setStep(2);
-      setTimer(30); // Start 30-second timer for resend
-    } catch (err) {
-      setError(authError || 'Failed to send OTP. Please try again.');
+      setTimer(30);
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || 'Failed to send OTP.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  // Clerk OTP: Resend OTP
   const handleResendOTP = async () => {
-    if (timer > 0) return;
+    if (timer > 0 || !signInObj.isLoaded) return;
+    setIsLoading(true);
+    setError('');
     try {
-      await requestOtp({ 
-        phoneNumber: mobile,
-        countryCode: selectedCountry.countryCode 
-      });
-      setTimer(30); // Restart timer
+      const fullPhone = `+${selectedCountry.countryCode}${mobile}`;
+      await signInObj.signIn.prepareFirstFactor({ strategy: 'phone_code', phoneNumberId: fullPhone });
+      setTimer(30);
       setError('');
-    } catch (err) {
-      setError(authError || 'Failed to resend OTP. Please try again.');
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || 'Failed to resend OTP.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  // Clerk OTP: Verify OTP
   const handleVerifyOTP = async () => {
     if (!otp.trim() || otp.length !== 6) {
       setError('Please enter a valid 6-digit OTP');
       return;
     }
+    if (!signInObj.isLoaded) return;
+    setIsLoading(true);
+    setError('');
     try {
-      await verifyOtp({ 
-        phoneNumber: mobile, 
-        otp,
-        countryCode: selectedCountry.countryCode
+      const attempt = await signInObj.signIn.attemptFirstFactor({ strategy: 'phone_code', code: otp });
+      if (attempt.status === 'complete') {
+        await signInObj.setActive({ session: attempt.createdSessionId });
+        await handleGenerateToken();
+      } else {
+        setError('OTP verification failed.');
+      }
+    } catch (err: any) {
+      setError(err.errors?.[0]?.message || 'Invalid OTP.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Clerk OAuth: Google/Facebook
+  const handleOAuthSignIn = async (provider: 'oauth_google' | 'oauth_facebook') => {
+    setIsLoading(true);
+    setError('');
+    try {
+      if (!signInObj.isLoaded) {
+        setError('Sign-in is not ready. Please try again in a moment.');
+        return;
+      }
+      const { signIn } = signInObj;
+      if (!signIn) throw new Error('SignIn not loaded');
+      const redirectUrl = makeRedirectUri();
+      await signIn.authenticateWithRedirect({
+        strategy: provider,
+        redirectUrl,
+        redirectUrlComplete: redirectUrl,
       });
+    } catch (err) {
+      console.log('OAuth sign-in failed:', err);
+      setError('OAuth sign-in failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // After Clerk session, call backend to generate tokens
+  const handleGenerateToken = async () => {
+    try {
+      const clerkToken = await getToken();
+      const fullPhone = `+${selectedCountry.countryCode}${mobile}`;
+      await authService.generateToken({ phoneNumber: fullPhone, clerkToken: clerkToken || '' });
       router.replace('/');
     } catch (err) {
-      setError(authError || 'Invalid OTP. Please try again.');
+      setError('Failed to authenticate with backend.');
     }
   };
 
@@ -177,7 +236,6 @@ export default function LoginScreen() {
               <Text style={styles.buttonText}>Verify & Login</Text>
             )}
           </TouchableOpacity>
-          
           <TouchableOpacity
             style={[styles.resendButton, timer > 0 && styles.resendButtonDisabled]}
             onPress={handleResendOTP}
@@ -190,14 +248,20 @@ export default function LoginScreen() {
         </View>
       )}
 
-      {/* <View style={styles.footer}>
-        <Text style={styles.footerText}>New to KhataFlow? </Text>
-        <Link href="/register" asChild>
-          <TouchableOpacity>
-            <Text style={styles.registerLink}>Register here</Text>
-          </TouchableOpacity>
-        </Link>
-      </View> */}
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: '#DB4437' }]}
+        onPress={() => handleOAuthSignIn('oauth_google')}
+        disabled={!signInObj.isLoaded || isLoading}
+      >
+        <Text style={styles.buttonText}>Sign in with Google</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: '#4267B2' }]}
+        onPress={() => handleOAuthSignIn('oauth_facebook')}
+        disabled={!signInObj.isLoaded || isLoading}
+      >
+        <Text style={styles.buttonText}>Sign in with Facebook</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.salesmanLoginButton} onPress={goToSalesmanLogin}>
         <MaterialCommunityIcons name="account-tie" size={20} color="#fff" style={styles.salesmanIcon} />
@@ -309,6 +373,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
+    marginTop: 15,
   },
   buttonText: {
     color: '#fff',

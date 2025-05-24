@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import apiClient from './api-client';
-import { AuthResponse, LoginDto, OtpResponse, RequestOtpDto, VerifyOtpDto, RefreshTokenDto, RefreshTokenResponse, LogoutDto } from '../types/auth';
+import { AuthResponse, LoginDto, OtpResponse, RequestOtpDto, VerifyOtpDto, RefreshTokenDto, RefreshTokenResponse, LogoutDto, GenerateTokenDto } from '../types/auth';
 
 // Helper to ensure phone number has +91 country code
 function normalizePhoneNumber(data: RequestOtpDto): string {
@@ -26,6 +26,18 @@ export const authService = {
       await SecureStore.setItemAsync('refreshToken', response.data.refreshToken);
     }
     
+    return response.data;
+  },
+
+  generateToken: async (data: GenerateTokenDto): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('auth/generate-token', data);
+    // Store tokens in secure storage
+    if (response.data.accessToken) {
+      await SecureStore.setItemAsync('accessToken', response.data.accessToken);
+    }
+    if (response.data.refreshToken) {
+      await SecureStore.setItemAsync('refreshToken', response.data.refreshToken);
+    }
     return response.data;
   },
 

@@ -24,7 +24,8 @@
         "android.permission.ACCESS_WIFI_STATE",
         "android.permission.READ_PHONE_STATE",
         "android.permission.READ_PHONE_NUMBERS"
-      ]    },
+      ]
+    },
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -43,14 +44,16 @@
       ],
       "expo-font",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "env": "prod",
-      "apiUrl": "https://api.khataflow.com/"
+      "apiUrl": "https://api.khataflow.com/",
+      "clerkPublishableKey": "pk_test_aG9uZXN0LXBob2VuaXgtOTUuY2xlcmsuYWNjb3VudHMuZGV2JA"
     }
   }
 }

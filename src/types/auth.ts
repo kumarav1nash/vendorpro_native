@@ -28,6 +28,12 @@ export interface OtpResponse {
   phoneNumber: string;
 }
 
+export interface GenerateTokenDto {
+  email?: string;
+  phoneNumber?: string;
+  clerkToken: string;
+}
+
 export interface RefreshTokenDto {
   refreshToken: string;
 }
