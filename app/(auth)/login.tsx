@@ -11,6 +11,9 @@ import {
   Modal,
   FlatList,
   SafeAreaView,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { router, Link } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -115,133 +118,155 @@ export default function LoginScreen() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.logoContainer}>
-        <Text style={styles.logoText}>KhataFlow</Text>
-        <Text style={styles.tagline}>Manage your business efficiently</Text>
-      </View>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      {step === 1 ? (
-        <View style={styles.form}>
-          <Text style={styles.label}>Enter your mobile number</Text>
-          <View style={styles.inputRow}>
-            <TouchableOpacity 
-              style={styles.countryCodeBox}
-              onPress={toggleCountryPicker}
-            >
-              <Text style={styles.countryCodeText}>+{selectedCountry.countryCode}</Text>
-              <MaterialCommunityIcons name="chevron-down" size={16} color="#333" />
-            </TouchableOpacity>
-            <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Mobile number"
-              value={mobile}
-              onChangeText={setMobile}
-              keyboardType="numeric"
-              maxLength={15}
-            />
-          </View>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleSendOTP}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Send OTP</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.form}>
-          <Text style={styles.subtitle}>Enter OTP sent to +{selectedCountry.countryCode} {mobile}</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter 6-digit OTP"
-            value={otp}
-            onChangeText={setOtp}
-            keyboardType="numeric"
-            maxLength={6}
-          />
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleVerifyOTP}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Verify & Login</Text>
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.resendButton, timer > 0 && styles.resendButtonDisabled]}
-            onPress={handleResendOTP}
-            disabled={timer > 0 || isLoading}
-          >
-            <Text style={[styles.resendText, timer > 0 && styles.resendTextDisabled]}>
-              {timer > 0 ? `Resend OTP in ${formatTime(timer)}` : 'Resend OTP'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* <View style={styles.footer}>
-        <Text style={styles.footerText}>New to KhataFlow? </Text>
-        <Link href="/register" asChild>
-          <TouchableOpacity>
-            <Text style={styles.registerLink}>Register here</Text>
-          </TouchableOpacity>
-        </Link>
-      </View> */}
-
-      <TouchableOpacity style={styles.salesmanLoginButton} onPress={goToSalesmanLogin}>
-        <MaterialCommunityIcons name="account-tie" size={20} color="#fff" style={styles.salesmanIcon} />
-        <Text style={styles.salesmanLoginText}>Salesman Login</Text>
-      </TouchableOpacity>
-
-      <Modal
-        visible={isCountryPickerVisible}
-        animationType="slide"
-        transparent={true}
-      >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Country</Text>
-              <TouchableOpacity onPress={toggleCountryPicker}>
-                <MaterialCommunityIcons name="close" size={24} color="#333" />
-              </TouchableOpacity>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={{ flex: 1 }}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.container}>
+          <View style={styles.topSection}>
+            <View style={styles.logoContainer}>
+              <Text style={styles.logoText}>KhataFlow</Text>
+              <Text style={styles.tagline}>Manage your business efficiently</Text>
             </View>
-            <FlatList
-              data={countryCodes}
-              renderItem={renderCountryItem}
-              keyExtractor={(item) => item.isoCode}
-              initialNumToRender={15}
-              maxToRenderPerBatch={20}
-              windowSize={10}
+            <Image
+              source={require('../../assets/images/manage-shop-bro.png')}
+              style={styles.illustrationImage}
+              resizeMode="contain"
             />
           </View>
-        </SafeAreaView>
-      </Modal>
-    </View>
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <View style={styles.formContainer}>
+            {step === 1 ? (
+              <View style={styles.form}>
+                <Text style={styles.formTitle}>Login to your account</Text>
+                <Text style={styles.label}>Enter your mobile number</Text>
+                <View style={styles.inputRow}>
+                  <TouchableOpacity 
+                    style={styles.countryCodeBox}
+                    onPress={toggleCountryPicker}
+                  >
+                    <Text style={styles.countryCodeText}>+{selectedCountry.countryCode}</Text>
+                    <MaterialCommunityIcons name="chevron-down" size={16} color="#333" />
+                  </TouchableOpacity>
+                  <TextInput
+                    style={[styles.input, { 
+                      flex: 1,
+                      borderTopLeftRadius: 0,
+                      borderBottomLeftRadius: 0,
+                      borderLeftWidth: 0,
+                      marginBottom: 0
+                    }]}
+                    placeholder="Mobile number"
+                    value={mobile}
+                    onChangeText={setMobile}
+                    keyboardType="numeric"
+                    maxLength={15}
+                  />
+                </View>
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={handleSendOTP}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Send OTP</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.form}>
+                <Text style={styles.formTitle}>Verify OTP</Text>
+                <Text style={styles.subtitle}>Enter OTP sent to +{selectedCountry.countryCode} {mobile}</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter 6-digit OTP"
+                  value={otp}
+                  onChangeText={setOtp}
+                  keyboardType="numeric"
+                  maxLength={6}
+                />
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={handleVerifyOTP}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.buttonText}>Verify & Login</Text>
+                  )}
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.resendButton, timer > 0 && styles.resendButtonDisabled]}
+                  onPress={handleResendOTP}
+                  disabled={timer > 0 || isLoading}
+                >
+                  <Text style={[styles.resendText, timer > 0 && styles.resendTextDisabled]}>
+                    {timer > 0 ? `Resend OTP in ${formatTime(timer)}` : 'Resend OTP'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity style={styles.salesmanLoginButton} onPress={goToSalesmanLogin}>
+            <MaterialCommunityIcons name="account-tie" size={20} color="#fff" style={styles.salesmanIcon} />
+            <Text style={styles.salesmanLoginText}>Salesman Login</Text>
+          </TouchableOpacity>
+
+          <Modal
+            visible={isCountryPickerVisible}
+            animationType="slide"
+            transparent={true}
+          >
+            <SafeAreaView style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Select Country</Text>
+                  <TouchableOpacity onPress={toggleCountryPicker}>
+                    <MaterialCommunityIcons name="close" size={24} color="#333" />
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={countryCodes}
+                  renderItem={renderCountryItem}
+                  keyExtractor={(item) => item.isoCode}
+                  initialNumToRender={15}
+                  maxToRenderPerBatch={20}
+                  windowSize={10}
+                />
+              </View>
+            </SafeAreaView>
+          </Modal>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContainer: {
+    flexGrow: 1,
+  },
   container: {
     flex: 1,
     padding: 20,
     backgroundColor: '#fff',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+  },
+  topSection: {
+    alignItems: 'center',
+    marginTop: 20,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 50,
+    marginBottom: 20,
   },
   logoText: {
     fontSize: 32,
@@ -253,15 +278,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 30,
-    textAlign: 'center',
+  illustrationImage: {
+    width: '100%',
+    height: 200,
+    marginVertical: 20,
   },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 20,
+  formContainer: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginVertical: 20,
+  },
+  formTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
     textAlign: 'center',
   },
   form: {
@@ -276,18 +314,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 15,
+    overflow: 'hidden',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   countryCodeBox: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 15,
     paddingHorizontal: 12,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f5f5f5',
     borderTopLeftRadius: 8,
     borderBottomLeftRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRightWidth: 0,
+    height: 54,
+    minWidth: 80,
   },
   countryCodeText: {
     fontSize: 16,
@@ -300,15 +348,33 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     padding: 15,
     borderRadius: 8,
-    marginBottom: 0,
+    marginBottom: 15,
     fontSize: 16,
     backgroundColor: '#f8f8f8',
+    height: 54,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#666',
   },
   button: {
     backgroundColor: '#007AFF',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   buttonText: {
     color: '#fff',
@@ -331,9 +397,13 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   error: {
-    color: 'red',
+    color: '#FF3B30',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    padding: 10,
+    borderRadius: 8,
+    fontSize: 14,
   },
   footer: {
     flexDirection: 'row',
@@ -352,9 +422,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#4CAF50',
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
-    marginTop: 30,
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   salesmanIcon: {
     marginRight: 8,
