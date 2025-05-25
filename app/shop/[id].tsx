@@ -32,7 +32,7 @@ type TabItem = {
 };
 
 export default function ShopDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, tab } = useLocalSearchParams();
   const router = useRouter();
   const { shops, fetchMyShops, setShops } = useShop();
   
@@ -42,6 +42,13 @@ export default function ShopDetailScreen() {
   
   // Find the shop by ID
   const shop = shops.find(s => s.id === id);
+  
+  // Set active tab based on URL parameter
+  useEffect(() => {
+    if (tab === 'sales' || tab === 'inventory' || tab === 'salesmen') {
+      setActiveTab(tab);
+    }
+  }, [tab]);
   
   useEffect(() => {
     if (shop) {

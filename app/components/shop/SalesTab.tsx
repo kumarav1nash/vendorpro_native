@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Sale, CreateSaleDto, UpdateSaleDto, CreateSaleItemDto } from '../../../src/types/sales';
+import { useLocalSearchParams } from 'expo-router';
 
 import { useInventory } from '../../../src/contexts/InventoryContext';
 import { useSales } from '../../../src/contexts/SalesContext';
@@ -38,6 +39,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
   } = useSales();
   
   const { inventories,fetchInventoryByShopId } = useInventory();
+  const params = useLocalSearchParams();
   
   // Local state
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +50,14 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  
+  // Check for action=createSale parameter
+  useEffect(() => {
+    // Open create sale modal if action parameter is present
+    if (params.action === 'createSale' && !showCreateModal) {
+      handleOpenCreateModal();
+    }
+  }, [params.action]);
   
   // KPI metrics state
   const [metrics, setMetrics] = useState({
@@ -490,7 +500,7 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
   const handleOpenCreateModal = () => {
     // Reset form data
     setSelectedProduct(null);
-    setAddQuantity(1);
+    setAddQuantity(0);
     setAddSoldAt(0);
     
     // Show modal
@@ -526,9 +536,11 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
     setSelectedProduct(product);
     console.log('Selected product:', product);
     
-    // Update the form data with the selected product ID
-    //setAddQuantity(product.stockQuantity);
-    setAddSoldAt(product.sellingPrice);
+    // Set the quantity to 0 initially to avoid the "1" showing up
+    setAddQuantity(0);
+    
+    // Set the initial selling price to 0 - will be updated when user enters quantity
+    setAddSoldAt(0);
     
     console.log('Updated form data with product ID:', product.id);
     setShowProductPickerModal(false);
@@ -537,24 +549,39 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
   // Helper to reset modal state
   const resetCreateModalState = () => {
     setSelectedProduct(null);
-    setAddQuantity(1);
+    setAddQuantity(0);
     setAddSoldAt(0);
     setSaleItems([]);
   };
 
   // Add product to sale items list
   const handleAddProductToSale = () => {
-    if (!selectedProduct) return;
+    if (!selectedProduct) {
+      Alert.alert('No product selected', 'Please select a product first');
+      return;
+    }
+    
     const qty = addQuantity;
     const price = addSoldAt;
-    if (!qty || qty <= 0 || !price || price <= 0) return;
+    
+    if (!qty || qty <= 0) {
+      Alert.alert('Invalid quantity', 'Please enter a valid quantity greater than 0');
+      return;
+    }
+    
+    if (!price || price <= 0) {
+      Alert.alert('Invalid price', 'Please enter a valid selling price greater than 0');
+      return;
+    }
+    
     if (qty > selectedProduct.stockQuantity) {
       Alert.alert('Insufficient stock', `Only ${selectedProduct.stockQuantity} units available`);
       return;
     }
+    
     setSaleItems(prev => [...prev, { product: selectedProduct, quantity: qty, soldAt: price }]);
     setSelectedProduct(null);
-    setAddQuantity(1);
+    setAddQuantity(0);
     setAddSoldAt(0);
   };
 
@@ -986,34 +1013,82 @@ export default function SalesTab({ shopId, shop }: SalesTabProps) {
                   <View style={{ flex: 1, marginRight: 8 }}>
                     <Text style={{ fontSize: 14, color: '#333', marginBottom: 4 }}>Quantity</Text>
                     <TextInput
-                      style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, fontSize: 16, backgroundColor: '#F8FAFC' }}
+                      style={{ 
+                        borderWidth: 1, 
+                        borderColor: selectedProduct && (addQuantity <= 0 || addQuantity > selectedProduct.stockQuantity) 
+                          ? '#FF3B30' 
+                          : '#ddd', 
+                        borderRadius: 8, 
+                        padding: 10, 
+                        fontSize: 16, 
+                        backgroundColor: '#F8FAFC' 
+                      }}
                       keyboardType="numeric"
-                      value={addQuantity.toString()}
-                      onChangeText={text => setAddQuantity(Number(text) || 1)}
+                      value={addQuantity === 0 ? "" : addQuantity.toString()}
+                      onChangeText={text => {
+                        // Only allow numeric values
+                        const cleanedText = text.replace(/[^0-9]/g, '');
+                        
+                        // Convert to number or use 0 if empty
+                        const qty = cleanedText === "" ? 0 : parseInt(cleanedText, 10);
+                        
+                        // Update quantity state
+                        setAddQuantity(qty);
+                        
+                        // Update selling price if product is selected
+                        if (selectedProduct && qty > 0) {
+                          setAddSoldAt(qty * selectedProduct.sellingPrice);
+                        }
+                      }}
+                      placeholder="Enter quantity"
                       editable={!!selectedProduct}
                     />
-            </View>
+                    {selectedProduct && addQuantity > selectedProduct.stockQuantity && (
+                      <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: 4 }}>
+                        Max available: {selectedProduct.stockQuantity}
+                      </Text>
+                    )}
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, color: '#333', marginBottom: 4 }}>Selling Price (₹)</Text>
-              <TextInput
+                    <TextInput
                       style={{ borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, fontSize: 16, backgroundColor: '#F8FAFC' }}
                       keyboardType="numeric"
-                      value={addSoldAt.toString()}
-                      onChangeText={text => setAddSoldAt(Number(text) || 0)}
+                      value={addSoldAt === 0 ? "" : addSoldAt.toString()}
+                      onChangeText={text => {
+                        // Only allow numeric values and decimal point
+                        const cleanedText = text.replace(/[^0-9.]/g, '');
+                        
+                        // Ensure only one decimal point
+                        const parts = cleanedText.split('.');
+                        const formattedText = parts.length > 2 
+                          ? parts[0] + '.' + parts.slice(1).join('')
+                          : cleanedText;
+                        
+                        // Convert to number or use 0 if empty
+                        const price = formattedText === "" ? 0 : parseFloat(formattedText);
+                        
+                        setAddSoldAt(price);
+                      }}
+                      placeholder="Enter price"
                       editable={!!selectedProduct}
                     />
                   </View>
                 </View>
                 <TouchableOpacity
                   style={{
-                    backgroundColor: selectedProduct ? '#007AFF' : '#ccc',
+                    backgroundColor: selectedProduct 
+                      ? (addQuantity > 0 && addQuantity <= selectedProduct.stockQuantity && addSoldAt > 0)
+                        ? '#007AFF'
+                        : '#A1C4FD'
+                      : '#ccc',
                     borderRadius: 8,
                     paddingVertical: 12,
                     alignItems: 'center',
                     marginBottom: 8,
                   }}
                   onPress={handleAddProductToSale}
-                  disabled={!selectedProduct}
+                  disabled={!selectedProduct || addQuantity <= 0 || addQuantity > selectedProduct.stockQuantity || addSoldAt <= 0}
                 >
                   <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Add Product</Text>
                 </TouchableOpacity>

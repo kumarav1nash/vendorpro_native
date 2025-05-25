@@ -247,6 +247,13 @@ export default function DashboardScreen() {
     setSelectedShop(shop);
   };
   
+  const handleQuickSale = () => {
+    if (selectedShop) {
+      // Navigate to shop and open sales tab with param to auto-open create sale modal
+      router.push(`/shop/${selectedShop.id}?tab=sales&action=createSale`);
+    }
+  };
+  
   // Show loading when any context is loading or we're loading shop data
   const isLoading = shopsLoading || shopDataLoading;
   
@@ -272,138 +279,166 @@ export default function DashboardScreen() {
   const greetingName = profile?.firstName || profile?.lastName || user?.email || 'Shop Owner';
   
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello,</Text>
-          <Text style={styles.userName}>{greetingName}</Text>
-        </View>
+    <View style={styles.mainContainer}>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>Hello,</Text>
+            <Text style={styles.userName}>{greetingName}</Text>
+          </View>
 
-        {selectedShop && (
-          <TouchableOpacity 
-            style={styles.currentShopButton}
-            onPress={() => setShopDropdownVisible(true)}
-          >
-            <Text style={styles.currentShopText} numberOfLines={2}>
-              {selectedShop.shopName}
-            </Text>
-            <MaterialCommunityIcons name="chevron-down" size={20} color="#007AFF" />
-          </TouchableOpacity>
-        )}
+          {selectedShop && (
+            <TouchableOpacity 
+              style={styles.currentShopButton}
+              onPress={() => setShopDropdownVisible(true)}
+            >
+              <Text style={styles.currentShopText} numberOfLines={2}>
+                {selectedShop.shopName}
+              </Text>
+              <MaterialCommunityIcons name="chevron-down" size={20} color="#007AFF" />
+            </TouchableOpacity>
+          )}
 
-        {/* Shop Selector Dropdown */}
-        <Modal
-          visible={shopDropdownVisible}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShopDropdownVisible(false)}
-        >
-          <TouchableOpacity 
-            style={styles.modalOverlay} 
-            activeOpacity={1}
-            onPress={() => setShopDropdownVisible(false)}
+          {/* Shop Selector Dropdown */}
+          <Modal
+            visible={shopDropdownVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShopDropdownVisible(false)}
           >
-            <View style={styles.dropdownContainer}>
-              <View style={styles.dropdownHeader}>
-                <Text style={styles.dropdownTitle}>Select Shop</Text>
-                <TouchableOpacity onPress={() => setShopDropdownVisible(false)}>
-                  <MaterialCommunityIcons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
-              
-              <FlatList
-                data={shops}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity 
-                    style={[
-                      styles.shopItem,
-                      selectedShop?.id === item.id && styles.selectedShopItem
-                    ]}
-                    onPress={() => handleShopSelect(item)}
-                  >
-                    <MaterialCommunityIcons 
-                      name="store" 
-                      size={24} 
-                      color={selectedShop?.id === item.id ? "#007AFF" : "#666"} 
-                    />
-                    <Text 
-                      style={[
-                        styles.shopItemText,
-                        selectedShop?.id === item.id && styles.selectedShopItemText
-                      ]}
-                    >
-                      {item.shopName}
-                    </Text>
-                    {selectedShop?.id === item.id && (
-                      <MaterialCommunityIcons name="check" size={24} color="#007AFF" />
-                    )}
+            <TouchableOpacity 
+              style={styles.modalOverlay} 
+              activeOpacity={1}
+              onPress={() => setShopDropdownVisible(false)}
+            >
+              <View style={styles.dropdownContainer}>
+                <View style={styles.dropdownHeader}>
+                  <Text style={styles.dropdownTitle}>Select Shop</Text>
+                  <TouchableOpacity onPress={() => setShopDropdownVisible(false)}>
+                    <MaterialCommunityIcons name="close" size={24} color="#333" />
                   </TouchableOpacity>
-                )}
-              />
+                </View>
+                
+                <FlatList
+                  data={shops}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity 
+                      style={[
+                        styles.shopItem,
+                        selectedShop?.id === item.id && styles.selectedShopItem
+                      ]}
+                      onPress={() => handleShopSelect(item)}
+                    >
+                      <MaterialCommunityIcons 
+                        name="store" 
+                        size={24} 
+                        color={selectedShop?.id === item.id ? "#007AFF" : "#666"} 
+                      />
+                      <Text 
+                        style={[
+                          styles.shopItemText,
+                          selectedShop?.id === item.id && styles.selectedShopItemText
+                        ]}
+                      >
+                        {item.shopName}
+                      </Text>
+                      {selectedShop?.id === item.id && (
+                        <MaterialCommunityIcons name="check" size={24} color="#007AFF" />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                />
+              </View>
+            </TouchableOpacity>
+          </Modal>
+        </View>
+        
+        <View style={styles.kpiContainer}>
+          {kpiData.map((kpi, index) => (
+            <View key={index} style={styles.kpiCard}>
+              <View style={[styles.iconContainer, { backgroundColor: kpi.color }]}>
+                <MaterialCommunityIcons name={kpi.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={18} color="#fff" />
+              </View>
+              <View style={styles.kpiTextContainer}>
+                <Text style={styles.kpiValue} numberOfLines={1}>{kpi.value}</Text>
+                <Text style={styles.kpiTitle} numberOfLines={1}>{kpi.title}</Text>
+              </View>
             </View>
+          ))}
+        </View>
+        
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+        </View>
+        <View style={styles.quickActions}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigateToShop()}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: '#2196F3' }]}>
+              <MaterialCommunityIcons name="store" size={24} color="#fff" />
+            </View>
+            <Text style={styles.actionText}>Manage Shops</Text>
           </TouchableOpacity>
-        </Modal>
-      </View>
-      
-      <View style={styles.kpiContainer}>
-        {kpiData.map((kpi, index) => (
-          <View key={index} style={styles.kpiCard}>
-            <View style={[styles.iconContainer, { backgroundColor: kpi.color }]}>
-              <MaterialCommunityIcons name={kpi.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={18} color="#fff" />
+          {selectedShop && (
+              <TouchableOpacity 
+                style={styles.actionButton}
+              onPress={() => navigateToShop(selectedShop.id)}
+              >
+                <View style={[styles.actionIcon, { backgroundColor: '#4CAF50' }]}>
+                  <MaterialCommunityIcons name="view-dashboard" size={24} color="#fff" />
+                </View>
+                <Text style={styles.actionText}>Shop Dashboard</Text>
+              </TouchableOpacity>
+          )}
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => router.push('/(tabs)/profile')}
+          >
+            <View style={[styles.actionIcon, { backgroundColor: '#9C27B0' }]}>
+              <MaterialCommunityIcons name="account-circle" size={24} color="#fff" />
             </View>
-            <View style={styles.kpiTextContainer}>
-              <Text style={styles.kpiValue} numberOfLines={1}>{kpi.value}</Text>
-              <Text style={styles.kpiTitle} numberOfLines={1}>{kpi.title}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-      
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-      </View>
-      <View style={styles.quickActions}>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => navigateToShop()}
-        >
-          <View style={[styles.actionIcon, { backgroundColor: '#2196F3' }]}>
-            <MaterialCommunityIcons name="store" size={24} color="#fff" />
-          </View>
-          <Text style={styles.actionText}>Manage Shops</Text>
-        </TouchableOpacity>
-        {selectedShop && (
+            <Text style={styles.actionText}>My Profile</Text>
+          </TouchableOpacity>
+          {selectedShop && (
             <TouchableOpacity 
               style={styles.actionButton}
-            onPress={() => navigateToShop(selectedShop.id)}
+              onPress={handleQuickSale}
             >
-              <View style={[styles.actionIcon, { backgroundColor: '#4CAF50' }]}>
-                <MaterialCommunityIcons name="view-dashboard" size={24} color="#fff" />
+              <View style={[styles.actionIcon, { backgroundColor: '#FF9800' }]}>
+                <MaterialCommunityIcons name="point-of-sale" size={24} color="#fff" />
               </View>
-              <Text style={styles.actionText}>Shop Dashboard</Text>
+              <Text style={styles.actionText}>Quick Sale</Text>
             </TouchableOpacity>
-        )}
+          )}
+        </View>
+      </ScrollView>
+      
+      {/* Floating Action Button for Quick Sale */}
+      {selectedShop && (
         <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => router.push('/(tabs)/profile')}
+          style={styles.quickSaleFab}
+          onPress={handleQuickSale}
+          activeOpacity={0.8}
         >
-          <View style={[styles.actionIcon, { backgroundColor: '#9C27B0' }]}>
-            <MaterialCommunityIcons name="account-circle" size={24} color="#fff" />
-          </View>
-          <Text style={styles.actionText}>My Profile</Text>
+          <MaterialCommunityIcons name="point-of-sale" size={26} color="#fff" />
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
@@ -583,5 +618,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#333',
+  },
+  quickSaleFab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FF9800',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
   },
 }); 
